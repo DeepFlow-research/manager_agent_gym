@@ -1,0 +1,16 @@
+services:
+  app:
+    image: deep-research-app
+    env_file:
+      - .env
+    environment:
+      - PORT=8000
+      - INNGEST_BASE_URL=http://inngest:8288
+    ports:
+      - '8000:8000'
+  
+  inngest:
+    image: inngest/inngest:v0.27.0
+    command: 'inngest dev -u http://app:8000/api/inngest'
+    ports:
+      - '8288:8288'
