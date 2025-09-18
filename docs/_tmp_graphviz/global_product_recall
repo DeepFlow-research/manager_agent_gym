@@ -1,0 +1,35 @@
+// Workflow global_product_recall
+digraph {
+	graph [rankdir=LR splines=spline]
+	node [color="#5B8DEF" fillcolor="#E8F1FC" shape=box style="rounded,filled"]
+	edge [color="#8FAADC" penwidth=1.5]
+	"36718be2-af67-40f8-a3fc-cd0a50112231" [label="Crisis Assessment & Safety Evaluation"]
+	"605192a5-408d-44a0-ab1a-4492b9eccb36" [label="Global Regulatory Notification Package"]
+	"f41d8eb7-62b3-4e7e-95f5-8cfb685bfd8a" [label="Consumer Communication Campaign Launch"]
+	"d5ace5e2-c1be-4dbb-9016-e3b310f1a23b" [label="Crisis Management Coordination &…"]
+	"e056b01a-695a-4a56-a258-c1750b5c5cc8" [label="Global Product Retrieval Logistics"]
+	"f37ec75d-0dfb-4ad1-acec-30944f9ee09e" [label="Affected Inventory Management & Quarantine"]
+	"a5240040-23b4-4672-a5b8-ef7c18fa5674" [label="Root Cause Analysis & Technical…"]
+	"80babefb-88d3-46f7-8d78-a8f4a9c70c69" [label="Supplier Quality Improvements & Process…"]
+	"edaf54a8-5168-4e06-bc48-c8f49285f4b3" [label="Regulatory Compliance Documentation &…"]
+	"305b3b53-cdad-44a7-94e0-10dccefd9b88" [label="Legal & Financial Risk Management"]
+	"eadebe6e-fdd2-4ff5-a137-cfdaeb199701" [label="Market Re-entry Strategy & Product…"]
+	"6894361a-ca8d-48ce-b763-91f5a5f3c3c2" [label="Customer Confidence & Brand Reputation…"]
+	"7efa2518-ad12-4cbc-b746-5f1b78a93709" [label="Crisis Program Management & Coordination"]
+	"eaf5a686-97a5-4eae-ace2-0b54a6e258a0" [label="Stakeholder Communication & Relationship…"]
+	"f5b09d2c-2b98-4f65-a612-68a35ffb2ae4" [label="Quality Assurance & Process Oversight"]
+	"36718be2-af67-40f8-a3fc-cd0a50112231" -> "605192a5-408d-44a0-ab1a-4492b9eccb36"
+	"605192a5-408d-44a0-ab1a-4492b9eccb36" -> "f41d8eb7-62b3-4e7e-95f5-8cfb685bfd8a"
+	"f41d8eb7-62b3-4e7e-95f5-8cfb685bfd8a" -> "d5ace5e2-c1be-4dbb-9016-e3b310f1a23b"
+	"d5ace5e2-c1be-4dbb-9016-e3b310f1a23b" -> "e056b01a-695a-4a56-a258-c1750b5c5cc8"
+	"e056b01a-695a-4a56-a258-c1750b5c5cc8" -> "f37ec75d-0dfb-4ad1-acec-30944f9ee09e"
+	"f37ec75d-0dfb-4ad1-acec-30944f9ee09e" -> "a5240040-23b4-4672-a5b8-ef7c18fa5674"
+	"a5240040-23b4-4672-a5b8-ef7c18fa5674" -> "80babefb-88d3-46f7-8d78-a8f4a9c70c69"
+	"80babefb-88d3-46f7-8d78-a8f4a9c70c69" -> "edaf54a8-5168-4e06-bc48-c8f49285f4b3"
+	"edaf54a8-5168-4e06-bc48-c8f49285f4b3" -> "305b3b53-cdad-44a7-94e0-10dccefd9b88"
+	"305b3b53-cdad-44a7-94e0-10dccefd9b88" -> "eadebe6e-fdd2-4ff5-a137-cfdaeb199701"
+	"eadebe6e-fdd2-4ff5-a137-cfdaeb199701" -> "6894361a-ca8d-48ce-b763-91f5a5f3c3c2"
+	"36718be2-af67-40f8-a3fc-cd0a50112231" -> "7efa2518-ad12-4cbc-b746-5f1b78a93709"
+	"36718be2-af67-40f8-a3fc-cd0a50112231" -> "eaf5a686-97a5-4eae-ace2-0b54a6e258a0"
+	"605192a5-408d-44a0-ab1a-4492b9eccb36" -> "f5b09d2c-2b98-4f65-a612-68a35ffb2ae4"
+}

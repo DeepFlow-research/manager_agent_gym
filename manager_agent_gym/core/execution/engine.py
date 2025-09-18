@@ -140,6 +140,10 @@ class WorkflowExecutionEngine:
         self.recent_preference_change: PreferenceChange | None = None
         self.preference_change_total_count: int = 0
 
+        # Track which agents in the workflow were mirrored from the registry.
+        # This lets us safely prune only those, leaving user-added agents intact.
+        self._registry_mirrored_agent_ids: set[str] = set()
+
         # Ensure output directories exist (only if logging is enabled)
         if self.enable_timestep_logging or self.enable_final_metrics_logging:
             self.output_writer.ensure_directories()
@@ -163,7 +167,7 @@ class WorkflowExecutionEngine:
         restorer = WorkflowStateRestorer(snapshot_dir, timestep)
         restorer.load_snapshot_data()
 
-        print(f"🔄 Restoring workflow state from timestep {timestep}")
+        logger.info("Restoring workflow state from timestep %s", timestep)
 
         # Restore all state components
         restorer.restore_workflow_state(self.workflow)
@@ -397,8 +401,6 @@ class WorkflowExecutionEngine:
         tasks_started, tasks_completed, tasks_failed = await self._execute_ready_tasks()
 
         self._update_workflow_state(tasks_completed, tasks_failed)
-
-        # Coordination deadtime metrics moved to operational efficiency evaluator
 
         # Evaluate preferences for this timestep if configured
         did_eval_this_step = False
@@ -792,9 +794,54 @@ class WorkflowExecutionEngine:
             if status_updated:
                 for task in self.workflow.tasks.values():
                     task.sync_embedded_tasks_with_registry(self.workflow.tasks)
+
+            # Normalize composite task states: composites should never be READY/RUNNING
+            for task in self.workflow.tasks.values():
+                try:
+                    if not task.is_atomic_task() and task.status in (
+                        TaskStatus.READY,
+                        TaskStatus.RUNNING,
+                    ):
+                        task.status = TaskStatus.PENDING
+                except Exception:
+                    continue
+
+            # Update derived effective_status for all tasks (including embedded composites)
+            def _leaf_statuses(node: Task) -> list[TaskStatus]:
+                if node.is_atomic_task():
+                    reg = self.workflow.tasks.get(node.id)
+                    return [reg.status if reg is not None else node.status]
+                statuses: list[TaskStatus] = []
+                for leaf in node.get_atomic_subtasks():
+                    reg = self.workflow.tasks.get(leaf.id)
+                    statuses.append(reg.status if reg is not None else leaf.status)
+                return statuses
+
+            def _set_effective_status_recursive(node: Task) -> None:
+                try:
+                    if node.is_atomic_task():
+                        node.effective_status = node.status.value
+                    else:
+                        leaves = _leaf_statuses(node)
+                        if leaves and all(s == TaskStatus.COMPLETED for s in leaves):
+                            node.effective_status = TaskStatus.COMPLETED.value
+                        elif any(s == TaskStatus.RUNNING for s in leaves):
+                            node.effective_status = TaskStatus.RUNNING.value
+                        elif any(s == TaskStatus.READY for s in leaves):
+                            node.effective_status = TaskStatus.READY.value
+                        else:
+                            node.effective_status = TaskStatus.PENDING.value
+                    # Recurse into children so embedded composites get their own value
+                    for child in node.subtasks:
+                        _set_effective_status_recursive(child)
+                except Exception:
+                    node.effective_status = node.status.value
+
+            for root in self.workflow.tasks.values():
+                _set_effective_status_recursive(root)
         except Exception:
             # Non-fatal; composite completion is a quality-of-life enhancement
-            pass
+            logger.error("Composite completion propagation failed", exc_info=True)
 
     def _is_terminal_state(self) -> bool:
         """Check if execution is in a terminal state."""
@@ -941,8 +988,35 @@ class WorkflowExecutionEngine:
 
         # Mirror registry agents into workflow so observations/assignments can see them
         try:
-            for agent in self.agent_registry.list_agents():
+            # 1) Add or update agents that exist in the registry
+            current_registry_agents = {
+                a.agent_id: a for a in self.agent_registry.list_agents()
+            }
+            for agent in current_registry_agents.values():
                 self.workflow.add_agent(agent)
+            # Update mirrored set to current registry snapshot
+            current_registry_ids = set(current_registry_agents.keys())
+
+            # 2) Prune only previously mirrored agents that are no longer in the registry
+            #    Keep the stakeholder agent which is owned by the engine/workflow
+            stakeholder_id = self.stakeholder_agent.agent_id
+            previously_mirrored = set(self._registry_mirrored_agent_ids)
+            to_remove = [
+                agent_id
+                for agent_id in previously_mirrored
+                if agent_id != stakeholder_id
+                and agent_id not in current_registry_ids
+                and agent_id in self.workflow.agents
+            ]
+            for agent_id in to_remove:
+                try:
+                    del self.workflow.agents[agent_id]
+                except Exception:
+                    # Defensive: continue even if an entry cannot be deleted
+                    pass
+
+            # 3) Commit mirrored set to current for next timestep
+            self._registry_mirrored_agent_ids = current_registry_ids
         except Exception:
             logger.error(
                 "failed to sync agent registry into workflow agents", exc_info=True

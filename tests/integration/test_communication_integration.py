@@ -1,171 +1,42 @@
 from __future__ import annotations
 
-import asyncio
-from typing import Any
-from uuid import UUID, uuid4
+from typing import Any, cast
 
 import pytest
 
 from manager_agent_gym.core.communication.service import CommunicationService
 from manager_agent_gym.core.execution.engine import WorkflowExecutionEngine
-from manager_agent_gym.core.manager_agent.interface import ManagerAgent
-from manager_agent_gym.core.workflow_agents.interface import StakeholderBase
 from manager_agent_gym.core.workflow_agents.registry import AgentRegistry
 from manager_agent_gym.schemas.config import OutputConfig
 from manager_agent_gym.schemas.core.communication import (
     MessageGrouping,
     MessageType,
 )
-from manager_agent_gym.schemas.core.resources import Resource
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.workflow_agents.stakeholder import (
-    StakeholderPublicProfile,
-)
-from manager_agent_gym.schemas.execution.manager_actions import (
-    RequestEndWorkflowAction,
-    SendMessageAction,
-)
-from manager_agent_gym.schemas.execution.state import ExecutionState
-from manager_agent_gym.schemas.preferences.preference import (
-    PreferenceChange,
-    PreferenceWeights,
-)
 from manager_agent_gym.schemas.core.communication import ThreadMessagesView
+from manager_agent_gym.schemas.execution.state import ExecutionState
+from manager_agent_gym.schemas.preferences.preference import PreferenceWeights
+from tests.helpers.stubs import (
+    make_empty_workflow,
+    ManagerSendsThenEnd,
+    StakeholderStub,
+)
+
+pytestmark = pytest.mark.integration
 
 
-def _mk_empty_workflow() -> Workflow:
-    return Workflow(
-        name="test_workflow",
-        workflow_goal="validate communication",
-        owner_id=uuid4(),
-        tasks={},
-        resources={},
-        agents={},
-        messages=[],
-    )
+def _mk_empty_workflow():
+    return make_empty_workflow()
 
 
-class _StakeholderStub(StakeholderBase):
-    """Stakeholder stub that replies directly and broadcasts once per timestep."""
-
-    def __init__(self, agent_id: str = "stakeholder_1") -> None:
-        from manager_agent_gym.schemas.workflow_agents.stakeholder import (
-            StakeholderConfig,
-        )
-
-        config = StakeholderConfig(
-            agent_id=agent_id,
-            system_prompt="Stakeholder persona system prompt",
-            name="Stakeholder",
-            role="Owner",
-            model_name="o3",
-            initial_preferences=PreferenceWeights(preferences=[]),
-            agent_description="Stakeholder",
-            agent_capabilities=["Stakeholder"],
-        )
-        super().__init__(config)
-        self._replied_timesteps: set[int] = set()
-
-    async def execute_task(self, task: Task, resources: list[Resource]):
-        from manager_agent_gym.schemas.unified_results import create_task_result
-
-        return create_task_result(
-            task_id=task.id,
-            agent_id=self.agent_id,
-            success=True,
-            execution_time=0.001,
-            resources=[],
-            cost=0.0,
-        )
-
-    async def policy_step(self, current_timestep: int) -> None:
-        if self.communication_service is None:
-            return
-        if current_timestep in self._replied_timesteps:
-            return
-        # Direct reply to manager
-        await self.communication_service.send_direct_message(
-            from_agent=self.agent_id,
-            to_agent="manager_agent",
-            content=f"ack_t{current_timestep}",
-            message_type=MessageType.RESPONSE,
-        )
-        # Broadcast once per timestep as well (should reach all known agents except sender)
-        await self.communication_service.broadcast_message(
-            from_agent=self.agent_id,
-            content=f"broadcast_t{current_timestep}",
-            message_type=MessageType.BROADCAST,
-        )
-        self._replied_timesteps.add(current_timestep)
-
-    def get_preferences_for_timestep(self, timestep: int) -> PreferenceWeights:
-        return PreferenceWeights(preferences=[])
-
-    def apply_preference_change(
-        self,
-        timestep: int,
-        new_weights: PreferenceWeights,
-        change_event: PreferenceChange | None,
-    ) -> None:
-        return None
-
-    def apply_weight_update(self, request: Any) -> PreferenceChange:
-        return PreferenceChange(
-            timestep=0,
-            preferences=PreferenceWeights(preferences=[]),
-            previous_weights={},
-            new_weights={},
-            change_type="none",
-            magnitude=0.0,
-            trigger_reason="test",
-        )
-
-    def apply_weight_updates(self, requests: list[Any]) -> list[PreferenceChange]:
-        return [self.apply_weight_update(r) for r in requests]
+class _StakeholderStub(StakeholderStub):
+    pass
 
 
-class _ManagerSendsThenEnd(ManagerAgent):
-    """Manager that sends a direct message to stakeholder on first step, then requests end."""
-
-    def __init__(self, preferences: PreferenceWeights, receiver_id: str) -> None:
-        super().__init__(agent_id="manager_agent", preferences=preferences)
-        self._receiver_id = receiver_id
-        self._sent_initial: bool = False
-
-    async def step(
-        self,
-        workflow: Workflow,
-        execution_state: ExecutionState,
-        stakeholder_profile: StakeholderPublicProfile,
-        current_timestep: int,
-        running_tasks: dict[UUID, asyncio.Task[Any]] | dict,
-        completed_task_ids: set[UUID],
-        failed_task_ids: set[UUID],
-        communication_service: CommunicationService | None = None,
-        previous_reward: float = 0.0,
-        done: bool = False,
-    ) -> SendMessageAction | RequestEndWorkflowAction:
-        if not self._sent_initial:
-            self._sent_initial = True
-            return SendMessageAction(
-                reasoning="Say hello",
-                content="hello_stakeholder",
-                receiver_id=self._receiver_id,
-                success=True,
-                result_summary="sent hello to stakeholder",
-            )
-        return RequestEndWorkflowAction(
-            reasoning="finish",
-            success=True,
-            result_summary="finished workflow",
-            reason="finished workflow",
-        )
-
-    def reset(self) -> None:
-        self._sent_initial = False
+class _ManagerSendsThenEnd(ManagerSendsThenEnd):
+    pass
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_manager_to_stakeholder_direct_and_stakeholder_reply_and_broadcast_in_engine(
     tmp_path: Any,
@@ -221,6 +92,7 @@ async def test_manager_to_stakeholder_direct_and_stakeholder_reply_and_broadcast
     assert any(m.is_broadcast() and "broadcast_t" in m.content for m in manager_inbox)
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_thread_multicast_and_grouping() -> None:
     svc = CommunicationService()
@@ -238,14 +110,13 @@ async def test_thread_multicast_and_grouping() -> None:
 
     assert set(msg.recipients) == {"b", "c"}
     views_u = svc.get_all_messages_grouped(grouping=MessageGrouping.BY_THREAD)
-    views_t: list[ThreadMessagesView] = (
-        views_u  # narrow the union for type checker #type: ignore[assignment]
-    )
+    views_t = cast(list[ThreadMessagesView], views_u)
     assert any(
         v.thread_id == thread.thread_id and v.total_messages >= 1 for v in views_t
     )
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_mark_message_read_and_agent_view() -> None:
     svc = CommunicationService()

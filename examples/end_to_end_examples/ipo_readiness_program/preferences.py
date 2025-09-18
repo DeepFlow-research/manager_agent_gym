@@ -44,14 +44,20 @@ def create_preferences() -> PreferenceWeights:
         """Penalize unrealistic cost discrepancies for IPO readiness."""
         try:
             expected_min_cost = 150000.0  # IPO readiness should cost >$150k
-            total_estimated = sum(task.estimated_cost for task in workflow.tasks.values() if task.estimated_cost)
-            total_actual = sum(task.actual_cost for task in workflow.tasks.values() if task.actual_cost)
-            
+            total_estimated = sum(
+                task.estimated_cost
+                for task in workflow.tasks.values()
+                if task.estimated_cost
+            )
+            total_actual = sum(
+                task.actual_cost for task in workflow.tasks.values() if task.actual_cost
+            )
+
             if total_estimated == 0:
                 return 0.0
             if total_actual < expected_min_cost:
                 return 0.0  # IPO readiness should cost >$150k
-            
+
             cost_variance = abs(total_actual - total_estimated) / total_estimated
             if cost_variance > 0.4:
                 return 0.2
@@ -62,24 +68,40 @@ def create_preferences() -> PreferenceWeights:
         except Exception as e:
             print(f"Error in _validate_cost_realism: {e}")
             return 1.0
-    
+
     def _ipo_adversarial_pressure_score(workflow: Workflow) -> float:
         """Score based on handling IPO adversarial pressure."""
         pressure_indicators = [
-            "sec comment letter", "market volatility", "roadshow challenge", "investor skepticism",
-            "regulatory delay", "audit finding", "due diligence issue", "valuation dispute",
-            "competitor response", "market timing", "filing deficiency", "compliance gap"
+            "sec comment letter",
+            "market volatility",
+            "roadshow challenge",
+            "investor skepticism",
+            "regulatory delay",
+            "audit finding",
+            "due diligence issue",
+            "valuation dispute",
+            "competitor response",
+            "market timing",
+            "filing deficiency",
+            "compliance gap",
         ]
-        
+
         pressure_handled = 0
         for indicator in pressure_indicators:
             for res in workflow.resources.values():
                 if indicator.lower() in str(res.content or "").lower():
-                    if any(resolution.lower() in str(res.content or "").lower() 
-                           for resolution in ["addressed", "resolved", "mitigated", "corrected"]):
+                    if any(
+                        resolution.lower() in str(res.content or "").lower()
+                        for resolution in [
+                            "addressed",
+                            "resolved",
+                            "mitigated",
+                            "corrected",
+                        ]
+                    ):
                         pressure_handled += 1
                     break
-        
+
         return min(1.0, pressure_handled / max(1, len(pressure_indicators) * 0.3))
 
     def sec_filing_readiness(workflow: Workflow) -> float:
@@ -692,7 +714,6 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=12.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        
         # Major compliance and operational deliverables (8-10 points each)
         WorkflowRubric(
             name="edgar_submission_workflows_tested",
@@ -744,7 +765,6 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        
         # Important supporting deliverables (5-7 points each)
         WorkflowRubric(
             name="corporate_governance_package_complete",
@@ -796,7 +816,6 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        
         # Supporting deliverables (3-4 points each)
         WorkflowRubric(
             name="non_gaap_disclosure_controls",

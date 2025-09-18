@@ -11,7 +11,7 @@ we reuse `WorkflowValidationRule` to format, call, and interpret responses.
 
 import asyncio
 import inspect
-
+import tqdm
 from typing import Any, Callable, cast
 
 from ...schemas.evaluation.success_criteria import (
@@ -48,21 +48,7 @@ from ...schemas.execution.manager_actions import ActionResult
 
 
 def _make_pbar(total: int, disable: bool, desc: str):
-    try:
-        import importlib
-
-        _tqdm_mod = importlib.import_module("tqdm")  # type: ignore[no-redef]
-        return _tqdm_mod.tqdm(total=total, disable=disable, desc=desc)  # type: ignore[attr-defined]
-    except Exception:
-
-        class _Dummy:
-            def update(self, n: int = 1) -> None:
-                return None
-
-            def close(self) -> None:
-                return None
-
-        return _Dummy()
+    return tqdm.tqdm(total=total, disable=disable, desc=desc)
 
 
 class ValidationEngine:
@@ -282,6 +268,15 @@ class ValidationEngine:
             )
         except Exception:
             # Never raise from reward calculation; default to utility
+            try:
+                agg_name = type(self._reward_aggregator).__name__
+            except Exception:
+                agg_name = "<unknown>"
+            logger.error(
+                "Reward aggregation failed using %s; defaulting to weighted utility",
+                agg_name,
+                exc_info=True,
+            )
             self._last_reward_value = preference_sum_weighted
             self.most_recent_reward = float(preference_sum_weighted)
         # Ensure reward_vector is timestep-aligned and zero for gaps
@@ -421,6 +416,10 @@ class ValidationEngine:
                     )
                 ctx.agent_public_states = public_states
             except Exception:
+                logger.debug(
+                    "Failed building agent public states for rubric context",
+                    exc_info=True,
+                )
                 ctx.agent_public_states = {}
         if AdditionalContextItem.AGENT_TOOL_USAGE_BY_TASK in required:
             try:
@@ -431,9 +430,17 @@ class ValidationEngine:
                         for task_id, events in agent.get_tool_usage_by_task().items():
                             usage_by_task.setdefault(task_id, []).extend(events)
                     except Exception:
+                        logger.debug(
+                            "Agent tool usage retrieval failed for one agent",
+                            exc_info=True,
+                        )
                         continue
                 ctx.agent_tool_usage_by_task = usage_by_task
             except Exception:
+                logger.warning(
+                    "Failed aggregating agent tool usage by task; continuing with empty map",
+                    exc_info=True,
+                )
                 ctx.agent_tool_usage_by_task = {}
         return ctx
 
@@ -472,12 +479,19 @@ class ValidationEngine:
                         "" if reasoning_attr is None else str(reasoning_attr)
                     )
                 except Exception:
+                    logger.debug(
+                        "Result object lacks 'reasoning' attribute or is invalid",
+                        exc_info=True,
+                    )
                     reasoning_text = ""
                 return EvaluatedScore(
                     score=score_value, reasoning=reasoning_text
                 ), result
             except Exception:
-                pass
+                logger.debug(
+                    "Result object lacks 'score' attribute or is invalid; attempting float()",
+                    exc_info=True,
+                )
             return EvaluatedScore(score=float(result), reasoning=""), result
         except Exception:
             return EvaluatedScore(score=0.0, reasoning="Normalization failed"), result
@@ -509,6 +523,10 @@ class ValidationEngine:
                     cast(Any, fn)(normalized_scores, rubrics, workflow, context)
                 )
             except Exception:
+                logger.debug(
+                    "Custom aggregation strategy failed; returning 0.0",
+                    exc_info=True,
+                )
                 return 0.0
         # Built-in strategies
         match strategy:

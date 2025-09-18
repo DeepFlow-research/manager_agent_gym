@@ -7,17 +7,19 @@ from manager_agent_gym.schemas.core.base import TaskStatus
 from manager_agent_gym.core.execution.engine import WorkflowExecutionEngine
 from manager_agent_gym.core.workflow_agents.interface import AgentInterface
 from manager_agent_gym.core.workflow_agents.registry import AgentRegistry
-from manager_agent_gym.core.manager_agent.interface import ManagerAgent
-from manager_agent_gym.schemas.execution.manager import ManagerObservation
 from manager_agent_gym.schemas.unified_results import create_task_result
 from manager_agent_gym.schemas.config import OutputConfig
 from manager_agent_gym.schemas.preferences.preference import PreferenceWeights
-from manager_agent_gym.schemas.execution.state import ExecutionState
 from manager_agent_gym.core.workflow_agents.stakeholder_agent import StakeholderAgent
 from manager_agent_gym.schemas.workflow_agents.stakeholder import StakeholderConfig
-from manager_agent_gym.schemas.workflow_agents.stakeholder import (
-    StakeholderPublicProfile,
+from tests.helpers.stubs import (
+    ManagerAssignFirstReady,
+    StubAgent,
+    ManagerNoOp,
+    FailingStubAgent,
 )
+
+pytestmark = pytest.mark.integration
 
 
 class _StubAgent(AgentInterface):
@@ -45,58 +47,7 @@ class _StubAgent(AgentInterface):
         )
 
 
-class _StubManager(ManagerAgent):
-    def __init__(self):
-        super().__init__(
-            agent_id="stub_manager", preferences=PreferenceWeights(preferences=[])
-        )
-
-    async def take_action(self, observation: ManagerObservation):
-        from manager_agent_gym.schemas.execution.manager_actions import (
-            AssignTaskAction,
-            NoOpAction,
-        )
-
-        if observation.ready_task_ids and observation.available_agent_metadata:
-            return AssignTaskAction(
-                reasoning="assign first ready",
-                task_id=str(observation.ready_task_ids[0]),
-                agent_id=observation.available_agent_metadata[0].agent_id,
-                success=True,
-                result_summary="assigned first ready task",
-            )
-        return NoOpAction(reasoning="idle", success=True, result_summary="idle")
-
-    def reset(self):
-        pass
-
-    async def step(
-        self,
-        workflow: Workflow,
-        execution_state: ExecutionState,
-        stakeholder_profile: StakeholderPublicProfile,
-        current_timestep: int,
-        running_tasks: dict,
-        completed_task_ids: set,
-        failed_task_ids: set,
-        communication_service=None,
-        previous_reward: float = 0.0,
-        done: bool = False,
-    ):
-        # Build observation and delegate to take_action for test compatibility
-        obs = await self.create_observation(
-            workflow=workflow,
-            execution_state=execution_state,
-            stakeholder_profile=StakeholderPublicProfile(
-                display_name="Test Stakeholder", role="Owner", preference_summary=""
-            ),
-            current_timestep=current_timestep,
-            running_tasks=running_tasks,
-            completed_task_ids=completed_task_ids,
-            failed_task_ids=failed_task_ids,
-            communication_service=communication_service,
-        )
-        return await self.take_action(obs)
+# Use shared Manager stub from tests.helpers.stubs
 
 
 def _chain_workflow() -> Workflow:
@@ -132,7 +83,7 @@ async def test_ready_state_and_chain_completion(tmp_path):
     engine = WorkflowExecutionEngine(
         workflow=w,
         agent_registry=AgentRegistry(),
-        manager_agent=_StubManager(),
+        manager_agent=ManagerAssignFirstReady(),
         stakeholder_agent=stakeholder,
         output_config=OutputConfig(
             base_output_dir=tmp_path, create_run_subdirectory=False
@@ -231,7 +182,7 @@ async def test_nested_subtasks_chain_and_parallel(tmp_path):
     engine = WorkflowExecutionEngine(
         workflow=w,
         agent_registry=AgentRegistry(),
-        manager_agent=_StubManager(),
+        manager_agent=ManagerAssignFirstReady(),
         stakeholder_agent=stakeholder,
         output_config=OutputConfig(
             base_output_dir=tmp_path, create_run_subdirectory=False
@@ -306,3 +257,149 @@ async def test_nested_subtasks_chain_and_parallel(tmp_path):
     assert _find_by_name("ChildA").status == TaskStatus.COMPLETED
     assert _find_by_name("ChildB").status == TaskStatus.COMPLETED
     assert _find_by_name("P").status == TaskStatus.COMPLETED
+
+
+@pytest.mark.asyncio
+async def test_parent_never_ready_or_running_and_only_completes_after_all_leaves(
+    tmp_path,
+):
+    w = Workflow(name="nested2", workflow_goal="d", owner_id=uuid4())
+    parent = Task(name="P", description="parent")
+    ga = Task(name="GA", description="leaf chain start")
+    gb = Task(name="GB", description="leaf chain next", dependency_task_ids=[ga.id])
+    c1 = Task(name="C1", description="container 1")
+    c1.add_subtask(ga)
+    c1.add_subtask(gb)
+    hc = Task(name="HC", description="leaf single")
+    c2 = Task(name="C2", description="container 2")
+    c2.add_subtask(hc)
+    parent.add_subtask(c1)
+    parent.add_subtask(c2)
+    w.add_task(parent)
+
+    agent = StubAgent(agent_id="worker-1", agent_type="ai", seconds=0.0)
+    w.add_agent(agent)
+    for leaf in (ga, gb, hc):
+        leaf.assigned_agent_id = agent.agent_id
+
+    stakeholder = StakeholderAgent(
+        config=StakeholderConfig(
+            agent_id="stakeholder",
+            agent_type="stakeholder",
+            system_prompt="Stakeholder",
+            model_name="o3",
+            name="Stakeholder",
+            role="Owner",
+            initial_preferences=PreferenceWeights(preferences=[]),
+            agent_description="Stakeholder",
+            agent_capabilities=["Stakeholder"],
+        )
+    )
+    w.add_agent(stakeholder)
+
+    engine = WorkflowExecutionEngine(
+        workflow=w,
+        agent_registry=AgentRegistry(),
+        manager_agent=ManagerNoOp(),
+        stakeholder_agent=stakeholder,
+        output_config=OutputConfig(
+            base_output_dir=tmp_path, create_run_subdirectory=False
+        ),
+        enable_timestep_logging=False,
+        enable_final_metrics_logging=False,
+        max_timesteps=50,
+        seed=42,
+    )
+
+    ready0 = {t.name for t in w.get_ready_tasks()}
+    assert {"GA", "HC"} <= ready0
+    assert "P" not in ready0 and "C1" not in ready0 and "C2" not in ready0
+
+    for _ in range(5):
+        await engine.execute_timestep()
+        if (
+            next(t for t in w.tasks.values() if t.name == "GA").status
+            == TaskStatus.COMPLETED
+        ):
+            break
+    assert (
+        next(t for t in w.tasks.values() if t.name == "GA").status
+        == TaskStatus.COMPLETED
+    )
+    assert parent.status != TaskStatus.COMPLETED
+
+    for _ in range(10):
+        if all(
+            next(t for t in w.tasks.values() if t.name == n).status
+            == TaskStatus.COMPLETED
+            for n in ("GB", "HC")
+        ):
+            break
+        await engine.execute_timestep()
+
+    assert all(
+        next(t for t in w.tasks.values() if t.name == n).status == TaskStatus.COMPLETED
+        for n in ("GB", "HC")
+    )
+    assert parent.status == TaskStatus.COMPLETED
+
+
+@pytest.mark.asyncio
+async def test_failed_leaf_blocks_dependents_and_parent_incomplete(tmp_path):
+    w = Workflow(name="fail-prop", workflow_goal="d", owner_id=uuid4())
+    parent = Task(name="P", description="parent")
+    a = Task(name="A", description="will fail")
+    b = Task(name="B", description="will succeed")
+    parent.add_subtask(a)
+    parent.add_subtask(b)
+    w.add_task(parent)
+
+    q = Task(name="Q", description="depends on P")
+    q.dependency_task_ids = [parent.id]
+    w.add_task(q)
+
+    failer = FailingStubAgent(agent_id="failer")
+    ok = StubAgent(agent_id="ok", agent_type="ai", seconds=0.0)
+    w.add_agent(failer)
+    w.add_agent(ok)
+    a.assigned_agent_id = "failer"
+    b.assigned_agent_id = "ok"
+
+    stakeholder = StakeholderAgent(
+        config=StakeholderConfig(
+            agent_id="stakeholder",
+            agent_type="stakeholder",
+            system_prompt="Stakeholder",
+            model_name="o3",
+            name="Stakeholder",
+            role="Owner",
+            initial_preferences=PreferenceWeights(preferences=[]),
+            agent_description="Stakeholder",
+            agent_capabilities=["Stakeholder"],
+        )
+    )
+    w.add_agent(stakeholder)
+
+    engine = WorkflowExecutionEngine(
+        workflow=w,
+        agent_registry=AgentRegistry(),
+        manager_agent=ManagerNoOp(),
+        stakeholder_agent=stakeholder,
+        output_config=OutputConfig(
+            base_output_dir=tmp_path, create_run_subdirectory=False
+        ),
+        enable_timestep_logging=False,
+        enable_final_metrics_logging=False,
+        max_timesteps=50,
+        seed=42,
+    )
+
+    for _ in range(6):
+        await engine.execute_timestep()
+
+    assert (
+        next(t for t in w.tasks.values() if t.name == "A").status == TaskStatus.FAILED
+    )
+    assert parent.status != TaskStatus.COMPLETED
+    ready = {t.id for t in w.get_ready_tasks()}
+    assert q.id not in ready

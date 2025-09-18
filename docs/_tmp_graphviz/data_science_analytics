@@ -1,0 +1,36 @@
+// Workflow data_science_analytics
+digraph {
+	graph [rankdir=LR splines=spline]
+	node [color="#5B8DEF" fillcolor="#E8F1FC" shape=box style="rounded,filled"]
+	edge [color="#8FAADC" penwidth=1.5]
+	"f8c71472-bd1e-48aa-999b-f8d0929e1a95" [label="Project Charter & Scope"]
+	"a4a70f54-d1de-4b87-ae94-0b9902714727" [label="Data Access & Privacy Review"]
+	"e90c7a06-d053-460a-a38a-5c1166ce8abc" [label="Environment & Reproducibility Setup"]
+	"a2857b2c-ea19-44c3-b3d1-0629ae2d141d" [label="Data Ingestion"]
+	"6ae56061-ac52-4bfb-a4df-d098bcd04025" [label="Data Understanding & Profiling"]
+	"4af1d21c-d7b3-44c4-ad97-ccf8734fb64f" [label="Data Quality & Cleaning"]
+	"d5946f1d-f5bf-4a34-9217-d6264bf0a1e1" [label="Feature Engineering Pipeline"]
+	"3f8cc97f-06a0-4a3c-8f25-955c5d392145" [label="Baseline Modeling"]
+	"b7eb447b-0d7c-4dd7-a8b2-145b14f4a97e" [label="Experimentation & Tuning"]
+	"41c49291-e106-4ab0-b264-5a5572990c0a" [label="Model Evaluation & Validation"]
+	"fd014388-5293-43ba-98da-796ef40b32d0" [label="Responsible AI Checks"]
+	"0020f1bf-c773-4603-97a1-21d1fb6dff46" [label="Model Packaging & Registry"]
+	"71c1bd2a-405e-4b9b-945a-e76d1ea2b444" [label="Model Card & Documentation"]
+	"982637be-34a7-4842-8271-7e1a4481f29c" [label="CI/CD & Security Review"]
+	"ed6488d5-6b25-46d6-8af8-ac4b0695193e" [label="Monitoring & Rollback Plan"]
+	"23ad6924-4cde-4279-a539-d9763b47abdd" [label="Executive Readout & Sign‑offs"]
+	"f8c71472-bd1e-48aa-999b-f8d0929e1a95" -> "a4a70f54-d1de-4b87-ae94-0b9902714727"
+	"f8c71472-bd1e-48aa-999b-f8d0929e1a95" -> "e90c7a06-d053-460a-a38a-5c1166ce8abc"
+	"a4a70f54-d1de-4b87-ae94-0b9902714727" -> "a2857b2c-ea19-44c3-b3d1-0629ae2d141d"
+	"e90c7a06-d053-460a-a38a-5c1166ce8abc" -> "a2857b2c-ea19-44c3-b3d1-0629ae2d141d"
+	"a2857b2c-ea19-44c3-b3d1-0629ae2d141d" -> "6ae56061-ac52-4bfb-a4df-d098bcd04025"
+	"6ae56061-ac52-4bfb-a4df-d098bcd04025" -> "4af1d21c-d7b3-44c4-ad97-ccf8734fb64f"
+	"4af1d21c-d7b3-44c4-ad97-ccf8734fb64f" -> "d5946f1d-f5bf-4a34-9217-d6264bf0a1e1"
+	"3f8cc97f-06a0-4a3c-8f25-955c5d392145" -> "b7eb447b-0d7c-4dd7-a8b2-145b14f4a97e"
+	"b7eb447b-0d7c-4dd7-a8b2-145b14f4a97e" -> "41c49291-e106-4ab0-b264-5a5572990c0a"
+	"41c49291-e106-4ab0-b264-5a5572990c0a" -> "fd014388-5293-43ba-98da-796ef40b32d0"
+	"0020f1bf-c773-4603-97a1-21d1fb6dff46" -> "71c1bd2a-405e-4b9b-945a-e76d1ea2b444"
+	"71c1bd2a-405e-4b9b-945a-e76d1ea2b444" -> "982637be-34a7-4842-8271-7e1a4481f29c"
+	"982637be-34a7-4842-8271-7e1a4481f29c" -> "ed6488d5-6b25-46d6-8af8-ac4b0695193e"
+	"ed6488d5-6b25-46d6-8af8-ac4b0695193e" -> "23ad6924-4cde-4279-a539-d9763b47abdd"
+}

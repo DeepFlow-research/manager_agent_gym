@@ -50,7 +50,12 @@ def test_env_overrides(monkeypatch) -> None:
     assert isinstance(mgr, RandomManagerAgentV2)
 
 
-def test_manager_mode_label_stable(monkeypatch) -> None:
-    _clear_env(monkeypatch)
-    assert manager_mode_label("random") == "random"
-    assert manager_mode_label("assign_all") == "assign_all"
+def test_invalid_mode_raises(monkeypatch) -> None:
+    monkeypatch.setenv("MAG_MANAGER_MODE", "invalid_mode")
+    with pytest.raises(ValueError):
+        _ = manager_mode_label()
+
+
+def test_manager_mode_label_reflects_env(monkeypatch) -> None:
+    monkeypatch.setenv("MAG_MANAGER_MODE", "assign_all")
+    assert manager_mode_label() == "assign_all"

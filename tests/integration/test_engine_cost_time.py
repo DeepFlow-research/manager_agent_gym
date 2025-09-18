@@ -1,5 +1,5 @@
-# pyright: reportMissingImports=false, reportMissingTypeStubs=false
-import pytest  # type: ignore[import-not-found]
+import pytest
+
 from uuid import uuid4
 
 from manager_agent_gym.schemas.core.workflow import Workflow
@@ -18,6 +18,8 @@ from manager_agent_gym.schemas.workflow_agents.stakeholder import (
     StakeholderPublicProfile,
 )
 from manager_agent_gym.schemas.execution.state import ExecutionState
+
+pytestmark = pytest.mark.integration
 
 
 class _CostTimeStubAgent(AgentInterface):

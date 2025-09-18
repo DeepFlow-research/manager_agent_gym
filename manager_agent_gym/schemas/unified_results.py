@@ -9,9 +9,10 @@ from datetime import datetime
 from typing import Any, TYPE_CHECKING
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 from ..schemas.core import Resource
+from ..core.common.logging import logger
 from ..schemas.preferences.preference import PreferenceChange
 
 if TYPE_CHECKING:
@@ -52,8 +53,8 @@ class ExecutionResult(BaseModel):
     execution_time_seconds: float = Field(
         ..., description="Actual wall-clock execution time"
     )
-    simulated_duration_hours: float | None = Field(
-        default=None, description="Simulated/realistic duration for metrics"
+    simulated_duration_hours: float = Field(
+        ..., description="Simulated/realistic duration for metrics"
     )
     completed_at: datetime = Field(default_factory=datetime.now)
 
@@ -74,25 +75,6 @@ class ExecutionResult(BaseModel):
         default=None, description="Reasoning for approach taken"
     )
 
-    @model_validator(mode="after")
-    def _ensure_simulated_duration(self) -> "ExecutionResult":
-        """Ensure simulated_duration_hours is always populated for type-safe consumers.
-
-        If not provided by the agent/engine, derive it deterministically from context.
-        """
-        if self.simulated_duration_hours is None:
-            if self.target_type == "timestep":
-                # For timesteps, if no simulated hours provided, assume no simulated work completed
-                # This should rarely happen since execute_timestep() calculates it from completed tasks
-                self.simulated_duration_hours = 0.0
-            else:
-                # For individual tasks, use wall-clock fallback if agent didn't provide estimate
-                # This converts LLM processing time to simulated time as last resort
-                self.simulated_duration_hours = (
-                    float(self.execution_time_seconds) / 3600.0
-                )
-        return self
-
 
 # Convenience constructors for common cases
 def create_task_result(
@@ -103,7 +85,7 @@ def create_task_result(
     resources: list[Resource] | None = None,
     cost: float = 0.0,
     error: str | None = None,
-    simulated_duration_hours: float | None = None,
+    simulated_duration_hours: float = 0.0,
     **metadata,
 ) -> ExecutionResult:
     """Create a result for task execution."""
@@ -129,7 +111,7 @@ def create_timestep_result(
     tasks_completed: list[UUID],
     tasks_failed: list[UUID],
     execution_time: float,
-    completed_tasks_simulated_hours: float | None = None,
+    completed_tasks_simulated_hours: float,
     manager_action=None,
     manager_observation: "ManagerObservation | None" = None,
     workflow_snapshot: dict | None = None,
@@ -179,7 +161,10 @@ def create_timestep_result(
                     "trigger_reason": preference_change_event.trigger_reason,
                 }
         except Exception:
-            pass
+            logger.debug(
+                "Failed to serialize preference change event; continuing without it",
+                exc_info=True,
+            )
 
     return ExecutionResult(
         id=f"timestep_{timestep}",

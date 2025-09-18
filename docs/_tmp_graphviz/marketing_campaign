@@ -1,0 +1,44 @@
+// Workflow marketing_campaign
+digraph {
+	graph [rankdir=LR splines=spline]
+	node [color="#5B8DEF" fillcolor="#E8F1FC" shape=box style="rounded,filled"]
+	edge [color="#8FAADC" penwidth=1.5]
+	"06a74662-a1c2-4763-a33d-bd68861d93bf" [label="Market Discovery & Audience Research"]
+	"de954005-d66e-4e51-911e-3583dd68ae03" [label="Messaging House & Green Claims Playbook"]
+	"ee433dc7-68e7-4adc-b528-cf077e63b57b" [label="Channel Strategy, Budget & Flighting"]
+	"2bb5c6c6-126f-42d6-ac0b-358f6f9fcc1f" [label="Creative Toolkit & Asset Production"]
+	"d8cfaccf-3546-4284-9ea4-0ff5dea7b4a2" [label="Web & Conversion Experience"]
+	"48268b4b-dbba-4afc-b9bd-710c938b2ca4" [label="CRM Enablement & Lead Routing"]
+	"cc662635-1135-401f-9939-1ee473bbfe74" [label="PR & Analyst Program"]
+	"0dfab06c-0cd9-456e-8f72-bbdeb425173b" [label="Events & Field Marketing"]
+	"7dc9fc53-2b32-4558-bb36-13ef9b4ac9f1" [label="Partner Co‑Marketing"]
+	"fbe3ef68-6515-4172-8f90-6a60ba8ea4d3" [label="Paid Media Activation"]
+	"ef3b8dcf-0ec5-453c-9a8b-c7d7ae03c7e2" [label="Email & Nurture Programs"]
+	"d439cdc7-976f-4c5d-987b-e144f2723df7" [label="Measurement Framework & Dashboards"]
+	"7b3d9a13-c71b-46ae-b82f-ce11aafa1a82" [label="Experimentation & Optimization"]
+	"9d7e48be-caec-4257-be99-d9eb4ad58010" [label="Brand Lift Study"]
+	"911e53d4-5fc2-47d1-98fb-48a4c3fe98d6" [label="Executive Readouts & Decision Memos"]
+	"7bd5dfa5-e781-4764-acfd-78ebd307206d" [label="Post‑Campaign Review & Learnings"]
+	"06a74662-a1c2-4763-a33d-bd68861d93bf" -> "de954005-d66e-4e51-911e-3583dd68ae03"
+	"de954005-d66e-4e51-911e-3583dd68ae03" -> "ee433dc7-68e7-4adc-b528-cf077e63b57b"
+	"ee433dc7-68e7-4adc-b528-cf077e63b57b" -> "2bb5c6c6-126f-42d6-ac0b-358f6f9fcc1f"
+	"ee433dc7-68e7-4adc-b528-cf077e63b57b" -> "d8cfaccf-3546-4284-9ea4-0ff5dea7b4a2"
+	"d8cfaccf-3546-4284-9ea4-0ff5dea7b4a2" -> "48268b4b-dbba-4afc-b9bd-710c938b2ca4"
+	"de954005-d66e-4e51-911e-3583dd68ae03" -> "cc662635-1135-401f-9939-1ee473bbfe74"
+	"2bb5c6c6-126f-42d6-ac0b-358f6f9fcc1f" -> "0dfab06c-0cd9-456e-8f72-bbdeb425173b"
+	"d8cfaccf-3546-4284-9ea4-0ff5dea7b4a2" -> "0dfab06c-0cd9-456e-8f72-bbdeb425173b"
+	"2bb5c6c6-126f-42d6-ac0b-358f6f9fcc1f" -> "7dc9fc53-2b32-4558-bb36-13ef9b4ac9f1"
+	"de954005-d66e-4e51-911e-3583dd68ae03" -> "7dc9fc53-2b32-4558-bb36-13ef9b4ac9f1"
+	"2bb5c6c6-126f-42d6-ac0b-358f6f9fcc1f" -> "fbe3ef68-6515-4172-8f90-6a60ba8ea4d3"
+	"ee433dc7-68e7-4adc-b528-cf077e63b57b" -> "fbe3ef68-6515-4172-8f90-6a60ba8ea4d3"
+	"48268b4b-dbba-4afc-b9bd-710c938b2ca4" -> "ef3b8dcf-0ec5-453c-9a8b-c7d7ae03c7e2"
+	"de954005-d66e-4e51-911e-3583dd68ae03" -> "ef3b8dcf-0ec5-453c-9a8b-c7d7ae03c7e2"
+	"ee433dc7-68e7-4adc-b528-cf077e63b57b" -> "d439cdc7-976f-4c5d-987b-e144f2723df7"
+	"d8cfaccf-3546-4284-9ea4-0ff5dea7b4a2" -> "d439cdc7-976f-4c5d-987b-e144f2723df7"
+	"d439cdc7-976f-4c5d-987b-e144f2723df7" -> "7b3d9a13-c71b-46ae-b82f-ce11aafa1a82"
+	"fbe3ef68-6515-4172-8f90-6a60ba8ea4d3" -> "7b3d9a13-c71b-46ae-b82f-ce11aafa1a82"
+	"fbe3ef68-6515-4172-8f90-6a60ba8ea4d3" -> "9d7e48be-caec-4257-be99-d9eb4ad58010"
+	"d439cdc7-976f-4c5d-987b-e144f2723df7" -> "911e53d4-5fc2-47d1-98fb-48a4c3fe98d6"
+	"7b3d9a13-c71b-46ae-b82f-ce11aafa1a82" -> "7bd5dfa5-e781-4764-acfd-78ebd307206d"
+	"911e53d4-5fc2-47d1-98fb-48a4c3fe98d6" -> "7bd5dfa5-e781-4764-acfd-78ebd307206d"
+}

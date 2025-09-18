@@ -21,13 +21,13 @@ dependencies = [
     "openai-agents>=0.2.4",
     "pydantic>=2.10.5",
     "pydantic-settings>=2.7.1",
-    "pytest-asyncio>=1.1.0",
     "rich>=13.9.4",
     "scalar-fastapi>=1.0.3",
     "uvicorn>=0.34.0",
     "tqdm>=4.66.5",
     "typer>=0.12.5",
     "questionary>=2.0.1",
+    "instructor>=1.11.3",
 ]
 
 [dependency-groups]
@@ -35,6 +35,13 @@ dev = [
     "ruff>=0.9.5",
     "pytest>=8.3.2",
     "pytest-asyncio>=0.24.0",
+    "mkdocs-material>=9.5.38",
+    "mkdocstrings[python]>=0.25.2",
+    "mkdocs-gen-files>=0.5.0",
+    "mkdocs-literate-nav>=0.6.1",
+    "mkdocs-awesome-pages-plugin>=2.9.2",
+    "graphviz>=0.20.3",
+    "pydot>=2.0.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -52,3 +59,10 @@ exclude = [
 # Tests rely on pytest which may not ship type stubs
 reportMissingImports = false
 reportMissingTypeStubs = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+  "integration: marks tests as integration (deselect with '-m \"not integration\"')",
+]

@@ -8,16 +8,13 @@ from manager_agent_gym.schemas.config import OutputConfig
 from manager_agent_gym.core.execution.engine import WorkflowExecutionEngine
 from manager_agent_gym.core.workflow_agents.interface import AgentInterface
 from manager_agent_gym.core.workflow_agents.registry import AgentRegistry
-from manager_agent_gym.core.manager_agent.interface import ManagerAgent
-from manager_agent_gym.schemas.execution.manager import ManagerObservation
 from manager_agent_gym.schemas.unified_results import create_task_result
 from manager_agent_gym.core.workflow_agents.stakeholder_agent import StakeholderAgent
 from manager_agent_gym.schemas.workflow_agents.stakeholder import StakeholderConfig
 from typing import cast
-from manager_agent_gym.schemas.execution.state import ExecutionState
-from manager_agent_gym.schemas.workflow_agents.stakeholder import (
-    StakeholderPublicProfile,
-)
+from tests.helpers.stubs import ManagerAssignFirstReady
+
+pytestmark = pytest.mark.integration
 
 
 class _StubAgent(AgentInterface):
@@ -46,55 +43,7 @@ class _StubAgent(AgentInterface):
         )
 
 
-class _StubManager(ManagerAgent):
-    def __init__(self):
-        super().__init__(
-            agent_id="stub_manager", preferences=PreferenceWeights(preferences=[])
-        )
-
-    async def take_action(self, observation: ManagerObservation):
-        from manager_agent_gym.schemas.execution.manager_actions import (
-            AssignTaskAction,
-            NoOpAction,
-        )
-
-        if observation.ready_task_ids and observation.available_agent_metadata:
-            return AssignTaskAction(
-                reasoning="assign ready",
-                task_id=str(observation.ready_task_ids[0]),
-                agent_id=observation.available_agent_metadata[0].agent_id,
-                success=True,
-                result_summary="assigned first ready task",
-            )
-        return NoOpAction(reasoning="idle", success=True, result_summary="idle")
-
-    def reset(self):
-        pass
-
-    async def step(
-        self,
-        workflow: Workflow,
-        execution_state: ExecutionState,
-        stakeholder_profile: StakeholderPublicProfile,
-        current_timestep: int,
-        running_tasks: dict,
-        completed_task_ids: set,
-        failed_task_ids: set,
-        communication_service=None,
-        previous_reward: float = 0.0,
-        done: bool = False,
-    ):
-        obs = await self.create_observation(
-            workflow=workflow,
-            execution_state=execution_state,
-            stakeholder_profile=stakeholder_profile,
-            current_timestep=current_timestep,
-            running_tasks=running_tasks,
-            completed_task_ids=completed_task_ids,
-            failed_task_ids=failed_task_ids,
-            communication_service=communication_service,
-        )
-        return await self.take_action(obs)
+# Use shared Manager stub from tests.helpers.stubs
 
 
 def _workflow_two_step():
@@ -128,7 +77,7 @@ async def test_full_execution_completes_workflow(tmp_path, monkeypatch):
     engine = WorkflowExecutionEngine(
         workflow=_workflow_two_step(),
         agent_registry=AgentRegistry(),
-        manager_agent=_StubManager(),
+        manager_agent=ManagerAssignFirstReady(),
         stakeholder_agent=cast(
             StakeholderAgent,
             next(
@@ -158,7 +107,7 @@ async def test_engine_honors_end_workflow_request(tmp_path):
     engine = WorkflowExecutionEngine(
         workflow=_workflow_two_step(),
         agent_registry=AgentRegistry(),
-        manager_agent=_StubManager(),
+        manager_agent=ManagerAssignFirstReady(),
         stakeholder_agent=cast(
             StakeholderAgent,
             next(

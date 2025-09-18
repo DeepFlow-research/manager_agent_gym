@@ -108,6 +108,7 @@ def identity_float(value: object) -> float:
     try:
         return float(value)  # type: ignore[arg-type]
     except Exception:
+        # Fall back to zero on non-castable values
         return 0.0
 
 

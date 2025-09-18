@@ -54,6 +54,13 @@ class WorkflowSerialiser:
             filepath.parent.mkdir(parents=True, exist_ok=True)
             with open(filepath, "w") as f:
                 data = timestep_result.model_dump(mode="json")
+                # Add headline cumulative hours for convenience in per-timestep files
+                try:
+                    data["cumulative_workflow_hours"] = float(
+                        workflow.total_simulated_hours
+                    )
+                except Exception:
+                    data["cumulative_workflow_hours"] = "FAILED_TO_CALCULATE"
                 json.dump(data, f, indent=2, default=str)
         except Exception:
             logger.error("failed writing timestep result", exc_info=True)
@@ -137,6 +144,12 @@ class WorkflowSerialiser:
                 "timestep": current_timestep,
                 "manager_state": manager_state,
                 "stakeholder_state": stakeholder_state,
+                # Explicit headline figure for convenience
+                "cumulative_workflow_hours": (
+                    float(workflow.total_simulated_hours)
+                    if isinstance(workflow.total_simulated_hours, (int, float))
+                    else "FAILED_TO_CALCULATE"
+                ),
             }
 
             wf_dir = self.output_config.workflow_dir
@@ -191,6 +204,12 @@ class WorkflowSerialiser:
                 "completed_tasks": len(completed_task_ids),
                 "failed_tasks": len(failed_task_ids),
                 "timesteps": current_timestep,
+                # Headline cumulative hours across all tasks (simulated)
+                "cumulative_workflow_hours": (
+                    float(workflow.total_simulated_hours)
+                    if isinstance(workflow.total_simulated_hours, (int, float))
+                    else "FAILED_TO_CALCULATE"
+                ),
             }
             path = self.output_config.get_workflow_summary_path()
             with open(path, "w") as f:

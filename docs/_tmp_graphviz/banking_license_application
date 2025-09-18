@@ -1,0 +1,41 @@
+// Workflow banking_license_application
+digraph {
+	graph [rankdir=LR splines=spline]
+	node [color="#5B8DEF" fillcolor="#E8F1FC" shape=box style="rounded,filled"]
+	edge [color="#8FAADC" penwidth=1.5]
+	"be126b86-8484-4f9e-ba9d-9a2cc5c9899e" [label="Regulatory Strategy & Feasibility…"]
+	"a72748ed-32f3-44a4-960e-802999e924fb" [label="Legal Structure & Documentation Framework"]
+	"cedbbb25-40a4-4f74-bfd4-462eb2590569" [label="OCC Application Package Preparation"]
+	"0ec25eb7-29e8-4533-98e3-c8e60b0b8706" [label="Due Diligence & Background Verification"]
+	"b860dbc0-2ded-40a7-b160-df0350690080" [label="AML/BSA Compliance Program"]
+	"ae0b8835-576b-4a1b-a7b4-f506e0b991f4" [label="Regulatory Compliance Framework"]
+	"3b616797-07a5-4258-8071-4c4c0912eb20" [label="Risk Management Framework Development"]
+	"3ecf7301-2edc-4d28-9284-d2b5ef37fc28" [label="Regulatory Reporting Systems"]
+	"6bff3e23-5523-4617-a663-3aebe86afcbb" [label="Operational Infrastructure Setup"]
+	"5a7e359b-401c-4aa3-b71a-406642862b0e" [label="Correspondent Banking & Relationships"]
+	"e6626768-1695-458d-a536-dac0f471319b" [label="Capital Structure & CED Arrangements"]
+	"3b486136-78c9-4a6e-8da0-17af40978b8f" [label="Staffing Plan & Human Resources"]
+	"41458478-2839-4ef0-a0c9-4afce31a2be7" [label="US Market Entry Business Strategy"]
+	"aca62b0d-fd06-4fba-80a1-f881fb4bc74b" [label="Application Submission & Regulatory…"]
+	"edea9f01-edb1-4f71-9f9a-6cbe2180f4f0" [label="Final Approvals & Launch Preparation"]
+	"380fa03c-7923-4756-bdfa-ccaa144b870a" [label="Project Management & Coordination"]
+	"b907d6f3-76a6-450b-a4c9-143d74f046aa" [label="Stakeholder Engagement & Communication"]
+	"ee01547c-ab37-4a43-83e6-364f556aaefa" [label="Quality Assurance & Documentation Control"]
+	"be126b86-8484-4f9e-ba9d-9a2cc5c9899e" -> "a72748ed-32f3-44a4-960e-802999e924fb"
+	"a72748ed-32f3-44a4-960e-802999e924fb" -> "cedbbb25-40a4-4f74-bfd4-462eb2590569"
+	"cedbbb25-40a4-4f74-bfd4-462eb2590569" -> "0ec25eb7-29e8-4533-98e3-c8e60b0b8706"
+	"0ec25eb7-29e8-4533-98e3-c8e60b0b8706" -> "b860dbc0-2ded-40a7-b160-df0350690080"
+	"b860dbc0-2ded-40a7-b160-df0350690080" -> "ae0b8835-576b-4a1b-a7b4-f506e0b991f4"
+	"ae0b8835-576b-4a1b-a7b4-f506e0b991f4" -> "3b616797-07a5-4258-8071-4c4c0912eb20"
+	"3b616797-07a5-4258-8071-4c4c0912eb20" -> "3ecf7301-2edc-4d28-9284-d2b5ef37fc28"
+	"3ecf7301-2edc-4d28-9284-d2b5ef37fc28" -> "6bff3e23-5523-4617-a663-3aebe86afcbb"
+	"6bff3e23-5523-4617-a663-3aebe86afcbb" -> "5a7e359b-401c-4aa3-b71a-406642862b0e"
+	"5a7e359b-401c-4aa3-b71a-406642862b0e" -> "e6626768-1695-458d-a536-dac0f471319b"
+	"e6626768-1695-458d-a536-dac0f471319b" -> "3b486136-78c9-4a6e-8da0-17af40978b8f"
+	"3b486136-78c9-4a6e-8da0-17af40978b8f" -> "41458478-2839-4ef0-a0c9-4afce31a2be7"
+	"41458478-2839-4ef0-a0c9-4afce31a2be7" -> "aca62b0d-fd06-4fba-80a1-f881fb4bc74b"
+	"aca62b0d-fd06-4fba-80a1-f881fb4bc74b" -> "edea9f01-edb1-4f71-9f9a-6cbe2180f4f0"
+	"be126b86-8484-4f9e-ba9d-9a2cc5c9899e" -> "380fa03c-7923-4756-bdfa-ccaa144b870a"
+	"be126b86-8484-4f9e-ba9d-9a2cc5c9899e" -> "b907d6f3-76a6-450b-a4c9-143d74f046aa"
+	"a72748ed-32f3-44a4-960e-802999e924fb" -> "ee01547c-ab37-4a43-83e6-364f556aaefa"
+}

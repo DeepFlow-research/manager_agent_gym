@@ -59,7 +59,6 @@ async def test_structured_manager_prompt_includes_stakeholder_messages() -> None
     prompt = manager._prepare_context(
         observation
     )  # Access internal to inspect prompt content
-    print(prompt)
     # Assert: stakeholder message appears in the "Recent Communications (sample)" section
     assert stake_id in prompt
     assert target_manager_id in prompt

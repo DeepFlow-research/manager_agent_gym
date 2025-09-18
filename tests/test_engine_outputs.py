@@ -17,40 +17,15 @@ from manager_agent_gym.schemas.execution.state import ExecutionState
 from manager_agent_gym.schemas.workflow_agents.stakeholder import (
     StakeholderPublicProfile,
 )
+from tests.helpers.stubs import ManagerNoOp
 
 
-class _StubManager(ManagerAgent):
-    def __init__(self):
-        super().__init__(agent_id="m", preferences=PreferenceWeights(preferences=[]))
-
-    async def take_action(self, observation: ManagerObservation):
-        from manager_agent_gym.schemas.execution.manager_actions import NoOpAction
-
-        return NoOpAction(reasoning="noop", success=True, result_summary="noop")
-
-    async def step(
-        self,
-        workflow: Workflow,
-        execution_state: ExecutionState,
-        stakeholder_profile: StakeholderPublicProfile,
-        current_timestep: int,
-        running_tasks: dict,
-        completed_task_ids: set,
-        failed_task_ids: set,
-        communication_service=None,
-        previous_reward: float = 0.0,
-        done: bool = False,
-    ):
-        from manager_agent_gym.schemas.execution.manager_actions import NoOpAction
-
-        return NoOpAction(reasoning="noop", success=True, result_summary="noop")
-
-    def reset(self):
-        pass
+# Use shared Manager stub from tests.helpers.stubs
 
 
+@pytest.mark.parametrize("enable_logs", [True, False])
 @pytest.mark.asyncio
-async def test_output_files_written_when_enabled(tmp_path: Path):
+async def test_output_files_written_when_enabled(tmp_path: Path, enable_logs: bool):
     out = OutputConfig(base_output_dir=tmp_path, create_run_subdirectory=False)
     w = Workflow(name="w", workflow_goal="d", owner_id=uuid4())
     w.add_task(Task(name="t", description="d"))
@@ -72,57 +47,21 @@ async def test_output_files_written_when_enabled(tmp_path: Path):
     engine = WorkflowExecutionEngine(
         workflow=w,
         agent_registry=AgentRegistry(),
-        manager_agent=_StubManager(),
+        manager_agent=ManagerNoOp(),
         stakeholder_agent=stakeholder,
         output_config=out,
-        enable_timestep_logging=True,
-        enable_final_metrics_logging=True,
+        enable_timestep_logging=enable_logs,
+        enable_final_metrics_logging=enable_logs,
         seed=42,
     )
 
     await engine.run_full_execution()
-    # Timestep file exists
-    path = out.get_timestep_file_path(0)
-    assert path.exists()
-    # Final metrics exists
-    fpath = out.get_final_metrics_path()
-    assert fpath.exists()
-
-
-@pytest.mark.asyncio
-async def test_output_files_not_written_when_disabled(tmp_path: Path):
-    out = OutputConfig(base_output_dir=tmp_path, create_run_subdirectory=False)
-    w = Workflow(name="w", workflow_goal="d", owner_id=uuid4())
-    w.add_task(Task(name="t", description="d"))
-    # Minimal stakeholder with empty preferences to satisfy evaluation
-    stakeholder_cfg = StakeholderConfig(
-        agent_id="stakeholder",
-        agent_type="stakeholder",
-        system_prompt="Stakeholder",
-        model_name="o3",
-        name="Stakeholder",
-        role="Owner",
-        initial_preferences=PreferenceWeights(preferences=[]),
-        agent_description="Stakeholder",
-        agent_capabilities=["Stakeholder"],
-    )
-    stakeholder = StakeholderAgent(config=stakeholder_cfg)
-    w.add_agent(stakeholder)
-
-    engine = WorkflowExecutionEngine(
-        workflow=w,
-        agent_registry=AgentRegistry(),
-        manager_agent=_StubManager(),
-        stakeholder_agent=stakeholder,
-        output_config=out,
-        enable_timestep_logging=False,
-        enable_final_metrics_logging=False,
-        seed=42,
-    )
-
-    await engine.run_full_execution()
-    assert not out.get_timestep_file_path(0).exists()
-    assert not out.get_final_metrics_path().exists()
+    if enable_logs:
+        assert out.get_timestep_file_path(0).exists()
+        assert out.get_final_metrics_path().exists()
+    else:
+        assert not out.get_timestep_file_path(0).exists()
+        assert not out.get_final_metrics_path().exists()
 
 
 @pytest.mark.asyncio

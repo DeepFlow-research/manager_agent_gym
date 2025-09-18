@@ -58,6 +58,12 @@ class Task(BaseModel):
         default=None, description="When all dependencies became satisfied"
     )
 
+    # Derived, reporting-only composite status for UX/manager (scheduler ignores this)
+    effective_status: str | None = Field(
+        default=None,
+        description="Derived status for composites based on descendant leaves; for leaves equals status.",
+    )
+
     @property
     def task_id(self) -> UUID:
         """Alias for id field to maintain compatibility."""

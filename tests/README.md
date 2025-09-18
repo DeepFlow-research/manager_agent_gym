@@ -24,7 +24,6 @@ This directory contains unit and integration tests for `manager_agent_gym`. The 
   - `test_validation_engine.py`: Validation engine orchestration and result aggregation.
   - `test_validation_frequency.py`: Frequency gating for validations (every timestep vs on completion).
   - `test_workflow_core.py`: Core workflow/Task semantics and readiness logic.
-  - `test_workflow_evaluator.py`: Evaluation helpers around regret and category scoring.
 
 ### How to Run
 

@@ -12,6 +12,8 @@ from uuid import UUID
 from typing import Any
 
 from ..workflow_agents.registry import AgentRegistry
+from ..common.logging import logger
+from ...schemas.execution.manager_actions import ActionResult
 from ...schemas.core.communication import Message, MessageType
 from ...schemas.core.tasks import TaskStatus
 from ...schemas.preferences.preference import PreferenceWeights, Preference
@@ -66,7 +68,7 @@ class WorkflowStateRestorer:
             with open(execution_log_file, "r") as f:
                 self.execution_log_data = json.load(f)
         else:
-            print(f"⚠️  Execution log not found: {execution_log_file}")
+            logger.warning("Execution log not found: %s", execution_log_file)
 
     def restore_workflow_state(self, workflow) -> None:
         """Update workflow task and resource states from snapshot."""
@@ -98,7 +100,7 @@ class WorkflowStateRestorer:
 
         # Restore resources from snapshot
         resources_data = workflow_snapshot.get("resources", {})
-        print(f"📋 Restoring {len(resources_data)} resources from snapshot")
+        logger.info("Restoring %s resources from snapshot", len(resources_data))
 
         # Import Resource here to avoid circular imports
         from ...schemas.core.resources import Resource
@@ -147,7 +149,7 @@ class WorkflowStateRestorer:
         manager_observation = self.timestep_data["metadata"]["manager_observation"]
         messages = manager_observation.get("recent_messages", [])
 
-        print(f"📬 Restoring {len(messages)} messages from snapshot")
+        logger.info("Restoring %s messages from snapshot", len(messages))
 
         for i, msg_data in enumerate(messages):
             try:
@@ -180,30 +182,34 @@ class WorkflowStateRestorer:
                 # Add message to communication service
                 communication_service.graph.add_message(message)
 
-                print(
-                    f"  ✅ Message {i + 1}: {msg_data['sender_id']} -> {msg_data['content'][:50]}..."
+                logger.debug(
+                    "Restored message %s: %s -> %s...",
+                    i + 1,
+                    msg_data["sender_id"],
+                    msg_data["content"][:50],
                 )
 
             except Exception as e:
-                print(f"  ❌ Failed to restore message {i + 1}: {e}")
+                logger.error(
+                    "Failed to restore message %s: %s", i + 1, e, exc_info=True
+                )
                 continue
 
-        print(
-            f"📬 Successfully restored {len(communication_service.graph.messages)} messages"
+        logger.info(
+            "Successfully restored %s messages",
+            len(communication_service.graph.messages),
         )
 
     def restore_manager_action_buffer(self, manager_agent) -> None:
         """Restore manager agent action buffer from execution logs."""
         if not self.execution_log_data:
-            print(
-                "⚠️  No execution log data available for manager action buffer restoration"
+            logger.warning(
+                "No execution log data available for manager action buffer restoration"
             )
             return
 
-        # TODO: Implement manager action buffer restoration
-        # Need to examine execution log structure first
         manager_actions = self.execution_log_data.get("manager_actions", [])
-        print(f"🎯 Found {len(manager_actions)} manager actions in execution log")
+        logger.info("Found %s manager actions in execution log", len(manager_actions))
 
         # Filter actions up to our target timestep
         actions_to_restore = [
@@ -212,19 +218,40 @@ class WorkflowStateRestorer:
             if action.get("timestep", 0) <= self.timestep
         ]
 
-        print(
-            f"🎯 Restoring {len(actions_to_restore)} manager actions up to timestep {self.timestep}"
+        logger.info(
+            "Restoring %s manager actions up to timestep %s",
+            len(actions_to_restore),
+            self.timestep,
         )
 
-        # TODO: Add actions to manager agent buffer
-        # This depends on the manager agent's action buffer interface
+        restored_count = 0
+        for entry in actions_to_restore:
+            try:
+                payload = entry.get("action")
+                if not payload:
+                    continue
+                # Reconstruct ActionResult directly from serialized payload
+                restored = ActionResult.model_validate(payload)
+                if restored.timestep is None:
+                    restored.timestep = entry.get("timestep")
+                manager_agent.record_action(restored)
+                restored_count += 1
+            except Exception as e:
+                logger.debug(
+                    "Skipping invalid manager action entry during restoration: %s",
+                    e,
+                    exc_info=True,
+                )
+                continue
+
+        logger.info("Restored %s manager actions into manager buffer", restored_count)
 
     def restore_active_agents(self, agent_registry: AgentRegistry) -> None:
         """Restore active agent states from snapshot."""
         workflow_snapshot = self.timestep_data["metadata"]["workflow_snapshot"]
         agents_data = workflow_snapshot.get("agents", [])
 
-        print(f"👥 Restoring {len(agents_data)} active agents from snapshot")
+        logger.info("Restoring %s active agents from snapshot", len(agents_data))
 
         for agent_data in agents_data:
             agent_id = agent_data.get("agent_id")
@@ -233,7 +260,9 @@ class WorkflowStateRestorer:
             if (
                 agent_id and agent_id != "stakeholder_balanced"
             ):  # Skip stakeholder agent
-                print(f"  ✅ Agent: {agent_id} ({agent_type})")
+                logger.debug(
+                    "Active agent from snapshot: %s (%s)", agent_id, agent_type
+                )
                 # TODO: Properly restore agent states to registry
                 # This depends on AgentRegistry interface
 

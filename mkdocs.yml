@@ -1,0 +1,57 @@
+site_name: Manager Agent Gym
+site_description: SDK and Simulation Framework for Manager Agents
+repo_url: https://example.com/your-repo
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.instant
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.image.lightbox
+    - content.image.lazy
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - tables
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_toc_entry: false
+            show_signature_annotations: true
+            line_length: 100
+            filters: ["!^__"]
+  - gen-files:
+      scripts:
+        - docs/gen_benchmarks.py
+  - literate-nav
+watch:
+  - examples/end_to_end_examples
+nav:
+  - Overview: index.md
+  - Guides:
+    - Quick Start: QUICK_START_GUIDE.md
+    - Architecture: TECHNICAL_ARCHITECTURE.md
+    - Library Overview: LIBRARY_DOCUMENTATION.md
+    - Docs How-To: dev/building-docs.md
+  - Benchmarks: benchmark/
+  - API Reference:
+    - Core: api/core.md
+    - Schemas:
+      - Overview: api/schemas.md
+      - Core Models: api/schemas_core.md
+      - Execution Models: api/schemas_execution.md
+      - Preferences Models: api/schemas_preferences.md
+    - Evaluation: api/evaluation.md
+    - Execution I/O: api/execution.md
+

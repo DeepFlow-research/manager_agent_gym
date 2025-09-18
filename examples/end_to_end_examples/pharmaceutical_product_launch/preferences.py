@@ -826,7 +826,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
                 "5.0 if there is evidence of any of the following: logistics partners qualified, "
                 "cold-chain testing completed, "
                 "serialization/track-and-trace compliance operational, "
-                "inventory ramp-up executed, " 
+                "inventory ramp-up executed, "
                 "0.0 otherwise."
             ),
             max_score=10.0,

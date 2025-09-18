@@ -1,0 +1,34 @@
+// Workflow tech_company_acquisition
+digraph {
+	graph [rankdir=LR splines=spline]
+	node [color="#5B8DEF" fillcolor="#E8F1FC" shape=box style="rounded,filled"]
+	edge [color="#8FAADC" penwidth=1.5]
+	"b0aead05-d8fe-46c6-9729-126790a93378" [label="Technology Due Diligence Assessment"]
+	"9d961bbc-2be8-47c4-95c1-7a4427c4eb3e" [label="Business & Financial Due Diligence"]
+	"18f3d800-858d-4a2b-9402-4b6f54a90d3b" [label="Regulatory Compliance & Legal Framework"]
+	"6fdf3587-903d-492d-8b3b-5f44c47b2bf6" [label="Integration Management Office Setup"]
+	"6925338d-84e9-4f7c-b32e-69c64d64ae05" [label="Technology Systems Integration Strategy"]
+	"44bb1609-b686-4df2-a55d-6ed7e8a82084" [label="Human Capital Integration Program"]
+	"aca13b59-0bbe-4c90-aef4-5aca9edbe20f" [label="Customer Relationship Preservation"]
+	"d555fe19-d78c-490a-8261-95f899470e34" [label="Market Positioning & Synergy Realization"]
+	"b8434361-bdc3-4547-8059-400ce64f74a7" [label="Systems Integration Execution"]
+	"da4c3e0a-6ff7-41ba-bf4c-e668a960488f" [label="Organizational Integration Execution"]
+	"59705851-f765-461b-a6ec-9bee228bd985" [label="Integration Performance Validation"]
+	"2711b159-de3f-4366-839d-b1665e5c1233" [label="Regulatory Approval Coordination"]
+	"624c03c6-c18d-4b41-b16e-23d1254dfbd9" [label="Stakeholder Communication Management"]
+	"b0aead05-d8fe-46c6-9729-126790a93378" -> "18f3d800-858d-4a2b-9402-4b6f54a90d3b"
+	"9d961bbc-2be8-47c4-95c1-7a4427c4eb3e" -> "18f3d800-858d-4a2b-9402-4b6f54a90d3b"
+	"18f3d800-858d-4a2b-9402-4b6f54a90d3b" -> "6fdf3587-903d-492d-8b3b-5f44c47b2bf6"
+	"b0aead05-d8fe-46c6-9729-126790a93378" -> "6925338d-84e9-4f7c-b32e-69c64d64ae05"
+	"6fdf3587-903d-492d-8b3b-5f44c47b2bf6" -> "6925338d-84e9-4f7c-b32e-69c64d64ae05"
+	"6fdf3587-903d-492d-8b3b-5f44c47b2bf6" -> "44bb1609-b686-4df2-a55d-6ed7e8a82084"
+	"6925338d-84e9-4f7c-b32e-69c64d64ae05" -> "aca13b59-0bbe-4c90-aef4-5aca9edbe20f"
+	"aca13b59-0bbe-4c90-aef4-5aca9edbe20f" -> "d555fe19-d78c-490a-8261-95f899470e34"
+	"44bb1609-b686-4df2-a55d-6ed7e8a82084" -> "d555fe19-d78c-490a-8261-95f899470e34"
+	"6925338d-84e9-4f7c-b32e-69c64d64ae05" -> "b8434361-bdc3-4547-8059-400ce64f74a7"
+	"44bb1609-b686-4df2-a55d-6ed7e8a82084" -> "da4c3e0a-6ff7-41ba-bf4c-e668a960488f"
+	"b8434361-bdc3-4547-8059-400ce64f74a7" -> "59705851-f765-461b-a6ec-9bee228bd985"
+	"da4c3e0a-6ff7-41ba-bf4c-e668a960488f" -> "59705851-f765-461b-a6ec-9bee228bd985"
+	"18f3d800-858d-4a2b-9402-4b6f54a90d3b" -> "2711b159-de3f-4366-839d-b1665e5c1233"
+	"6fdf3587-903d-492d-8b3b-5f44c47b2bf6" -> "624c03c6-c18d-4b41-b16e-23d1254dfbd9"
+}

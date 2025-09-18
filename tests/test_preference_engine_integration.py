@@ -1,6 +1,6 @@
 from uuid import uuid4
 import pytest
-
+from typing import Literal
 from manager_agent_gym.core.execution.engine import WorkflowExecutionEngine
 from manager_agent_gym.schemas.core.workflow import Workflow
 from manager_agent_gym.schemas.workflow_agents.stakeholder import (
@@ -26,7 +26,7 @@ from manager_agent_gym.schemas.execution.state import ExecutionState
 
 class DummyAction(BaseManagerAction):
     reasoning: str = "ok"
-    action_type: str = "noop"
+    action_type: Literal["noop"] = "noop"
 
     async def execute(self, workflow, communication_service=None):
         from manager_agent_gym.schemas.execution.manager_actions import ActionResult

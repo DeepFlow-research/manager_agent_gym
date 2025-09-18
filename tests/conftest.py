@@ -1,4 +1,7 @@
 import pytest
+from uuid import uuid4
+from typing import Any
+
 from manager_agent_gym.core.workflow_agents.interface import AgentInterface
 from manager_agent_gym.schemas.workflow_agents import AgentConfig
 from manager_agent_gym.schemas.core import Task, Resource
@@ -6,6 +9,12 @@ from manager_agent_gym.schemas.unified_results import (
     ExecutionResult,
     create_task_result,
 )
+from manager_agent_gym.schemas.core.workflow import Workflow
+from manager_agent_gym.schemas.core.tasks import Task as WorkflowTask
+from manager_agent_gym.core.workflow_agents.stakeholder_agent import StakeholderAgent
+from manager_agent_gym.schemas.workflow_agents.stakeholder import StakeholderConfig
+from manager_agent_gym.schemas.preferences.preference import PreferenceWeights
+from manager_agent_gym.schemas.config import OutputConfig
 
 
 class MockConfig(AgentConfig):
@@ -65,6 +74,45 @@ class DummyHuman(AgentInterface[MockConfig]):
             cost=0.0,
             simulated_duration_hours=0.0,
         )
+
+
+# Shared fixtures / factories
+
+
+@pytest.fixture
+def empty_workflow() -> Workflow:
+    return Workflow(name="test_workflow", workflow_goal="desc", owner_id=uuid4())
+
+
+@pytest.fixture
+def workflow_two_step() -> Workflow:
+    w = Workflow(name="w", workflow_goal="d", owner_id=uuid4())
+    a = WorkflowTask(name="A", description="d")
+    b = WorkflowTask(name="B", description="d", dependency_task_ids=[a.id])
+    w.add_task(a)
+    w.add_task(b)
+    return w
+
+
+@pytest.fixture
+def stakeholder_agent_empty_prefs() -> StakeholderAgent:
+    cfg = StakeholderConfig(
+        agent_id="stakeholder",
+        agent_type="stakeholder",
+        system_prompt="Stakeholder",
+        model_name="o3",
+        name="Stakeholder",
+        role="Owner",
+        initial_preferences=PreferenceWeights(preferences=[]),
+        agent_description="Stakeholder",
+        agent_capabilities=["Stakeholder"],
+    )
+    return StakeholderAgent(config=cfg)
+
+
+@pytest.fixture
+def output_config(tmp_path: Any) -> OutputConfig:
+    return OutputConfig(base_output_dir=tmp_path, create_run_subdirectory=False)
 
 
 @pytest.fixture

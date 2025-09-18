@@ -893,7 +893,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             llm_prompt=(
                 "Do validated airworthiness arrangements exist with: Part-CAMO approval or contracts, "
                 "Part-145 maintenance organization arrangements, reliability monitoring systems, and MEL/GMEL approvals? "
-                "Return true if continuing airworthiness arrangements are validated, false otherwise."  
+                "Return true if continuing airworthiness arrangements are validated, false otherwise."
             ),
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,

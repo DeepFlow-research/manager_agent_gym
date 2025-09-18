@@ -72,8 +72,9 @@ async def test_assign_task_invalid_ids() -> None:
         success=True,
         result_summary="assign",
     )
-    with pytest.raises(ValueError):
-        await bad_task_action.execute(w)
+    res1 = await bad_task_action.execute(w)
+    assert res1.success is False
+    assert res1.kind == "failed_action"
 
     # Bad agent id
     bad_agent_action = AssignTaskAction(
@@ -83,8 +84,9 @@ async def test_assign_task_invalid_ids() -> None:
         success=True,
         result_summary="assign",
     )
-    with pytest.raises(ValueError):
-        await bad_agent_action.execute(w)
+    res2 = await bad_agent_action.execute(w)
+    assert res2.success is False
+    assert res2.kind == "failed_action"
 
 
 @pytest.mark.asyncio

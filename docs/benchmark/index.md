@@ -1,0 +1,25 @@
+## Benchmarks
+
+The following scenario pages are generated from the example code at build time.
+
+- [Airline Launch Program](./airline_launch_program.md)
+- [Banking License Application](./banking_license_application.md)
+- [Brand Crisis Management](./brand_crisis_management.md)
+- [Data Science Analytics](./data_science_analytics.md)
+- [Enterprise Saas Negotiation Pipeline](./enterprise_saas_negotiation_pipeline.md)
+- [Genai Feature Launch](./genai_feature_launch.md)
+- [Global Product Recall](./global_product_recall.md)
+- [Icap](./icap.md)
+- [Ipo Readiness Program](./ipo_readiness_program.md)
+- [Legal Contract Negotiation](./legal_contract_negotiation.md)
+- [Legal Global Data Breach](./legal_global_data_breach.md)
+- [Legal Litigation Ediscovery](./legal_litigation_ediscovery.md)
+- [Legal M And A](./legal_m_and_a.md)
+- [Marketing Campaign](./marketing_campaign.md)
+- [Mnc Workforce Restructuring](./mnc_workforce_restructuring.md)
+- [Orsa](./orsa.md)
+- [Pharmaceutical Product Launch](./pharmaceutical_product_launch.md)
+- [Supply Chain Planning](./supply_chain_planning.md)
+- [Tech Acquisition Integration](./tech_acquisition_integration.md)
+- [Tech Company Acquisition](./tech_company_acquisition.md)
+- [Uk University Accreditation](./uk_university_accreditation.md)

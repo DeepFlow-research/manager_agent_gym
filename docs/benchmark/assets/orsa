@@ -1,0 +1,45 @@
+// Workflow orsa
+digraph {
+	graph [rankdir=LR splines=spline]
+	node [color="#5B8DEF" fillcolor="#E8F1FC" shape=box style="rounded,filled"]
+	edge [color="#8FAADC" penwidth=1.5]
+	"50aa17b2-ce5e-4897-9e55-59deeb67a751" [label="Governance & Scope"]
+	"3401437c-0818-428b-8f60-03fbe0a38484" [label="Data & Model Inventory (SR 11‑7)"]
+	"c5823007-457d-40ba-bec3-a89a7f6c8d67" [label="Risk Appetite & Materiality"]
+	"ea57f807-ac32-4950-9020-0a7dc4405af0" [label="Risk Identification Workshops"]
+	"16c032df-3016-4220-999e-b4660de304d5" [label="Scenario Suite Design"]
+	"ffa2b610-5d9b-446a-9f0b-fcb2402d89d9" [label="Credit Loss Projection"]
+	"5b616dd9-54d5-419e-b7d5-cc31a08d093d" [label="IRRBB & NII/EVE Sensitivity"]
+	"34ea30c8-484c-4a28-82b1-918e8c309505" [label="Liquidity Profile & Contingency Funding…"]
+	"e9a9aeb7-8214-4324-b82e-ef2af2042571" [label="Operational Risk Assessment"]
+	"6f0c5d7f-0c52-42aa-b0df-219589f8b930" [label="Capital Adequacy & Buffer Policy"]
+	"52a3ff02-0f47-43c5-bafe-68853d8c4058" [label="Model Validation & Use‑Test (SR 11‑7)"]
+	"20990010-013b-404d-903f-9f11828cbbcf" [label="Control Testing & Audit Trail"]
+	"0ee214d6-a110-422b-9bfd-64b55d65f3f9" [label="Management Actions & Recovery Options"]
+	"a09faee7-3970-49d0-b12a-3ecbf7136f46" [label="Internal Risk & Solvency Assessment Report"]
+	"07dc6464-ae17-495a-a38f-ec5229d925c2" [label="Board Review & Approval"]
+	"493220f3-448f-46ea-831a-c2cea03b903e" [label="Stakeholder Communication & Filing…"]
+	"50aa17b2-ce5e-4897-9e55-59deeb67a751" -> "3401437c-0818-428b-8f60-03fbe0a38484"
+	"50aa17b2-ce5e-4897-9e55-59deeb67a751" -> "c5823007-457d-40ba-bec3-a89a7f6c8d67"
+	"c5823007-457d-40ba-bec3-a89a7f6c8d67" -> "ea57f807-ac32-4950-9020-0a7dc4405af0"
+	"ea57f807-ac32-4950-9020-0a7dc4405af0" -> "16c032df-3016-4220-999e-b4660de304d5"
+	"3401437c-0818-428b-8f60-03fbe0a38484" -> "16c032df-3016-4220-999e-b4660de304d5"
+	"16c032df-3016-4220-999e-b4660de304d5" -> "ffa2b610-5d9b-446a-9f0b-fcb2402d89d9"
+	"16c032df-3016-4220-999e-b4660de304d5" -> "5b616dd9-54d5-419e-b7d5-cc31a08d093d"
+	"16c032df-3016-4220-999e-b4660de304d5" -> "34ea30c8-484c-4a28-82b1-918e8c309505"
+	"ea57f807-ac32-4950-9020-0a7dc4405af0" -> "e9a9aeb7-8214-4324-b82e-ef2af2042571"
+	"ffa2b610-5d9b-446a-9f0b-fcb2402d89d9" -> "6f0c5d7f-0c52-42aa-b0df-219589f8b930"
+	"5b616dd9-54d5-419e-b7d5-cc31a08d093d" -> "6f0c5d7f-0c52-42aa-b0df-219589f8b930"
+	"e9a9aeb7-8214-4324-b82e-ef2af2042571" -> "6f0c5d7f-0c52-42aa-b0df-219589f8b930"
+	"3401437c-0818-428b-8f60-03fbe0a38484" -> "52a3ff02-0f47-43c5-bafe-68853d8c4058"
+	"ffa2b610-5d9b-446a-9f0b-fcb2402d89d9" -> "52a3ff02-0f47-43c5-bafe-68853d8c4058"
+	"5b616dd9-54d5-419e-b7d5-cc31a08d093d" -> "52a3ff02-0f47-43c5-bafe-68853d8c4058"
+	"52a3ff02-0f47-43c5-bafe-68853d8c4058" -> "20990010-013b-404d-903f-9f11828cbbcf"
+	"6f0c5d7f-0c52-42aa-b0df-219589f8b930" -> "0ee214d6-a110-422b-9bfd-64b55d65f3f9"
+	"34ea30c8-484c-4a28-82b1-918e8c309505" -> "0ee214d6-a110-422b-9bfd-64b55d65f3f9"
+	"6f0c5d7f-0c52-42aa-b0df-219589f8b930" -> "a09faee7-3970-49d0-b12a-3ecbf7136f46"
+	"20990010-013b-404d-903f-9f11828cbbcf" -> "a09faee7-3970-49d0-b12a-3ecbf7136f46"
+	"0ee214d6-a110-422b-9bfd-64b55d65f3f9" -> "a09faee7-3970-49d0-b12a-3ecbf7136f46"
+	"a09faee7-3970-49d0-b12a-3ecbf7136f46" -> "07dc6464-ae17-495a-a38f-ec5229d925c2"
+	"07dc6464-ae17-495a-a38f-ec5229d925c2" -> "493220f3-448f-46ea-831a-c2cea03b903e"
+}

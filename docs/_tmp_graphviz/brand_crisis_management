@@ -1,0 +1,34 @@
+// Workflow brand_crisis_management
+digraph {
+	graph [rankdir=LR splines=spline]
+	node [color="#5B8DEF" fillcolor="#E8F1FC" shape=box style="rounded,filled"]
+	edge [color="#8FAADC" penwidth=1.5]
+	"b36f876f-0bc5-4032-9ed0-8a20fee0d6fd" [label="Crisis Assessment & Impact Analysis"]
+	"b34a92dd-ee66-43ab-9285-ee7ce81afd2f" [label="Executive Crisis Team Activation"]
+	"f3dcf6eb-1d08-4a92-8466-37a6ad506302" [label="Immediate Response Strategy"]
+	"d979fc90-6bf4-446d-a72e-af780822fdd7" [label="Public Communication Launch"]
+	"30dac642-46b5-45e9-ba99-f2a6bbb670fc" [label="Internal Stakeholder Communication"]
+	"ac3df44f-7334-4b49-89a1-36486cf16bfe" [label="Media Relations & Narrative Control"]
+	"4648acd8-4db0-4b10-8f17-ab772471a639" [label="Customer Engagement & Retention Program"]
+	"2c1c8c42-6e9f-46b3-a09a-e7663f6bb1f0" [label="Legal & Regulatory Coordination"]
+	"ed9c7c7e-3861-4756-84dd-0b93c7ee63e8" [label="Digital Reputation Recovery Campaign"]
+	"312cd2ef-d566-4af4-beb4-34c0f8204fd6" [label="Brand Trust Rebuilding & Monitoring"]
+	"3d4f790c-28ce-409a-99d1-05d4d667ca4c" [label="Crisis Response Analysis & Protocol…"]
+	"cb9ae565-d19c-435e-a9ee-6aff9425d541" [label="Real-time Sentiment Monitoring Dashboard"]
+	"cc0a2482-0c8f-4806-9b92-8275cbb54418" [label="Crisis Communication Hub Setup"]
+	"2f0a2597-0d6c-40dd-9c99-1e280408df41" [label="Stakeholder Feedback Integration System"]
+	"b36f876f-0bc5-4032-9ed0-8a20fee0d6fd" -> "b34a92dd-ee66-43ab-9285-ee7ce81afd2f"
+	"b34a92dd-ee66-43ab-9285-ee7ce81afd2f" -> "f3dcf6eb-1d08-4a92-8466-37a6ad506302"
+	"f3dcf6eb-1d08-4a92-8466-37a6ad506302" -> "d979fc90-6bf4-446d-a72e-af780822fdd7"
+	"f3dcf6eb-1d08-4a92-8466-37a6ad506302" -> "30dac642-46b5-45e9-ba99-f2a6bbb670fc"
+	"d979fc90-6bf4-446d-a72e-af780822fdd7" -> "ac3df44f-7334-4b49-89a1-36486cf16bfe"
+	"d979fc90-6bf4-446d-a72e-af780822fdd7" -> "4648acd8-4db0-4b10-8f17-ab772471a639"
+	"b36f876f-0bc5-4032-9ed0-8a20fee0d6fd" -> "2c1c8c42-6e9f-46b3-a09a-e7663f6bb1f0"
+	"ac3df44f-7334-4b49-89a1-36486cf16bfe" -> "ed9c7c7e-3861-4756-84dd-0b93c7ee63e8"
+	"4648acd8-4db0-4b10-8f17-ab772471a639" -> "312cd2ef-d566-4af4-beb4-34c0f8204fd6"
+	"ed9c7c7e-3861-4756-84dd-0b93c7ee63e8" -> "312cd2ef-d566-4af4-beb4-34c0f8204fd6"
+	"312cd2ef-d566-4af4-beb4-34c0f8204fd6" -> "3d4f790c-28ce-409a-99d1-05d4d667ca4c"
+	"b36f876f-0bc5-4032-9ed0-8a20fee0d6fd" -> "cb9ae565-d19c-435e-a9ee-6aff9425d541"
+	"b34a92dd-ee66-43ab-9285-ee7ce81afd2f" -> "cc0a2482-0c8f-4806-9b92-8275cbb54418"
+	"30dac642-46b5-45e9-ba99-f2a6bbb670fc" -> "2f0a2597-0d6c-40dd-9c99-1e280408df41"
+}

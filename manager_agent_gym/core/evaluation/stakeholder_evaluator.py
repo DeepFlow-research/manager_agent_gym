@@ -93,60 +93,62 @@ def graph_complexity_penalty(
     workflow: Workflow, context: ValidationContext
 ) -> Tuple[float, str]:
     """Max 8; penalize complex, hard-to-read workflow graphs (0-8 points)."""
-    
+
     tasks = list(workflow.tasks.values())
     if not tasks:
         return 8.0, "no_tasks -> score=8.0"
-    
+
     total_tasks = len(tasks)
-    
+
     # Metric 1: Ready task ratio (penalize too many ready tasks at once)
     ready_tasks = [t for t in tasks if t.status == "ready"]
     ready_ratio = len(ready_tasks) / total_tasks if total_tasks > 0 else 0.0
-    
+
     # Metric 2: Branching factor (penalize excessive subtask sprawl)
     parent_tasks = [t for t in tasks if not t.parent_task_id]
     child_tasks = [t for t in tasks if t.parent_task_id]
-    
+
     if parent_tasks:
         branching_factor = len(child_tasks) / len(parent_tasks)
     else:
         branching_factor = 0.0
-    
+
     # Metric 3: Pending task accumulation (penalize large pending backlogs)
     pending_tasks = [t for t in tasks if t.status == "pending"]
     pending_ratio = len(pending_tasks) / total_tasks if total_tasks > 0 else 0.0
-    
+
     # Binary scoring rules with 20% partial credit principle:
     complexity_score = 8.0  # Start with max score
-    
+
     # Rule 1: Ready task overload (>50% ready = coordination failure)
     if ready_ratio > 0.5:
         complexity_score -= 2.5  # Major penalty for coordination failure
     elif ready_ratio > 0.3:
         complexity_score -= 0.5  # 20% partial penalty for high ready ratio
-    
-    # Rule 2: Excessive branching (>10 subtasks per parent = planning failure)  
+
+    # Rule 2: Excessive branching (>10 subtasks per parent = planning failure)
     if branching_factor > 10.0:
         complexity_score -= 2.5  # Major penalty for excessive branching
     elif branching_factor > 5.0:
         complexity_score -= 0.5  # 20% partial penalty for high branching
-    
+
     # Rule 3: Pending task accumulation (>70% pending = poor execution)
     if pending_ratio > 0.7:
         complexity_score -= 2.5  # Major penalty for execution failure
     elif pending_ratio > 0.5:
         complexity_score -= 0.5  # 20% partial penalty for high pending ratio
-    
+
     # Rule 4: Scale penalty for very large workflows (>50 tasks = complexity risk)
     if total_tasks > 50:
         complexity_score -= 0.5  # Flat penalty for large-scale complexity
-    
+
     final_score = max(0.0, complexity_score)
-    
-    details = (f"ready_ratio={ready_ratio:.2f}, branching_factor={branching_factor:.1f}, "
-              f"pending_ratio={pending_ratio:.2f}, total_tasks={total_tasks} -> score={final_score:.1f}")
-    
+
+    details = (
+        f"ready_ratio={ready_ratio:.2f}, branching_factor={branching_factor:.1f}, "
+        f"pending_ratio={pending_ratio:.2f}, total_tasks={total_tasks} -> score={final_score:.1f}"
+    )
+
     return final_score, details
 
 
