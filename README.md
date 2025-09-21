@@ -77,6 +77,7 @@ if __name__ == "__main__":
 - **Library Guide**: [docs/LIBRARY_DOCUMENTATION.md](docs/LIBRARY_DOCUMENTATION.md)
 - **Technical Architecture**: [docs/TECHNICAL_ARCHITECTURE.md](docs/TECHNICAL_ARCHITECTURE.md)
 - **Build/Serve Docs**: [docs/README.md](docs/README.md)
+- **Research Paper (PDF)**: [docs/Orchestrating_Human_AI_Teams__The_Manager_Agent_as_a_Unifying_Research_Challenge.pdf](docs/Orchestrating_Human_AI_Teams__The_Manager_Agent_as_a_Unifying_Research_Challenge.pdf)
 
 ## 🧪 Examples & Workflows
 
