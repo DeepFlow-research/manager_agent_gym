@@ -10,10 +10,21 @@ import time
 import traceback
 from typing import TYPE_CHECKING
 
-from agents import Agent, Runner, Tool, RunResult
-from agents.extensions.models.litellm_model import LitellmModel
+try:
+    from agents import Agent, Runner, Tool, RunResult  # type: ignore
+    from agents.extensions.models.litellm_model import LitellmModel  # type: ignore
+except Exception:
+    Agent = None  # type: ignore
+    Runner = None  # type: ignore
+    Tool = None  # type: ignore
+    RunResult = None  # type: ignore
+    LitellmModel = None  # type: ignore
 from ...config import settings
-from litellm.cost_calculator import cost_per_token
+try:
+    from litellm.cost_calculator import cost_per_token  # type: ignore
+except Exception:  # pragma: no cover - optional dependency guard
+    def cost_per_token(**kwargs):  # type: ignore
+        return 0.0, 0.0
 
 from ...schemas.core import Resource, Task
 from ...schemas.workflow_agents import (
@@ -48,6 +59,10 @@ class AIAgent(AgentInterface[AIAgentConfig]):
         config: AIAgentConfig,
         tools: list[Tool],
     ):
+        if Agent is None or LitellmModel is None or Runner is None:
+            raise ImportError(
+                "openai-agents SDK is not installed. Install with `uv sync --group agents`."
+            )
         super().__init__(config)
 
         # Ensure OpenAI API key is available in environment

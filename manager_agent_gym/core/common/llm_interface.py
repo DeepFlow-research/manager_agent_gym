@@ -2,8 +2,6 @@
 Centralized LLM interface using Instructor for structured outputs.
 """
 
-from openai import AsyncOpenAI
-import instructor
 from typing import TypeVar, Type, Any
 import os
 from pydantic import BaseModel
@@ -57,15 +55,29 @@ class LLMInferenceTruncationError(Exception):
         return base + (" [" + ", ".join(details) + "]" if details else "")
 
 
-def _get_openai_client() -> AsyncOpenAI:
-    """Get configured OpenAI async client patched by Instructor."""
+def _get_openai_client():
+    """Get configured OpenAI async client patched by Instructor.
+
+    Lazy-imports provider SDKs so they are optional until actually used.
+    """
+    try:
+        from openai import AsyncOpenAI  # type: ignore
+    except Exception as e:  # pragma: no cover - import guard
+        raise ImportError(
+            "OpenAI SDK is not installed. Install with `uv sync --group openai`."
+        ) from e
+
     client = AsyncOpenAI(
         api_key=os.getenv("OPENAI_API_KEY"),
-        timeout=300.0,  # 5 minute timeout for long responses
+        timeout=300.0,
     )
-    # Patch the client to support response_model with validation & retries
-    if instructor is not None:  # type: ignore[truthy-function]
+
+    try:
+        import instructor  # type: ignore
         instructor.patch(client)  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
     return client
 
 

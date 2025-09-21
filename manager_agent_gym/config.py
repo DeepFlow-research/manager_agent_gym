@@ -91,9 +91,11 @@ if settings.EXA_API_KEY != "na":
 if settings.COHERE_API_KEY != "na":
     os.environ["COHERE_API_KEY"] = settings.COHERE_API_KEY
 
-if settings.ENV == "local" and any(
-    v for v in settings.model_dump().values() if v in ["na", None]
-):
+# Soft validation: warn on missing env vars instead of erroring hard
+if settings.ENV == "local":
     missing = [k for k, v in settings.model_dump().items() if v in ["na", None]]
-    logger.error(f"Missing required environment variables: {missing}")
-    raise ValueError("Please set all environment variables needed")
+    if missing:
+        logger.warning(
+            "Optional env vars missing; features may be disabled: %s",
+            ", ".join(missing),
+        )
