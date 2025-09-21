@@ -137,63 +137,6 @@ async def generate_structured_response(
     client = _get_openai_client()
 
     try:
-        # Compatibility path for older tests/mocks expecting .beta.chat.completions.parse
-        beta = getattr(client, "beta", None)
-        if beta is not None and hasattr(beta, "chat") and hasattr(beta.chat, "completions") and hasattr(beta.chat.completions, "parse"):
-            response = await beta.chat.completions.parse(
-                model=model,
-                messages=messages,
-                response_format=response_type,
-                temperature=temperature,
-                seed=seed,
-            )
-
-            # Check for refusal
-            if getattr(response.choices[0].message, "refusal", None):
-                error = LLMInferenceTruncationError(
-                    f"LLM refused to generate {response_type.__name__}",
-                    refusal_text=response.choices[0].message.refusal,
-                    model=model,
-                    response_id=response.id,
-                    finish_reason=response.choices[0].finish_reason,
-                    provider_fields={
-                        "seed": seed,
-                        "max_completion_tokens": max_completion_tokens,
-                        "temperature": temperature,
-                        "messages": messages,
-                        "response_type": response_type,
-                    },
-                )
-                logger.error(
-                    f"LLM refused to generate {response_type.__name__}: {error}"
-                )
-                raise error
-
-            # Check for content
-            if not getattr(response.choices[0].message, "parsed", None):
-                error = LLMInferenceTruncationError(
-                    f"LLM failed to generate structured {response_type.__name__}",
-                    model=model,
-                    response_id=response.id,
-                    finish_reason=response.choices[0].finish_reason,
-                    provider_fields={
-                        "seed": seed,
-                        "max_completion_tokens": max_completion_tokens,
-                        "temperature": temperature,
-                        "messages": messages,
-                        "response": response,
-                        "response_type": response_type,
-                    },
-                )
-                logger.error(
-                    f"LLM failed to generate {response_type.__name__}: {error}"
-                )
-                raise error
-
-            # Return the parsed structured response
-            return response.choices[0].message.parsed
-
-        # Default path using Instructor-enhanced create()
         kwargs: dict[str, Any] = {
             "model": model,
             "messages": messages,
@@ -201,9 +144,11 @@ async def generate_structured_response(
             "temperature": temperature,
             "seed": seed,
         }
+        # Map "max_completion_tokens" if provided
         if max_completion_tokens and max_completion_tokens > 0:
             kwargs["max_tokens"] = max_completion_tokens
 
+        # Delegate validation and retries to Instructor (patched method not typed)
         create_fn: Any = client.chat.completions.create
         result: T = await create_fn(
             max_retries=max_retries,
@@ -212,9 +157,6 @@ async def generate_structured_response(
         return result
 
     except Exception as e:
-        if isinstance(e, LLMInferenceTruncationError):
-            # Preserve rich error details from compatibility path
-            raise
         error = LLMInferenceTruncationError(
             f"LLM request failed for {response_type.__name__}: {str(e)}",
             model=model,

@@ -20,7 +20,20 @@ if TYPE_CHECKING:
 
 
 class ActionResult(BaseModel):
-    """Structured result returned by manager actions."""
+    """Structured result returned by manager actions.
+
+    Example:
+        ```python
+        ActionResult(
+            action_type="assign_task",
+            summary="Assigned T123 to ai_writer",
+            kind="mutation",
+            data={"task_id": "...", "agent_id": "ai_writer"},
+            timestep=3,
+            success=True,
+        )
+        ```
+    """
 
     action_type: Literal[
         "assign_task",
@@ -39,6 +52,7 @@ class ActionResult(BaseModel):
         "inspect_task",
         "request_end_workflow",
         "decompose_task",
+        "assign_tasks_to_agents",
     ] = Field(description="Type of action result")
     summary: str = Field(description="Short summary of what happened / info returned")
     kind: Literal[
@@ -64,7 +78,8 @@ class BaseManagerAction(BaseModel, ABC):
     """
 
     reasoning: str = Field(
-        description="Reasoning for this action decision (should be around 2-3 sentences long.)"
+        description="Concise 2–3 sentence rationale for the chosen action",
+        examples=["Agent idle, task READY, skill match found → assigning ai_writer."],
     )
     success: bool | None = Field(
         description="Whether the action succeeded (set by execute)"
@@ -202,6 +217,61 @@ class AssignAllPendingTasksAction(BaseManagerAction):
         )
         summary = f"Assigned {assigned_count} pending tasks to {target_agent_id}"
         data = {"assigned_count": assigned_count, "agent_id": target_agent_id}
+        self.success = True
+        self.result_summary = summary
+        return ActionResult(
+            summary=summary,
+            kind="mutation",
+            data=data,
+            action_type=self.action_type,
+            success=self.success,
+        )
+
+
+class AssignmentPair(BaseModel):
+    task_id: UUID = Field(description="Task to assign")
+    agent_id: str = Field(description="Agent ID to assign to")
+
+
+class AssignTasksToAgentsAction(BaseManagerAction):
+    """Bulk-assign specific tasks to specific agents in one action.
+
+    Applies a task->agent mapping (e.g., produced by an LLM) in a single mutation.
+    """
+
+    action_type: Literal["assign_tasks_to_agents"] = "assign_tasks_to_agents"
+    assignments: list[AssignmentPair] = Field(
+        default_factory=list, description="List of task->agent assignments to apply"
+    )
+
+    async def execute(
+        self,
+        workflow: "Workflow",
+        communication_service: "CommunicationService | None" = None,
+    ) -> ActionResult:
+        assigned = 0
+        skipped: list[str] = []
+        for pair in self.assignments:
+            task = workflow.tasks.get(pair.task_id)
+            if task is None:
+                skipped.append(f"missing:{pair.task_id}")
+                continue
+            if task.status in (TaskStatus.COMPLETED, TaskStatus.FAILED):
+                skipped.append(f"terminal:{pair.task_id}")
+                continue
+            if pair.agent_id not in workflow.agents:
+                skipped.append(f"no_agent:{pair.agent_id}")
+                continue
+            task.assigned_agent_id = pair.agent_id
+            assigned += 1
+
+        summary = f"Applied {assigned} assignment(s)" + (
+            f"; skipped {len(skipped)}" if skipped else ""
+        )
+        data = {
+            "assigned_count": assigned,
+            "skipped": skipped,
+        }
         self.success = True
         self.result_summary = summary
         return ActionResult(

@@ -74,7 +74,7 @@ def create_evaluator_to_measure_goal_achievement(name: str) -> Evaluator:
     if not SCENARIOS[name].create_evaluator_to_measure_goal_achievement:
         raise ValueError(f"No evaluator to measure goal achievement for {name}")
 
-    return SCENARIOS[name].create_evaluator_to_measure_goal_achievement()
+    return SCENARIOS[name].create_evaluator_to_measure_goal_achievement() #type: ignore
 
 
 async def run_demo(

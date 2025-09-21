@@ -57,7 +57,9 @@ async def test_composite_effective_status_and_never_schedulable(tmp_path):
         agent_registry=AgentRegistry(),
         manager_agent=ManagerAssignFirstReady(),
         stakeholder_agent=stakeholder,
-        output_config=OutputConfig(base_output_dir=tmp_path, create_run_subdirectory=False),
+        output_config=OutputConfig(
+            base_output_dir=tmp_path, create_run_subdirectory=False
+        ),
         enable_timestep_logging=False,
         enable_final_metrics_logging=False,
         max_timesteps=20,
@@ -68,9 +70,7 @@ async def test_composite_effective_status_and_never_schedulable(tmp_path):
     ready0 = {t.name for t in w.get_ready_tasks()}
     assert "A" in ready0 and "B" not in ready0
     parent = next(t for t in w.tasks.values() if t.name == "Parent")
-    container = next(
-        (st for st in parent.subtasks if st.name == "Container"), None
-    )
+    container = next((st for st in parent.subtasks if st.name == "Container"), None)
     assert container is not None
     assert parent.status == TaskStatus.PENDING
     assert container.status == TaskStatus.PENDING
@@ -122,5 +122,3 @@ async def test_composite_effective_status_and_never_schedulable(tmp_path):
     assert container.status == TaskStatus.COMPLETED
     assert parent.effective_status == TaskStatus.COMPLETED.value
     assert container.effective_status == TaskStatus.COMPLETED.value
-
-

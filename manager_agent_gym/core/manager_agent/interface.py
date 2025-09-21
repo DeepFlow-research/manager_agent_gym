@@ -22,12 +22,30 @@ if TYPE_CHECKING:
 
 
 class ManagerAgent(ABC):
-    """
-    Abstract base class for manager agents.
+    """Abstract interface for manager agents.
 
-    Manager agents observe workflow state and can take actions to
-    influence execution, such as reassigning tasks, updating preferences,
-    or sending communications.
+    Implementations observe the workflow, choose an action each timestep,
+    and maintain a compact action history for downstream evaluation.
+
+    Args:
+        agent_id (str): Unique identifier for the manager agent.
+        preferences (PreferenceWeights): Initial normalized preference weights.
+
+    Attributes:
+        agent_id (str): Identifier for logging and communications.
+        preferences (PreferenceWeights): Current preference weights.
+        _action_buffer (deque[ActionResult]): Recent actions (maxlen 50).
+
+    Example:
+        ```python
+        class MyManager(ManagerAgent):
+            async def step(self, workflow, execution_state, stakeholder_profile,
+                           current_timestep, running_tasks, completed_task_ids,
+                           failed_task_ids, communication_service=None,
+                           previous_reward=0.0, done=False) -> BaseManagerAction:
+                # decide an action...
+                return NoOpAction(reasoning="Observing")
+        ```
     """
 
     def __init__(self, agent_id: str, preferences: PreferenceWeights):

@@ -11,7 +11,7 @@ we reuse `WorkflowValidationRule` to format, call, and interpret responses.
 
 import asyncio
 import inspect
-import tqdm
+import tqdm  # type: ignore
 from typing import Any, Callable, cast
 
 from ...schemas.evaluation.success_criteria import (
@@ -52,7 +52,26 @@ def _make_pbar(total: int, disable: bool, desc: str):
 
 
 class ValidationEngine:
-    """Stateless per-timestep evaluator for preferences and floating evaluators."""
+    """Stateless per-timestep evaluator for preferences and workflow rubrics.
+
+    Runs rubric groups concurrently, normalizes scores, aggregates using
+    configurable strategies, and maintains a reward vector over timesteps.
+
+    Args:
+        seed (int): Random seed for LLM rubric evaluation consistency.
+        max_concurrent_rubrics (int): Concurrency limit for rubric execution.
+        log_preference_progress (bool): Show tqdm progress when evaluating preferences.
+        selected_timesteps (list[int] | None): Forced evaluation timesteps; if provided,
+            cadence checks are augmented to include these timesteps.
+        reward_aggregator (BaseRewardAggregator | None): Aggregator mapping evaluation
+            results to a reward value (scalar or structured). Defaults to utility sum.
+        reward_projection (RewardProjection | None): Optional projector to scalar reward.
+
+    Attributes:
+        evaluation_results (list[EvaluationResult]): History of evaluation outputs.
+        reward_vector (list[float]): Scalar reward per timestep (zeros where not evaluated).
+        most_recent_reward (float): Last projected reward value.
+    """
 
     def __init__(
         self,

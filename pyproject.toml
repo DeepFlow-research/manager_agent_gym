@@ -28,6 +28,7 @@ dependencies = [
     "typer>=0.12.5",
     "questionary>=2.0.1",
     "instructor>=1.11.3",
+    "anthropic>=0.68.0",
 ]
 
 [dependency-groups]

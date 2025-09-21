@@ -112,6 +112,10 @@ class StakeholderAgent(StakeholderBase):
             execution_time = time.time() - start_time
 
             if not isinstance(output, AITaskOutput):
+                logger.error(
+                    f"Stakeholder failed to complete task. Output was {output} of type {type(output)}, expected AITaskOutput",
+                    exc_info=True,
+                )
                 return create_task_result(
                     task_id=task.id,
                     agent_id=self.config.agent_id,
@@ -121,8 +125,11 @@ class StakeholderAgent(StakeholderBase):
                     cost=cost,
                     error="Stakeholder failed to complete task",
                 )
-
             if not output.resources:
+                logger.error(
+                    "Stakeholder failed to complete task. No resources were generated",
+                    exc_info=True,
+                )
                 return create_task_result(
                     task_id=task.id,
                     agent_id=self.config.agent_id,
@@ -141,6 +148,7 @@ class StakeholderAgent(StakeholderBase):
                 success=True,
                 execution_time=execution_time,
                 resources=output.resources,
+                simulated_duration_hours=(execution_time / 3600.0),
                 cost=cost,
                 reasoning=output.reasoning,
                 execution_notes=output.execution_notes,
@@ -162,6 +170,7 @@ class StakeholderAgent(StakeholderBase):
                         content_type="text/plain",
                     )
                 ],
+                simulated_duration_hours=(execution_time / 3600.0),
                 cost=0.0,
             )
 

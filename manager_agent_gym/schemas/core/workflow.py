@@ -27,40 +27,73 @@ class Workflow(BaseModel):
     """
 
     # Essential fields (previously from BaseEntity)
-    id: UUID = Field(default_factory=uuid4)
-    name: str = Field(..., description="Human-readable name")
+    id: UUID = Field(
+        default_factory=uuid4,
+        description="Unique identifier for this workflow instance.",
+        examples=[str(uuid4())],
+    )
+    name: str = Field(
+        ...,
+        description="Human-readable name for dashboards and logs.",
+        examples=["IPO Readiness"],
+    )
     workflow_goal: str = Field(
         ...,
-        description="Detailed description of what the workflow attempts to achieve.",
+        description="Detailed objective and acceptance criteria for the workflow run.",
+        examples=[
+            "Objective: Secure AOC and Operating Licence. Acceptance: AOC issued, OL granted, inspections passed.",
+        ],
     )
-    owner_id: UUID = Field(..., description="ID of the workflow owner")
+    owner_id: UUID = Field(
+        ...,
+        description="ID of the workflow owner (tenant/user)",
+        examples=[str(uuid4())],
+    )
 
     # Core POSG state components
     tasks: dict[UUID, Task] = Field(
-        default_factory=dict, description="Task graph nodes (G)"
+        default_factory=dict,
+        description="Task graph nodes (G). Keys are task UUIDs; values are Task models.",
+        examples=[
+            {str(uuid4()): Task(name="Draft plan", description="...").model_dump()}
+        ],
     )
     resources: dict[UUID, Resource] = Field(
-        default_factory=dict, description="Resource registry (R)"
+        default_factory=dict,
+        description="Resource registry (R). Keys are resource UUIDs; values are Resource models.",
     )
     agents: dict[str, AgentInterface] = Field(
-        default_factory=dict, description="Available agents (W)"
+        default_factory=dict,
+        description="Available agents (W). Keys are agent ids; values are live AgentInterface instances.",
     )
     messages: list[Message] = Field(
-        default_factory=list, description="Communication history (C)"
+        default_factory=list,
+        description="Communication history (C). Appended by the communication service.",
     )
 
     # Workflow metadata
-    constraints: list[Constraint] = Field(default_factory=list)
+    constraints: list[Constraint] = Field(
+        default_factory=list,
+        description="Hard/soft constraints used by evaluators and planning",
+    )
 
     # Execution tracking
-    started_at: datetime | None = Field(default=None)
+    started_at: datetime | None = Field(
+        default=None, description="When execution started (set by engine)"
+    )
     # Optional run seed for reproducibility; engine sets this when provided
     seed: int = Field(default=42, description="Run-level seed for reproducibility")
-    completed_at: datetime | None = Field(default=None)
-    is_active: bool = Field(default=False)
+    completed_at: datetime | None = Field(
+        default=None, description="When execution completed (set by engine)"
+    )
+    is_active: bool = Field(
+        default=False, description="Whether the workflow is currently active"
+    )
 
     # Metrics for evaluation
-    total_cost: float = Field(default=0.0)
+    total_cost: float = Field(
+        default=0.0, description="Cumulative actual cost reported by agents"
+    )
     # Sum of all task-level simulated durations (hours), reported by agents
     total_simulated_hours: float = Field(
         default=0.0,

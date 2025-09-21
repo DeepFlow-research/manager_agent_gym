@@ -31,9 +31,6 @@ from ..common.llm_interface import (
 )
 from ...schemas.workflow_agents.config import AgentConfig
 
-from .llm_action_utils import parse_action_response
-import json
-
 
 class ChainOfThoughtManagerAgent(ManagerAgent):
     """
@@ -82,7 +79,7 @@ class ChainOfThoughtManagerAgent(ManagerAgent):
             )
             user_prompt = self._prepare_context(observation)
 
-            # Direct LiteLLM call with structured output
+            # Direct LLM call with structured output (validated by Pydantic)
             parsed_action = await generate_structured_response(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
@@ -90,14 +87,7 @@ class ChainOfThoughtManagerAgent(ManagerAgent):
                 model=self.model_name,
                 seed=self._seed,
             )
-            # Map constrained schema instance to real action class with execute()
-            action_payload = parsed_action.action.model_dump(mode="json")  # type: ignore[attr-defined]
-            envelope = {
-                "reasoning": parsed_action.reasoning,  # type: ignore[attr-defined]
-                "action": action_payload,
-            }
-            action = parse_action_response(json.dumps(envelope), self.action_classes)
-            return action
+            return parsed_action.action  # type: ignore[attr-defined]
 
         except LLMInferenceTruncationError as e:
             concise_reason = (

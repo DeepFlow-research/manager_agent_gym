@@ -3,7 +3,6 @@ from __future__ import annotations
 import importlib
 import sys
 import inspect
-import pkgutil
 from pathlib import Path
 import os
 from typing import Any, Callable
@@ -25,7 +24,7 @@ def discover_scenarios() -> list[tuple[str, Path]]:
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
     base_pkg = importlib.import_module(EXAMPLES_PKG)
-    base_dir = Path(base_pkg.__file__).parent #type: ignore
+    base_dir = Path(base_pkg.__file__).parent  # type: ignore
     scenarios: list[tuple[str, Path]] = []
     for child in base_dir.iterdir():
         if not child.is_dir():
@@ -77,8 +76,11 @@ def extract_goal_text(workflow_obj: Any) -> str:
 def _try_call_zero_arg(fn: Callable[..., Any]) -> Any | None:
     try:
         sig = inspect.signature(fn)
-        if any(p.default is inspect._empty and p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
-               for p in sig.parameters.values()):
+        if any(
+            p.default is inspect._empty
+            and p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+            for p in sig.parameters.values()
+        ):
             return None
         return fn()
     except Exception:
@@ -110,8 +112,13 @@ def find_workflow_factory(module: Any) -> Any | None:
     return None
 
 
-def summarize_workflow_stats(wf: Any, team_details: list[dict[str, Any]], schedule: dict[int, list[tuple[str, str]]]) -> dict[str, int]:
+def summarize_workflow_stats(
+    wf: Any,
+    team_details: list[dict[str, Any]],
+    schedule: dict[int, list[tuple[str, str]]],
+) -> dict[str, int]:
     """Compute simple statistics for badges: tasks, constraints, team size, timeline length."""
+
     def _count_all_tasks(tasks_dict: dict) -> int:
         seen: set = set()
         total = 0
@@ -165,12 +172,12 @@ def format_goal(goal_text: str) -> list[str]:
     if prim_idx != -1:
         head = objective[:prim_idx].strip()
         rest = objective[prim_idx:].splitlines()
-        lines_out.append("!!! info \"Objective\"\n")
+        lines_out.append('!!! info "Objective"\n')
         for ln in head.splitlines():
             lines_out.append(f"    {ln}\n")
         # Render deliverables bullets
         lines_out.append("\n")
-        lines_out.append("??? note \"Primary deliverables\"\n")
+        lines_out.append('??? note "Primary deliverables"\n')
         for ln in rest[1:]:
             ln = ln.strip(" -\t")
             if not ln:
@@ -178,7 +185,7 @@ def format_goal(goal_text: str) -> list[str]:
             lines_out.append(f"    - {ln}\n")
         lines_out.append("\n")
     else:
-        lines_out.append("!!! info \"Objective\"\n")
+        lines_out.append('!!! info "Objective"\n')
         for ln in objective.splitlines():
             lines_out.append(f"    {ln}\n")
         lines_out.append("\n")
@@ -189,7 +196,7 @@ def format_goal(goal_text: str) -> list[str]:
         # Strip heading line
         if acc_lines:
             heading = acc_lines[0].strip(": ")
-            lines_out.append(f"??? success \"{heading}\"\n")
+            lines_out.append(f'??? success "{heading}"\n')
             bullet_block = acc_lines[1:]
             for ln in bullet_block:
                 clean = ln.strip(" -\t")
@@ -223,7 +230,7 @@ def build_mermaid_workflow(wf: Any) -> list[str]:
 
     def _clean(text: str) -> str:
         text = text.replace("\\", " ").replace("\n", " ")
-        return text.replace("\"", "'")
+        return text.replace('"', "'")
 
     # Nodes
     for idx, (tid, t) in enumerate(task_items, start=1):
@@ -233,7 +240,7 @@ def build_mermaid_workflow(wf: Any) -> list[str]:
         # truncate long labels for readability
         if len(label) > 60:
             label = label[:57] + "..."
-        lines.append(f"  {nid}[\"{label}\"]\n")
+        lines.append(f'  {nid}["{label}"]\n')
 
     # Edges: dependencies
     for tid, t in task_items:
@@ -253,7 +260,9 @@ def build_mermaid_workflow(wf: Any) -> list[str]:
     return lines
 
 
-def write_graphviz_svg(wf: Any, scenario: str, out_dir: Path, use_gen: bool) -> str | None:
+def write_graphviz_svg(
+    wf: Any, scenario: str, out_dir: Path, use_gen: bool
+) -> str | None:
     """Render a Graphviz DOT diagram of the workflow to SVG and return relative path.
 
     When running under mkdocs-gen-files, write into docs/benchmark/assets; else to disk.
@@ -269,8 +278,17 @@ def write_graphviz_svg(wf: Any, scenario: str, out_dir: Path, use_gen: bool) -> 
         print(f"[bench] no tasks found for {scenario}; skipping graphviz")
         return None
 
-    dot = Digraph(comment=f"Workflow {scenario}", graph_attr={"rankdir": "LR", "splines": "spline"})
-    dot.attr("node", shape="box", style="rounded,filled", fillcolor="#E8F1FC", color="#5B8DEF")
+    dot = Digraph(
+        comment=f"Workflow {scenario}",
+        graph_attr={"rankdir": "LR", "splines": "spline"},
+    )
+    dot.attr(
+        "node",
+        shape="box",
+        style="rounded,filled",
+        fillcolor="#E8F1FC",
+        color="#5B8DEF",
+    )
     dot.attr("edge", color="#8FAADC", penwidth="1.5")
 
     id_map: dict[str, str] = {}
@@ -310,7 +328,9 @@ def write_graphviz_svg(wf: Any, scenario: str, out_dir: Path, use_gen: bool) -> 
     return md_rel_path
 
 
-def extract_team_schedule(module: Any) -> tuple[list[dict[str, Any]], dict[int, list[tuple[str, str]]]]:
+def extract_team_schedule(
+    module: Any,
+) -> tuple[list[dict[str, Any]], dict[int, list[tuple[str, str]]]]:
     """Return (team_details, schedule) where
     - team_details: list of {id,type,description,capabilities}
     - schedule: {timestep: [(agent_id, note), ...]}
@@ -325,7 +345,9 @@ def extract_team_schedule(module: Any) -> tuple[list[dict[str, Any]], dict[int, 
             for key, obj in cfg.items():
                 agent_id = getattr(obj, "agent_id", key)
                 agent_type = getattr(obj, "agent_type", "")
-                description = getattr(obj, "agent_description", getattr(obj, "description", ""))
+                description = getattr(
+                    obj, "agent_description", getattr(obj, "description", "")
+                )
                 capabilities = getattr(obj, "agent_capabilities", [])
                 # Human agents sometimes have name/role fields
                 name = getattr(obj, "name", "")
@@ -355,19 +377,27 @@ def extract_team_schedule(module: Any) -> tuple[list[dict[str, Any]], dict[int, 
                     for key, obj in out.items():
                         agent_id = getattr(obj, "agent_id", key)
                         agent_type = getattr(obj, "agent_type", "")
-                        description = getattr(obj, "agent_description", getattr(obj, "description", ""))
+                        description = getattr(
+                            obj, "agent_description", getattr(obj, "description", "")
+                        )
                         capabilities = getattr(obj, "agent_capabilities", [])
                         name_v = getattr(obj, "name", "")
                         role = getattr(obj, "role", "")
-                        caps = [str(c) for c in capabilities] if isinstance(capabilities, list) else []
-                        team_details.append({
-                            "id": str(agent_id),
-                            "type": str(agent_type),
-                            "name": str(name_v),
-                            "role": str(role),
-                            "description": str(description),
-                            "capabilities": caps,
-                        })
+                        caps = (
+                            [str(c) for c in capabilities]
+                            if isinstance(capabilities, list)
+                            else []
+                        )
+                        team_details.append(
+                            {
+                                "id": str(agent_id),
+                                "type": str(agent_type),
+                                "name": str(name_v),
+                                "role": str(role),
+                                "description": str(description),
+                                "capabilities": caps,
+                            }
+                        )
                     break
     try:
         tl = create_tl() if create_tl else {}
@@ -396,7 +426,9 @@ def extract_team_schedule(module: Any) -> tuple[list[dict[str, Any]], dict[int, 
                         row: list[tuple[str, str]] = []
                         try:
                             for op in ops:
-                                agent_id = getattr(op[1], "agent_id", None) or str(op[1])
+                                agent_id = getattr(op[1], "agent_id", None) or str(
+                                    op[1]
+                                )
                                 note = op[2] if len(op) > 2 else ""
                                 row.append((str(agent_id), str(note)))
                         except Exception:
@@ -419,6 +451,7 @@ def main() -> None:
     # Use mkdocs-gen-files virtual FS when running under mkdocs; fall back to disk writes.
     try:
         import mkdocs_gen_files  # type: ignore
+
         use_gen = True
     except Exception:
         mkdocs_gen_files = None  # type: ignore
@@ -443,16 +476,24 @@ def main() -> None:
     print(f"[bench] discovered {len(scenarios)} scenarios under {EXAMPLES_PKG}")
     for pkg_name, dir_path in sorted(scenarios):
         print(f"[bench] building {pkg_name}")
-        wf_mod = import_module_from_path(dir_path / "workflow.py", f"bench.{pkg_name}.workflow")
-        team_mod = import_module_from_path(dir_path / "team.py", f"bench.{pkg_name}.team")
-        pref_mod = import_module_from_path(dir_path / "preferences.py", f"bench.{pkg_name}.preferences")
+        wf_mod = import_module_from_path(
+            dir_path / "workflow.py", f"bench.{pkg_name}.workflow"
+        )
+        team_mod = import_module_from_path(
+            dir_path / "team.py", f"bench.{pkg_name}.team"
+        )
+        pref_mod = import_module_from_path(
+            dir_path / "preferences.py", f"bench.{pkg_name}.preferences"
+        )
 
         workflow_goal = ""
         wf_obj = find_workflow_factory(wf_mod)
         if wf_obj is not None:
             workflow_goal = extract_goal_text(wf_obj)
 
-        team_details, schedule = extract_team_schedule(team_mod) if team_mod else ([], {})
+        team_details, schedule = (
+            extract_team_schedule(team_mod) if team_mod else ([], {})
+        )
         pref_note = "Yes" if (pref_mod and has_preferences(pref_mod)) else "Unknown"
 
         # Write scenario page
@@ -478,12 +519,23 @@ def main() -> None:
         # Team structure as a table
         lines.append("### Team Structure\n\n")
         if team_details:
+
             def _fmt(val: str) -> str:
                 return str(val).replace("|", "\\|")
+
             lines.append("| Agent ID | Type | Name / Role | Capabilities |\n")
             lines.append("|---|---|---|---|\n")
             for info in team_details:
-                name_role = " ".join([x for x in [info.get("name") or "", f"({info.get('role')})" if info.get("role") else ""] if x]).strip()
+                name_role = " ".join(
+                    [
+                        x
+                        for x in [
+                            info.get("name") or "",
+                            f"({info.get('role')})" if info.get("role") else "",
+                        ]
+                        if x
+                    ]
+                ).strip()
                 caps = info.get("capabilities") or []
                 caps_str = "<br>".join(_fmt(c) for c in caps) if caps else ""
                 lines.append(
@@ -507,7 +559,9 @@ def main() -> None:
                             items.append(f"**{agent_id}** — {note}")
                         else:
                             items.append(f"**{agent_id}**")
-                    lines.append(f"| {ts} | " + "<br>".join(items).replace("|", "\\|") + " |\n")
+                    lines.append(
+                        f"| {ts} | " + "<br>".join(items).replace("|", "\\|") + " |\n"
+                    )
             lines.append("\n")
         else:
             lines.append("(No timeline found)\n\n")
@@ -518,7 +572,9 @@ def main() -> None:
             svg_rel = write_graphviz_svg(wf_obj, pkg_name, DOCS_DIR, use_gen)
             if svg_rel is None:
                 # Explicitly note when graphviz generation failed
-                lines.append("> Diagram generation failed; falling back to Mermaid.\n\n")
+                lines.append(
+                    "> Diagram generation failed; falling back to Mermaid.\n\n"
+                )
                 print(f"[bench] diagram failed for {pkg_name}; using Mermaid fallback")
             if svg_rel:
                 # Add size attributes and wrap in a self-link to open full-size in a new tab
@@ -547,7 +603,9 @@ def main() -> None:
 
     # Ensure index includes a note when no scenarios were found (debugging aid)
     if len(scenarios) == 0:
-        index_lines.append("(No scenarios discovered. Check import paths and packaging.)\n")
+        index_lines.append(
+            "(No scenarios discovered. Check import paths and packaging.)\n"
+        )
 
     # Write index
     if use_gen and mkdocs_gen_files is not None:
@@ -575,5 +633,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-

@@ -76,6 +76,33 @@ class DummyHuman(AgentInterface[MockConfig]):
         )
 
 
+# CLI options / marks
+def pytest_addoption(parser: pytest.Parser) -> None:  # pragma: no cover
+    parser.addoption(
+        "--fast",
+        action="store_true",
+        default=False,
+        help="Skip tests that call live LLMs (marked live_llm)",
+    )
+
+
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:  # pragma: no cover
+    if config.getoption("--fast"):
+        skip_live = pytest.mark.skip(reason="--fast: skipping live LLM tests")
+        for item in items:
+            if "live_llm" in item.keywords:
+                item.add_marker(skip_live)
+
+
+def pytest_configure(config: pytest.Config) -> None:  # pragma: no cover
+    config.addinivalue_line(
+        "markers",
+        "live_llm: marks tests that call live LLMs (skipped with --fast)",
+    )
+
+
 # Shared fixtures / factories
 
 

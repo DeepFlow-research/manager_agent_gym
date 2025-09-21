@@ -64,7 +64,7 @@ class Message(BaseModel):
     Enhanced with thread support, multiple recipients, and read tracking.
     """
 
-    message_id: UUID = Field(default_factory=uuid4)
+    message_id: UUID = Field(default_factory=uuid4, description="Unique message ID")
     sender_id: str = Field(..., description="ID of the sender (agent or manager)")
     receiver_id: str | None = Field(
         default=None, description="Primary receiver ID, None for broadcast"
@@ -73,12 +73,16 @@ class Message(BaseModel):
         default_factory=list,
         description="List of recipient agent IDs (for multi-cast messages)",
     )
-    content: str = Field(..., description="Message content")
+    content: str = Field(
+        ...,
+        description="Message content body (avoid PII in shared environments)",
+        examples=["Kickoff in 5 minutes"],
+    )
     message_type: MessageType = Field(
         default=MessageType.GENERAL,
         description="Type of message for categorization and filtering",
     )
-    timestamp: datetime = Field(default_factory=datetime.now)
+    timestamp: datetime = Field(default_factory=datetime.now, description="Send time")
 
     # Thread and conversation context
     thread_id: UUID | None = Field(

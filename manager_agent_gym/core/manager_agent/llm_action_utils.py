@@ -1,12 +1,10 @@
 """
 LLM Action Utilities for Manager Agents.
 
-Simple utility functions for building LLM constraints and parsing responses
+Simple utility functions for building LLM constraints and action descriptions
 without the overhead of a registry class.
 """
 
-import json
-import traceback
 from typing import Type, Union
 from pydantic import BaseModel, Field
 
@@ -26,7 +24,6 @@ from ...schemas.execution.manager_actions import (
     GetAvailableAgentsAction,
     GetPendingTasksAction,
 )
-from ..common.logging import logger
 
 
 def build_action_constraint_schema(
@@ -55,69 +52,8 @@ def build_action_constraint_schema(
     return ConstrainedManagerAction
 
 
-def parse_action_response(
-    response_json: str, action_classes: list[type[BaseManagerAction]]
-) -> BaseManagerAction:
-    """
-    Parse LLM JSON response into action object.
-
-    Args:
-        response_json: JSON string from LLM structured output
-        action_classes: List of allowed action classes
-
-    Returns:
-        Validated action instance
-
-    Raises:
-        ValueError: If response is invalid or action type not allowed
-        json.JSONDecodeError: If response is not valid JSON
-    """
-    try:
-        data = json.loads(response_json)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON in LLM response: {e}")
-
-    # Validate structure
-    if "action" not in data:
-        raise ValueError("Missing 'action' field in LLM response")
-
-    if "reasoning" not in data:
-        raise ValueError("Missing 'reasoning' field in LLM response")
-
-    action_data = data["action"]
-    if "action_type" not in action_data:
-        raise ValueError("Missing 'action_type' in action data")
-
-    action_type = action_data["action_type"]
-
-    # Build mapping from action_type to action class
-    action_type_map = {}
-    for cls in action_classes:
-        # Get the default value from the field definition
-        try:
-            field_info = cls.model_fields["action_type"]
-            if field_info.default is not None:
-                action_type_map[field_info.default] = cls
-        except (AttributeError, KeyError):
-            # Skip classes that don't have proper action_type field
-            continue
-
-    # Find matching action class
-    if action_type not in action_type_map:
-        allowed_types = list(action_type_map.keys())
-        raise ValueError(
-            f"Unknown action type '{action_type}'. Allowed actions: {allowed_types}"
-        )
-
-    action_class = action_type_map[action_type]
-
-    # Validate with the action class
-    try:
-        validated_action = action_class.model_validate(action_data)
-        return validated_action
-    except Exception as e:
-        logger.error(f"Action validation failed: {traceback.format_exc()}")
-        raise ValueError(f"Invalid {action_type} action parameters: {e}")
+# Note: parse_action_response has been removed. Structured generation now
+# returns validated action instances directly from the LLM client.
 
 
 def get_action_descriptions(

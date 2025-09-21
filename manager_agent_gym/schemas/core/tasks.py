@@ -17,9 +17,20 @@ class Task(BaseModel):
     They form nodes in the task dependency graph (G in the POSG state).
     """
 
-    id: UUID = Field(default_factory=uuid4)
-    name: str = Field(..., description="Human-readable name")
-    description: str = Field(..., description="Detailed description")
+    id: UUID = Field(
+        default_factory=uuid4,
+        description="Unique identifier for the task",
+    )
+    name: str = Field(
+        ...,
+        description="Clear, descriptive task name",
+        examples=["Draft technical memo"],
+    )
+    description: str = Field(
+        ...,
+        description="Detailed task description and objectives",
+        examples=["Write a 2-page memo for execs."],
+    )
 
     # Hierarchical structure
     subtasks: list["Task"] = Field(
@@ -31,22 +42,41 @@ class Task(BaseModel):
     )
 
     # Dependencies and resources
-    input_resource_ids: list[UUID] = Field(default_factory=list)
-    output_resource_ids: list[UUID] = Field(default_factory=list)
+    input_resource_ids: list[UUID] = Field(
+        default_factory=list, description="IDs of required input resources"
+    )
+    output_resource_ids: list[UUID] = Field(
+        default_factory=list, description="IDs of produced output resources"
+    )
     dependency_task_ids: list[UUID] = Field(
         default_factory=list, description="Tasks that must complete before this one"
     )
 
     # Task metadata
-    status: TaskStatus = Field(default=TaskStatus.PENDING)
-    assigned_agent_id: str | None = Field(default=None)
+    status: TaskStatus = Field(
+        default=TaskStatus.PENDING, description="Execution status of the task"
+    )
+    assigned_agent_id: str | None = Field(
+        default=None, description="ID of the agent currently assigned to this task"
+    )
 
     # Execution tracking
-    execution_notes: list[str] = Field(default_factory=list)
-    estimated_duration_hours: float | None = Field(default=None)
-    actual_duration_hours: float | None = Field(default=None)
-    estimated_cost: float | None = Field(default=None)
-    actual_cost: float | None = Field(default=None)
+    execution_notes: list[str] = Field(
+        default_factory=list,
+        description="Free-form execution notes and manager instructions",
+    )
+    estimated_duration_hours: float | None = Field(
+        default=None, description="Estimated duration in hours"
+    )
+    actual_duration_hours: float | None = Field(
+        default=None, description="Actual duration in hours (reported by agent)"
+    )
+    estimated_cost: float | None = Field(
+        default=None, description="Estimated cost in currency units"
+    )
+    actual_cost: float | None = Field(
+        default=None, description="Actual cost in currency units (reported by agent)"
+    )
     quality_score: float | None = Field(
         default=None, description="Quality assessment [0,1]"
     )

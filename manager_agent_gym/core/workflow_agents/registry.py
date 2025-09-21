@@ -24,11 +24,18 @@ if TYPE_CHECKING:
 
 
 class AgentRegistry:
-    """
-    Registry for managing available agents in the system.
+    """Dynamic registry for agents participating in a workflow run.
 
-    Maintains a mapping of agent IDs to agent instances and provides
-    methods for agent discovery and task assignment.
+    Maintains agent instances, allows late binding of agent classes, and
+    optionally schedules agents to join/leave at specific timesteps.
+
+    Example:
+        ```python
+        reg = AgentRegistry()
+        reg.register_agent_class("ai", AIAgent)
+        reg.register_agent_class("human_mock", MockHumanAgent)
+        reg.register_ai_agent(AIAgentConfig(agent_id="ai_analyst"), [])
+        ```
     """
 
     def __init__(self):

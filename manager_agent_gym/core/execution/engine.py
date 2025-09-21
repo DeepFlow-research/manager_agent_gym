@@ -50,11 +50,53 @@ from ...schemas.execution.manager_actions import ActionResult
 
 
 class WorkflowExecutionEngine:
-    """
-    Core execution engine for workflow simulation.
+    """Timestep-based workflow execution engine.
 
-    Manages discrete timesteps where tasks execute asynchronously but
-    the manager agent can observe and act between timesteps.
+    Orchestrates agents and evaluations in a discrete-time loop. Tasks run
+    concurrently, while a manager agent observes state and takes actions
+    between timesteps. Produces rich artifacts (snapshots, metrics, logs)
+    for analysis and benchmarking.
+
+    Args:
+        workflow (Workflow): The workflow graph (tasks, resources, constraints).
+        agent_registry (AgentRegistry): Dynamic registry used to join/leave agents.
+        stakeholder_agent (StakeholderBase): Stakeholder simulator providing
+            preferences and messages over time.
+        manager_agent (ManagerAgent): The decision-making manager agent.
+        seed (int): Global deterministic seed to propagate to components.
+        evaluations (list[Evaluator] | None): Optional workflow-level evaluators to run.
+        output_config (OutputConfig | None): Output directories and filenames.
+        max_timesteps (int): Maximum number of timesteps to execute.
+        enable_timestep_logging (bool): Persist per-timestep snapshots and metrics.
+        enable_final_metrics_logging (bool): Persist final metrics and summary.
+        communication_service (CommunicationService | None): Message bus; a default
+            service is created if not provided.
+        timestep_end_callbacks (Sequence[Callable[[TimestepEndContext], Awaitable[None]]] | None):
+            Optional hooks fired at the end of each timestep (failures logged and ignored).
+        log_preference_evaluation_progress (bool): Show tqdm progress for preference evals.
+        max_concurrent_rubrics (int): Concurrency limit for rubric evaluation.
+        reward_aggregator (BaseRewardAggregator | None): Aggregator used by the evaluator.
+        reward_projection (RewardProjection | None): Optional projection to scalar reward.
+
+    Attributes:
+        current_timestep (int): Zero-based timestep index.
+        execution_state (ExecutionState): Current engine state.
+        timestep_results (list[ExecutionResult]): Accumulated per-timestep outputs.
+        validation_engine (ValidationEngine): Evaluator used to compute rewards.
+        communication_service (CommunicationService): Message hub used by agents.
+
+    Example:
+        ```python
+        engine = WorkflowExecutionEngine(
+            workflow=my_workflow,
+            agent_registry=registry,
+            stakeholder_agent=stakeholder,
+            manager_agent=manager,
+            seed=42,
+            evaluations=[...],
+        )
+        results = await engine.run_full_execution()
+        ```
     """
 
     def __init__(

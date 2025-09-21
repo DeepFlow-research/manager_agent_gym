@@ -130,8 +130,8 @@ class ChainOfThoughtManagerAgent(ManagerAgent):
             model=self.model_name
         )
         
-        # 3. Parse and validate action
-        return parse_action_response(response.action, self.action_classes)
+        # 3. Use the validated action instance directly
+        return response.action
 ```
 
 **Key Features:**

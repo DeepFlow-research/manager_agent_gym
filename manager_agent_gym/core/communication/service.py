@@ -25,11 +25,18 @@ from ...core.common.logging import logger
 
 
 class CommunicationService:
-    """
-    Centralized communication hub for all agent interactions.
+    """Centralized message hub for agent interactions.
 
-    Implements the C (Communication) component of the POSG state model.
-    Provides message routing, storage, and retrieval for agent coordination.
+    Implements the Communication (C) component of the POSG model. Provides
+    direct, multicast, and broadcast messaging, conversation threads, and
+    grouped views for manager oversight.
+
+    Example:
+        ```python
+        comm = CommunicationService()
+        await comm.broadcast_message(from_agent="manager", content="Kickoff")
+        inbox = comm.get_messages_for_agent("agent_a", limit=20)
+        ```
     """
 
     def __init__(self):

@@ -407,23 +407,6 @@ Important twist: You slightly misunderstand the task in a realistic, plausible w
 Deliver the output as you normally would for this task, fully believing it satisfies the request.
 """
 
-    def _parse_human_text_output(self, text_result: str) -> HumanWorkOutput:
-        """Parse non-structured text output into human work format."""
-        return HumanWorkOutput(
-            resources=[
-                Resource(
-                    name=f"Work Product from {self.config.name}",
-                    description="Human-generated work output",
-                    content=text_result,
-                    content_type="text/plain",
-                )
-            ],
-            work_process="Completed task using standard approach",
-            challenges_encountered=["Limited structured output parsing"],
-            quality_notes="Standard quality work product",
-            confidence_level="moderate",
-        )
-
     def _create_execution_notes(
         self, output: HumanWorkOutput, quality_modifier: float
     ) -> list[str]:

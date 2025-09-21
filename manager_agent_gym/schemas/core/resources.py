@@ -8,22 +8,42 @@ from pydantic import BaseModel, Field
 
 
 class Resource(BaseModel):
-    """
-    A resource in the workflow system.
+    """Workflow resource model.
 
-    Resources represent inputs/outputs of tasks including documents,
-    data, code, and other digital assets (R in the POSG state).
+    Represents inputs/outputs of tasks: documents, datasets, artifacts,
+    code snippets, and other digital assets (R in the POSG state).
+
+    Example:
+        ```python
+        Resource(
+            name="Stakeholder Brief v1",
+            description="Two-page summary for exec review",
+            content="...",
+            content_type="text/markdown",
+        )
+        ```
     """
 
-    id: UUID = Field(default_factory=uuid4)
-    name: str = Field(..., description="Human-readable name")
-    description: str = Field(..., description="Detailed description")
+    id: UUID = Field(
+        default_factory=uuid4, description="Unique identifier for the resource"
+    )
+    name: str = Field(
+        ...,
+        description="Human-readable resource name",
+        examples=["Stakeholder Brief v1"],
+    )
+    description: str = Field(
+        ..., description="What this resource contains and how it is used"
+    )
 
     content: str | None = Field(
-        default=None, description="Actual content of the resource"
+        default=None,
+        description="Inline content for small artifacts. Large files should be stored externally and referenced here.",
     )
     content_type: str = Field(
-        default="text/plain", description="MIME type of the content"
+        default="text/plain",
+        description="MIME type, e.g., text/plain, text/markdown, application/json",
+        examples=["text/markdown", "application/json"],
     )
 
     @property
