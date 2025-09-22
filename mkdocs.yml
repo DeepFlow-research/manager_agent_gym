@@ -4,6 +4,7 @@ repo_url: https://github.com/DeepFlow-research/manager_agent_gym
 site_url: https://deepflow-research.github.io/manager_agent_gym
 theme:
   name: material
+  logo: logo.png
   features:
     - navigation.tabs
     - navigation.instant
@@ -35,9 +36,11 @@ plugins:
   - gen-files:
       scripts:
         - docs/gen_benchmarks.py
+        - docs/gen_index_from_readme.py
   - literate-nav
 watch:
   - examples/end_to_end_examples
+  - README.md
 nav:
   - Overview: index.md
   - Guides:
