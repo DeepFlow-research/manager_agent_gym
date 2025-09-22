@@ -126,16 +126,17 @@ MIT License — see [LICENSE](LICENSE).
 
 If you use Manager Agent Gym in your work, please cite the accompanying paper:
 
-Charlie Masters, Advaith Vellanki, Jiangbo Shangguan, Bart Kultys, Alastair Moore, Stefano V. Albrecht. "Orchestrating Human-AI Teams: The Manager Agent as a Unifying Research Challenge." DeepFlow, London, United Kingdom, 2025. Available at `docs/Orchestrating_Human_AI_Teams__The_Manager_Agent_as_a_Unifying_Research_Challenge.pdf`.
+Charlie Masters, Advaith Vellanki, Jiangbo Shangguan, Bart Kultys, Alastair Moore, Stefano V. Albrecht. "Orchestrating Human-AI Teams: The Manager Agent as a Unifying Research Challenge." In Proceedings of the International Conference on Distributed Artificial Intelligence (DAI 2025), London, United Kingdom. Available at `docs/Orchestrating_Human_AI_Teams__The_Manager_Agent_as_a_Unifying_Research_Challenge.pdf`.
 
 ```bibtex
-@misc{manager_agent_gym_2025,
-  title        = {Orchestrating Human-AI Teams: The Manager Agent as a Unifying Research Challenge},
-  author       = {Masters, Charlie and Vellanki, Advaith and Shangguan, Jiangbo and Kultys, Bart and Moore, Alastair and Albrecht, Stefano V.},
-  howpublished = {DeepFlow Whitepaper},
-  year         = {2025},
-  note         = {Manager Agent Gym},
-  url          = {docs/Orchestrating_Human_AI_Teams__The_Manager_Agent_as_a_Unifying_Research_Challenge.pdf}
+@inproceedings{manager_agent_gym_2025,
+  title     = {Orchestrating Human-AI Teams: The Manager Agent as a Unifying Research Challenge},
+  author    = {Masters, Charlie and Vellanki, Advaith and Shangguan, Jiangbo and Kultys, Bart and Moore, Alastair and Albrecht, Stefano V.},
+  booktitle = {Proceedings of the International Conference on Distributed Artificial Intelligence (DAI 2025)},
+  year      = {2025},
+  address   = {London, United Kingdom},
+  note      = {Manager Agent Gym},
+  url       = {docs/Orchestrating_Human_AI_Teams__The_Manager_Agent_as_a_Unifying_Research_Challenge.pdf}
 }
 ```
 
