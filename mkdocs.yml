@@ -1,6 +1,7 @@
 site_name: Manager Agent Gym
 site_description: SDK and Simulation Framework for Manager Agents
-repo_url: https://example.com/your-repo
+repo_url: https://github.com/DeepFlow-research/manager_agent_gym
+site_url: https://deepflow-research.github.io/manager_agent_gym
 theme:
   name: material
   features:
