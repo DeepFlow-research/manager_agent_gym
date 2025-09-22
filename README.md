@@ -1,5 +1,7 @@
 # Manager Agent Gym
 
+![DeepFlow Logo](docs/logo.png)
+
 *A research platform for developing and evaluating autonomous agents that orchestrate complex workflows involving both human and AI collaborators*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -72,6 +74,7 @@ if __name__ == "__main__":
 
 ## 📚 Documentation & Resources
 
+- **Repository Home**: [This repository](.)
 - **Docs Home**: [docs/index.md](docs/index.md)
 - **Quick Start**: [docs/QUICK_START_GUIDE.md](docs/QUICK_START_GUIDE.md)
 - **Library Guide**: [docs/LIBRARY_DOCUMENTATION.md](docs/LIBRARY_DOCUMENTATION.md)
@@ -88,6 +91,23 @@ if __name__ == "__main__":
 ## 📝 License
 
 MIT License — see [LICENSE](LICENSE).
+
+## 📖 Citation
+
+If you use Manager Agent Gym in your work, please cite the accompanying paper:
+
+Charlie Masters, Advaith Vellanki, Jiangbo Shangguan, Bart Kultys, Alastair Moore, Stefano V. Albrecht. "Orchestrating Human-AI Teams: The Manager Agent as a Unifying Research Challenge." DeepFlow, London, United Kingdom, 2025. Available at `docs/Orchestrating_Human_AI_Teams__The_Manager_Agent_as_a_Unifying_Research_Challenge.pdf`.
+
+```bibtex
+@misc{manager_agent_gym_2025,
+  title        = {Orchestrating Human-AI Teams: The Manager Agent as a Unifying Research Challenge},
+  author       = {Masters, Charlie and Vellanki, Advaith and Shangguan, Jiangbo and Kultys, Bart and Moore, Alastair and Albrecht, Stefano V.},
+  howpublished = {DeepFlow Whitepaper},
+  year         = {2025},
+  note         = {Manager Agent Gym},
+  url          = {docs/Orchestrating_Human_AI_Teams__The_Manager_Agent_as_a_Unifying_Research_Challenge.pdf}
+}
+```
 
 —
 
