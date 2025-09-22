@@ -1,6 +1,8 @@
 # Manager Agent Gym
 
-![DeepFlow Logo](docs/logo.png)
+<p align="center">
+  <img src="docs/logo.png" alt="MA-Gym Logo" width="420" />
+</p>
 
 *A research platform for developing and evaluating autonomous agents that orchestrate complex workflows involving both human and AI collaborators*
 
