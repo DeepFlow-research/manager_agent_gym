@@ -12,6 +12,34 @@
 ## 🎯 Overview
 This repository contains the research platform and reference implementation for autonomous Manager Agents that orchestrate complex workflows with human and AI collaborators. For complete documentation, head to the docs below.
 
+## 🏁 Run the Benchmark
+
+Quick way to run the benchmark suite across scenarios using the CLI.
+
+```bash
+# Activate uv virtualenv (create it first if needed: `uv venv`)
+source .venv/bin/activate
+
+# From repo root, launch the interactive runner
+python -m examples.cli
+
+# Tip: non-interactive example
+# python -m examples.cli --non-interactive --manager-mode cot --model-name o3 --max-timesteps 50
+```
+
+Outputs are written under directories like `simulation_outputs_cot_rerun/`, `simulation_outputs_random_rerun/`, etc., grouped by model.
+
+The CLI entrypoint lives at `examples/cli.py`.
+
+## 🧩 Key Concepts
+
+- **worker**: A workflow-executing agent that performs tasks and produces resources. In code these implement `AgentInterface` (see `manager_agent_gym/core/workflow_agents/interface.py`). Workers can represent simulated humans or tool-using AIs.
+- **manager**: The decision-making agent that observes the workflow each timestep and issues actions (e.g., assign, split, refine, message). See manager actions in `manager_agent_gym/schemas/execution/manager_actions.py` and manager agents under `manager_agent_gym/core/manager_agent/`.
+- **task**: An atomic or composite unit of work with dependencies and inputs/outputs, modeled by `Task` (`manager_agent_gym/schemas/core/tasks.py`).
+- **resource**: A digital artifact produced/consumed by tasks (documents, datasets, code), modeled by `Resource` (`manager_agent_gym/schemas/core/resources.py`).
+- **workflow**: The container holding tasks, agents, resources, constraints, and messages; evolves over discrete timesteps. Modeled by `Workflow` (`manager_agent_gym/schemas/core/workflow.py`).
+- **stakeholder**: The persona owning preferences and providing feedback/approvals; exposed to the manager via a public profile. See `StakeholderBase`/`StakeholderConfig` (`manager_agent_gym/core/workflow_agents/interface.py`, `manager_agent_gym/schemas/workflow_agents/stakeholder.py`).
+
 ## 🚀 Your First Manager Agent
 
 ```python
