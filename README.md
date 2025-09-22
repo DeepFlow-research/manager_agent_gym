@@ -9,6 +9,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
+**📚 Online Docs:** [deepflow-research.github.io/manager_agent_gym](https://deepflow-research.github.io/manager_agent_gym)
+
 ## 🎯 Overview
 This repository contains the research platform and reference implementation for autonomous Manager Agents that orchestrate complex workflows with human and AI collaborators. For complete documentation, head to the docs below.
 
@@ -104,6 +106,7 @@ if __name__ == "__main__":
 
 ## 📚 Documentation & Resources
 
+- **Online Docs**: [https://deepflow-research.github.io/manager_agent_gym](https://deepflow-research.github.io/manager_agent_gym)
 - **Repository Home**: [This repository](.)
 - **Docs Home**: [docs/index.md](docs/index.md)
 - **Quick Start**: [docs/QUICK_START_GUIDE.md](docs/QUICK_START_GUIDE.md)
