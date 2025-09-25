@@ -4,7 +4,7 @@
   <img src="docs/logo.png" alt="MA-Gym Logo" width="420" />
 </p>
 
-*A research platform for developing and evaluating autonomous agents that orchestrate complex workflows involving both human and AI collaborators*
+*A research platform for developing and evaluating autonomous Manager Agents that orchestrate complex workflows involving both human and AI collaborators*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
@@ -12,11 +12,11 @@
 **📚 Online Docs:** [deepflow-research.github.io/manager_agent_gym](https://deepflow-research.github.io/manager_agent_gym)
 
 ## 🎯 Overview
-This repository contains the research platform and reference implementation for autonomous Manager Agents that orchestrate complex workflows with human and AI collaborators. For complete documentation, head to the docs below.
+This repository contains the research codebase and reference implementation for autonomous Manager Agents that orchestrate complex workflows with human and AI collaborators, as described in our recent paper ["Orchestrating Human-AI Teams: The Manager Agent as a Unifying Research Challenge"](arxivLink) published in [DAI 2025](https://www.adai.ai/dai/2025). For complete documentation, head to the docs below.
 
 ## 🏁 Run the Benchmark
 
-Quick way to run the benchmark suite across scenarios using the CLI.
+Quick way to run the benchmark suite across workflow scenarios using the CLI.
 
 ```bash
 # Activate uv virtualenv (create it first if needed: `uv venv`)
@@ -141,7 +141,3 @@ Charlie Masters, Advaith Vellanki, Jiangbo Shangguan, Bart Kultys, Alastair Moor
   url       = {docs/Orchestrating_Human_AI_Teams__The_Manager_Agent_as_a_Unifying_Research_Challenge.pdf}
 }
 ```
-
-—
-
-Manager Agent Gym: Where AI learns to manage complex work in realistic environments.
