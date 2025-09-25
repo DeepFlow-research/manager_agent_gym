@@ -180,7 +180,9 @@ class WorkflowExecutionEngine:
 ### Concurrency Model
 
 **Task Execution**: Tasks execute asynchronously within each timestep
+
 **Manager Actions**: Synchronous within timestep, between task execution phases
+
 **Evaluation**: Parallel rubric evaluation with semaphore-based concurrency control
 
 ```python
