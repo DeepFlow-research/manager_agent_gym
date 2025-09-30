@@ -5,7 +5,7 @@ This package provides a comprehensive framework for creating, executing, and eva
 autonomous manager agents in workflow environments.
 
 Key Components:
-- StructuredManagerAgent: Main manager agent implementation
+- ChainOfThoughtManagerAgent: Main LLM-based manager implementation
 - WorkflowExecutionEngine: Engine for running workflows
 - AgentRegistry: Registry for workflow agents
 - Workflow building utilities and examples

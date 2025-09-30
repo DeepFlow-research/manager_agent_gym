@@ -10,42 +10,26 @@
                 a safe, effective, and well-governed market entry across initial launch geographies.
 
 ??? note "Primary deliverables"
-    - Regulatory dossier (eCTD format) covering all required modules (quality, safety, nonclinical, clinical)
-    - submitted to FDA/EMA and aligned with ICH guidelines (Q8–Q11, M4).
-    - Good Manufacturing Practice (cGMP) audit reports with validated processes, equipment qualification
-    - (IQ/OQ/PQ), and lot release readiness.
-    - Quality by Design (QbD) and risk management package including critical quality attributes (CQAs),
-    - critical process parameters (CPPs), control strategy, and lifecycle monitoring plan.
-    - Pre-Launch Activities Importation Request (PLAIR) or equivalent documentation to stage product for
-    - commercial release in compliance with FDA/EMA requirements.
-    - Market access strategy including payer dossiers, HTA submissions, pricing models, and early access
-    - or compassionate use program approvals.
-    - Distribution and supply chain readiness plan: validated logistics partners, cold-chain testing,
-    - serialization/track-and-trace compliance, and inventory ramp-up.
-    - Pharmacovigilance system: safety management plan, adverse event reporting pathways, signal detection
-    - protocols, and risk minimization measures.
-    - Governance package: decision logs, launch readiness reviews, regulatory correspondence, and board
-    - sign-offs evidencing accountability at each gate.
+    - Regulatory dossier (eCTD format) covering all required modules (quality, safety, nonclinical, clinical) submitted to FDA/EMA and aligned with ICH guidelines (Q8–Q11, M4).
+    - Good Manufacturing Practice (cGMP) audit reports with validated processes, equipment qualification (IQ/OQ/PQ), and lot release readiness.
+    - Quality by Design (QbD) and risk management package including critical quality attributes (CQAs), critical process parameters (CPPs), control strategy, and lifecycle monitoring plan.
+    - Pre-Launch Activities Importation Request (PLAIR) or equivalent documentation to stage product for commercial release in compliance with FDA/EMA requirements.
+    - Market access strategy including payer dossiers, HTA submissions, pricing models, and early access or compassionate use program approvals.
+    - Distribution and supply chain readiness plan: validated logistics partners, cold-chain testing, serialization/track-and-trace compliance, and inventory ramp-up.
+    - Pharmacovigilance system: safety management plan, adverse event reporting pathways, signal detection protocols, and risk minimization measures.
+    - Governance package: decision logs, launch readiness reviews, regulatory correspondence, and board sign-offs evidencing accountability at each gate.
 
 ??? success "Acceptance criteria (high-level)"
-    - Regulatory agencies (FDA/EMA or local authorities) formally accept submission with no critical
-    - deficiencies; first cycle review proceeds without major gaps in modules.
-    - cGMP compliance confirmed by external inspection reports; no unresolved major observations.
-    - QbD framework documented with linkages between CQAs, CPPs, and control strategy; reproducibility
-    - demonstrated across at least three validation batches.
-    - Market access plans approved by internal governance and validated by payer/HTA feedback where
-    - available; launch pricing strategy documented and authorized.
+    - Regulatory agencies (FDA/EMA or local authorities) formally accept submission with no critical deficiencies; first cycle review proceeds without major gaps in modules. cGMP compliance confirmed by external inspection reports; no unresolved major observations.
+    - QbD framework documented with linkages between CQAs, CPPs, and control strategy; reproducibility demonstrated across at least three validation batches.
+    - Market access plans approved by internal governance and validated by payer/HTA feedback where available; launch pricing strategy documented and authorized.
     - Supply chain stress-tested with distribution partners; serialization and cold-chain controls verified.
     - Pharmacovigilance system tested with mock case processing and validated by safety/compliance team.
-    - Formal sign-offs secured from Regulatory Affairs, Quality, Pharmacovigilance, Commercial, and
-    - Executive Board prior to commercial release.
+    - Formal sign-offs secured from Regulatory Affairs, Quality, Pharmacovigilance, Commercial, and Executive Board prior to commercial release.
     - Constraints (soft):
-    - Target horizon: complete launch readiness within ≤ 10 weeks of simulated effort; avoid critical path
-    - stalls >5 days on regulatory or manufacturing deliverables.
-    - Budget guardrail: stay within ±20% of projected regulatory, manufacturing validation, and launch
-    - marketing costs absent justified scope changes.
-    - Transparency: prefer proactive disclosure of known risks (e.g., supply constraints, safety signals)
-    - with mitigation plans over concealment to maximize regulator and stakeholder confidence.
+    - Target horizon: complete launch readiness within ≤ 10 weeks of simulated effort; avoid critical path stalls >5 days on regulatory or manufacturing deliverables.
+    - Budget guardrail: stay within ±20% of projected regulatory, manufacturing validation, and launch marketing costs absent justified scope changes.
+    - Transparency: prefer proactive disclosure of known risks (e.g., supply constraints, safety signals) with mitigation plans over concealment to maximize regulator and stakeholder confidence.
 
 ### Team Structure
 

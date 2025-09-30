@@ -10,37 +10,25 @@
                 for SEC review, underwriter diligence, and investor confidence.
 
 ??? note "Primary deliverables"
-    - S-1 registration statement with complete narrative (Business, Risk Factors, MD&A, Executive Compensation,
-    - Legal Proceedings) and financials compliant with Regulation S-X (audited, age-appropriate periods).
-    - PCAOB-audited financial statements with reconciliations, non-GAAP disclosure controls, and comfort letter
-    - readiness for underwriters.
-    - Corporate governance package: independent directors, audit/comp committees, charters, board minutes,
-    - and Rule 10A-3 compliance mapped to NYSE/Nasdaq standards.
-    - Internal controls documentation: disclosure controls & procedures (SOX 302) and ICFR roadmap; 404(b)
-    - readiness if applicable; management certification process rehearsed.
-    - Risk management and disclosure register: comprehensive inventory of operational, financial, legal,
-    - and cyber risks with consistent mapping to S-1 risk factors.
-    - Legal and compliance artifacts: Staff Legal Bulletin No. 19-compliant legal/tax opinions, comfort letter
-    - request lists, and EDGAR submission workflows tested.
-    - Marketing and communications plan: counsel-approved quiet-period strategy, test-the-waters (if EGC),
-    - IR playbook with Reg FD safeguards, and post-pricing disclosure controls.
-    - Listing requirements checklist with market value/shareholder distribution tests, exchange approval
-    - correspondence, and evidence of auditor PCAOB registration.
+    - S-1 registration statement with complete narrative (Business, Risk Factors, MD&A, Executive Compensation, Legal Proceedings) and financials compliant with Regulation S-X (audited, age-appropriate periods).
+    - PCAOB-audited financial statements with reconciliations, non-GAAP disclosure controls, and comfort letter readiness for underwriters.
+    - Corporate governance package: independent directors, audit/comp committees, charters, board minutes, and Rule 10A-3 compliance mapped to NYSE/Nasdaq standards.
+    - Internal controls documentation: disclosure controls & procedures (SOX 302) and ICFR roadmap; 404(b) readiness if applicable; management certification process rehearsed.
+    - Risk management and disclosure register: comprehensive inventory of operational, financial, legal, and cyber risks with consistent mapping to S-1 risk factors.
+    - Legal and compliance artifacts: Staff Legal Bulletin No. 19-compliant legal/tax opinions, comfort letter request lists, and EDGAR submission workflows tested.
+    - Marketing and communications plan: counsel-approved quiet-period strategy, test-the-waters (if EGC), IR playbook with Reg FD safeguards, and post-pricing disclosure controls.
+    - Listing requirements checklist with market value/shareholder distribution tests, exchange approval correspondence, and evidence of auditor PCAOB registration.
 
 ??? success "Acceptance criteria (high-level)"
-    - S-1 accepted for review by SEC with ≤2 major comment letter cycles; all Reg S-K and Reg S-X disclosures
-    - evidenced and traceable to supporting workpapers.
-    - Independent board committees in place and certified as meeting NYSE/Nasdaq standards; committee minutes
-    - and charters filed.
+    - S-1 accepted for review by SEC with ≤2 major comment letter cycles; all Reg S-K and Reg S-X disclosures evidenced and traceable to supporting workpapers.
+    - Independent board committees in place and certified as meeting NYSE/Nasdaq standards; committee minutes and charters filed.
     - Audit sign-offs completed; comfort letters available; management SOX 302 certifications rehearsed.
     - Legal and tax opinions filed; EDGAR test submissions validated without error codes.
     - Comms plan operational with documented legal pre-clearance; no material "gun-jumping" incidents.
     - Constraints (soft):
-    - Target horizon: complete readiness within ≤ 8 weeks of simulated effort; no >5-day stalls on critical path
-    - (financial statements, governance formation, S-1 drafting).
+    - Target horizon: complete readiness within ≤ 8 weeks of simulated effort; no >5-day stalls on critical path (financial statements, governance formation, S-1 drafting).
     - Budget guardrail: stay within ±20% of planned legal/audit/consulting costs absent justified scope changes.
-    - Transparency: prefer candid disclosure of known material weaknesses or risks, paired with remediation
-    - plans, over concealment to maximize SEC and investor confidence.
+    - Transparency: prefer candid disclosure of known material weaknesses or risks, paired with remediation plans, over concealment to maximize SEC and investor confidence.
 
 ### Team Structure
 

@@ -9,18 +9,10 @@
                 qualified pipeline for B2B (utilities, municipalities, C&I), and sign-ups for B2C community energy.
 
 ??? note "Primary deliverables"
-    - Messaging house & claims playbook (substantiated, privacy-safe), brand & creative toolkit
-    - Channel plan & budget (paid/owned/earned), flighting calendar, and experimentation plan
-    - Web conversion flows (accessibility & consent), CRM and lead-routing with scoring
-    - PR & analyst program, events/field marketing kit, partner co-marketing assets
-    - Measurement framework (brand lift, funnel KPIs, CAC/LTV), MMM/MTA-compatible UTM governance
+    - Messaging house & claims playbook (substantiated, privacy-safe), brand & creative toolkit Channel plan & budget (paid/owned/earned), flighting calendar, and experimentation plan Web conversion flows (accessibility & consent), CRM and lead-routing with scoring PR & analyst program, events/field marketing kit, partner co-marketing assets Measurement framework (brand lift, funnel KPIs, CAC/LTV), MMM/MTA-compatible UTM governance
 
 ??? success "Acceptance criteria (high‑level)"
-    - Brand lift ≥ +6% aided awareness within target segments; ≥ 15% MoM web organic uplift during flight
-    - ≥ 1,000 MQLs (B2B+B2C) with <= target CAC thresholds; ≥ 25 qualified opportunities for B2B
-    - Claims substantiation log maintained; no greenwashing guideline violations
-    - WCAG 2.1 AA compliance for key web assets; consent opt‑in rates ≥ 85%
-    - Experimentation cadence established; weekly executive dashboard live
+    - Brand lift ≥ +6% aided awareness within target segments; ≥ 15% MoM web organic uplift during flight ≥ 1,000 MQLs (B2B+B2C) with <= target CAC thresholds; ≥ 25 qualified opportunities for B2B Claims substantiation log maintained; no greenwashing guideline violations WCAG 2.1 AA compliance for key web assets; consent opt‑in rates ≥ 85% Experimentation cadence established; weekly executive dashboard live
 
 ### Team Structure
 

@@ -9,18 +9,12 @@
                 high data quality, responsible‑AI controls, and reproducible results.
 
 ??? note "Primary deliverables"
-    - Curated and governed dataset with documented lineage and quality checks
-    - Feature pipeline and model artifacts with experiment tracking and seeds
-    - Model card, bias/fairness analysis, and explainability report
-    - Deployment package (CI/CD) with monitoring and rollback plan
-    - Executive readout with business impact, risks, and next steps
+    - Curated and governed dataset with documented lineage and quality checks Feature pipeline and model artifacts with experiment tracking and seeds Model card, bias/fairness analysis, and explainability report Deployment package (CI/CD) with monitoring and rollback plan Executive readout with business impact, risks, and next steps
 
 ??? success "Acceptance criteria (high‑level)"
-    - Data privacy/PII policy compliance; secrets not present in artifacts
-    - Reproducible training runs (fixed seeds, environment captured)
+    - Data privacy/PII policy compliance; secrets not present in artifacts Reproducible training runs (fixed seeds, environment captured)
     - Minimum evaluation thresholds met (e.g., AUC/accuracy and calibration)
-    - Bias/fairness metrics within policy thresholds and mitigations documented
-    - Deployment readiness gate passed (security review + monitoring plan)
+    - Bias/fairness metrics within policy thresholds and mitigations documented Deployment readiness gate passed (security review + monitoring plan)
 
 ### Team Structure
 

@@ -1024,18 +1024,10 @@ name = "manager-agent-gym"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "anthropic" },
-    { name = "cohere" },
-    { name = "exa" },
-    { name = "exa-py" },
     { name = "fastapi", extra = ["standard"] },
     { name = "inngest" },
-    { name = "instructor" },
-    { name = "litellm" },
     { name = "matplotlib" },
     { name = "numpy" },
-    { name = "openai" },
-    { name = "openai-agents" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "questionary" },
@@ -1047,6 +1039,18 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
+agents = [
+    { name = "litellm" },
+    { name = "openai" },
+    { name = "openai-agents" },
+]
+anthropic = [
+    { name = "anthropic" },
+    { name = "instructor" },
+]
+cohere = [
+    { name = "cohere" },
+]
 dev = [
     { name = "graphviz" },
     { name = "mkdocs-awesome-pages-plugin" },
@@ -1059,21 +1063,21 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "ruff" },
 ]
+exa = [
+    { name = "exa" },
+    { name = "exa-py" },
+]
+openai = [
+    { name = "instructor" },
+    { name = "openai" },
+]
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic", specifier = ">=0.68.0" },
-    { name = "cohere", specifier = ">=5.13.12" },
-    { name = "exa", specifier = ">=0.5.26" },
-    { name = "exa-py", specifier = ">=1.8.8" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.115.7" },
     { name = "inngest", specifier = ">=0.4.18" },
-    { name = "instructor", specifier = ">=1.11.3" },
-    { name = "litellm", specifier = ">=1.60.8" },
     { name = "matplotlib", specifier = ">=3.10.0" },
     { name = "numpy", specifier = ">=2.1.3" },
-    { name = "openai", specifier = ">=1.58.0" },
-    { name = "openai-agents", specifier = ">=0.2.4" },
     { name = "pydantic", specifier = ">=2.10.5" },
     { name = "pydantic-settings", specifier = ">=2.7.1" },
     { name = "questionary", specifier = ">=2.0.1" },
@@ -1085,6 +1089,16 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
+agents = [
+    { name = "litellm", specifier = ">=1.60.8" },
+    { name = "openai", specifier = ">=1.58.0" },
+    { name = "openai-agents", specifier = ">=0.2.4" },
+]
+anthropic = [
+    { name = "anthropic", specifier = ">=0.68.0" },
+    { name = "instructor", specifier = ">=1.11.3" },
+]
+cohere = [{ name = "cohere", specifier = ">=5.13.12" }]
 dev = [
     { name = "graphviz", specifier = ">=0.20.3" },
     { name = "mkdocs-awesome-pages-plugin", specifier = ">=2.9.2" },
@@ -1096,6 +1110,14 @@ dev = [
     { name = "pytest", specifier = ">=8.3.2" },
     { name = "pytest-asyncio", specifier = ">=0.24.0" },
     { name = "ruff", specifier = ">=0.9.5" },
+]
+exa = [
+    { name = "exa", specifier = ">=0.5.26" },
+    { name = "exa-py", specifier = ">=1.8.8" },
+]
+openai = [
+    { name = "instructor", specifier = ">=1.11.3" },
+    { name = "openai", specifier = ">=1.58.0" },
 ]
 
 [[package]]

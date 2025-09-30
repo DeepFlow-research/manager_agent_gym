@@ -10,32 +10,20 @@
                 and establishing governance evidence suitable for internal and external scrutiny.
 
 ??? note "Primary deliverables"
-    - Product definition pack: intended use and misuse, task boundaries, user journeys, success metrics, and
-    - out-of-scope behaviors (what the feature must refuse or route).
-    - Data protection & DPIA bundle: data-flow maps, lawful basis/consent model, retention/minimization rules,
-    - DSR handling paths, third-party/model disclosures, and residual-risk register.
-    - Threat model & control plan: risks across prompt injection, data exfiltration via tools, unsafe function
-    - calling, secrets exposure, rate/credit abuse; mapped controls incl. sandboxing, least privilege, filters.
-    - Safety evaluation suite: red-team scenarios and abuse tests, hallucination/jailbreak metrics, benchmark
-    - results with failure analysis and a remediation log to "fix or fence" issues before launch.
-    - Transparency & provenance assets: user-facing AI disclosures and capability limits, content labeling/
-    - watermarking or provenance where feasible, model/system cards, and policy copy for Help/ToS/Privacy.
-    - Observability & guardrails: runtime moderation checks, PII/unsafe-content filters, event logging, alerting
-    - thresholds, and dashboards for safety/quality/cost; rollback and kill-switch procedures.
-    - Pilot & rollout plan: design-partner cohort, A/B experiment design, acceptance gates, rollback criteria,
-    - staged exposure (internal → limited external → GA) with entry/exit criteria.
-    - Governance package: decision logs, launch-gate materials, approvals (Product, Security, Privacy/Compliance,
-    - Legal), and audit-ready links to evidence and artifacts.
+    - Product definition pack: intended use and misuse, task boundaries, user journeys, success metrics, and out-of-scope behaviors (what the feature must refuse or route).
+    - Data protection & DPIA bundle: data-flow maps, lawful basis/consent model, retention/minimization rules, DSR handling paths, third-party/model disclosures, and residual-risk register.
+    - Threat model & control plan: risks across prompt injection, data exfiltration via tools, unsafe function calling, secrets exposure, rate/credit abuse; mapped controls incl. sandboxing, least privilege, filters.
+    - Safety evaluation suite: red-team scenarios and abuse tests, hallucination/jailbreak metrics, benchmark results with failure analysis and a remediation log to "fix or fence" issues before launch.
+    - Transparency & provenance assets: user-facing AI disclosures and capability limits, content labeling/ watermarking or provenance where feasible, model/system cards, and policy copy for Help/ToS/Privacy.
+    - Observability & guardrails: runtime moderation checks, PII/unsafe-content filters, event logging, alerting thresholds, and dashboards for safety/quality/cost; rollback and kill-switch procedures.
+    - Pilot & rollout plan: design-partner cohort, A/B experiment design, acceptance gates, rollback criteria, staged exposure (internal → limited external → GA) with entry/exit criteria.
+    - Governance package: decision logs, launch-gate materials, approvals (Product, Security, Privacy/Compliance, Legal), and audit-ready links to evidence and artifacts.
 
 ??? success "Acceptance criteria (high-level)"
-    - Red-team coverage demonstrated across injection/exfiltration/unsafe tool use; all critical issues remediated
-    - or explicitly risk-accepted by the accountable owner with compensating controls.
-    - DPIA completed with privacy controls validated in staging and production paths; residual risks documented
-    - and accepted; no unresolved high-risk privacy issues at launch gate.
-    - Clear, testable transparency: disclosures present; labeling/provenance applied where applicable; telemetry
-    - shows safety checks executed in ≥99% of eligible events with alerting for misses.
-    - Formal sign-offs captured for Security, Privacy/Compliance, Legal, and Product; launch-gate minutes and
-    - evidence stored and linkable for audit.
+    - Red-team coverage demonstrated across injection/exfiltration/unsafe tool use; all critical issues remediated or explicitly risk-accepted by the accountable owner with compensating controls.
+    - DPIA completed with privacy controls validated in staging and production paths; residual risks documented and accepted; no unresolved high-risk privacy issues at launch gate.
+    - Clear, testable transparency: disclosures present; labeling/provenance applied where applicable; telemetry shows safety checks executed in ≥99% of eligible events with alerting for misses.
+    - Formal sign-offs captured for Security, Privacy/Compliance, Legal, and Product; launch-gate minutes and evidence stored and linkable for audit.
 
 ### Team Structure
 

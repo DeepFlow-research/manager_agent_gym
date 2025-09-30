@@ -5,7 +5,7 @@ This module provides access to the core submodules while preserving
 the organized folder structure. Import specific functionality from
 the appropriate submodules:
 
-- manager_agent: StructuredManagerAgent, ManagerAgent
+- manager_agent: ChainOfThoughtManagerAgent, ManagerAgent
 - workflow_agents: AgentRegistry, AIAgent, MockHumanAgent
 - execution: WorkflowExecutionEngine, workflow_builder
 - evaluation: NestedPreferenceRegretCalculator

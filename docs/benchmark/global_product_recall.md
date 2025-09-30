@@ -10,39 +10,22 @@
                 restored consumer confidence and regulatory compliance.
 
 ??? note "Primary deliverables"
-    - Global regulatory notification package: NHTSA, Transport Canada, EU GPSR, and national authority filings
-    - with defect characterization, risk assessment, and coordinated timeline across all jurisdictions.
-    - Crisis management coordination: cross-functional recall team activation, executive communication protocols,
-    - regulatory liaison management, and 24/7 incident response capability with documented decision-making authority.
-    - Consumer communication campaign: multi-channel safety notifications (mail, electronic, dealer networks),
-    - customer service hotline deployment, media relations strategy, and social media crisis management with
-    - regulatory-compliant messaging.
-    - Product retrieval logistics: reverse supply chain activation, dealer network coordination, customer return
-    - processing, affected inventory identification and quarantine, and disposal/recycling protocols across
-    - global markets.
-    - Root cause analysis and remediation: technical failure investigation, design modification development,
-    - enhanced testing protocols, supplier quality improvements, and manufacturing process corrections with
-    - validation evidence.
-    - Regulatory compliance documentation: recall effectiveness monitoring, consumer response tracking
-    - (targeting >95% completion), regulatory status reporting, and audit trail maintenance across all markets.
-    - Market re-entry strategy: product redesign validation, regulatory approval for resumed sales, enhanced
-    - quality assurance protocols, customer confidence rebuilding campaign, and competitive repositioning plan.
-    - Legal and financial coordination: liability management across jurisdictions, insurance claims processing,
-    - litigation strategy development, and financial impact mitigation with stakeholder communication.
+    - Global regulatory notification package: NHTSA, Transport Canada, EU GPSR, and national authority filings with defect characterization, risk assessment, and coordinated timeline across all jurisdictions.
+    - Crisis management coordination: cross-functional recall team activation, executive communication protocols, regulatory liaison management, and 24/7 incident response capability with documented decision-making authority.
+    - Consumer communication campaign: multi-channel safety notifications (mail, electronic, dealer networks), customer service hotline deployment, media relations strategy, and social media crisis management with regulatory-compliant messaging.
+    - Product retrieval logistics: reverse supply chain activation, dealer network coordination, customer return processing, affected inventory identification and quarantine, and disposal/recycling protocols across global markets.
+    - Root cause analysis and remediation: technical failure investigation, design modification development, enhanced testing protocols, supplier quality improvements, and manufacturing process corrections with validation evidence.
+    - Regulatory compliance documentation: recall effectiveness monitoring, consumer response tracking (targeting >95% completion), regulatory status reporting, and audit trail maintenance across all markets.
+    - Market re-entry strategy: product redesign validation, regulatory approval for resumed sales, enhanced quality assurance protocols, customer confidence rebuilding campaign, and competitive repositioning plan.
+    - Legal and financial coordination: liability management across jurisdictions, insurance claims processing, litigation strategy development, and financial impact mitigation with stakeholder communication.
 
 ??? success "Acceptance criteria (high-level)"
-    - Recall completion rate >95% across all 15 markets with regulatory sign-offs obtained; no outstanding
-    - critical safety findings.
-    - Consumer safety incidents eliminated with zero additional injuries/fatalities post-recall announcement;
-    - product hazard fully contained.
-    - Regulatory approvals secured for market re-entry in all jurisdictions; enhanced quality protocols
-    - validated and operational.
-    - Customer confidence metrics restored to >80% of pre-recall levels within 12 months; brand reputation
-    - recovery demonstrated through independent surveys.
-    - Financial impact contained within crisis management budget parameters; insurance coverage maximized
-    - and litigation exposure minimized.
-    - Supply chain partners retained with enhanced quality agreements; dealer network confidence maintained
-    - throughout process.
+    - Recall completion rate >95% across all 15 markets with regulatory sign-offs obtained; no outstanding critical safety findings.
+    - Consumer safety incidents eliminated with zero additional injuries/fatalities post-recall announcement; product hazard fully contained.
+    - Regulatory approvals secured for market re-entry in all jurisdictions; enhanced quality protocols validated and operational.
+    - Customer confidence metrics restored to >80% of pre-recall levels within 12 months; brand reputation recovery demonstrated through independent surveys.
+    - Financial impact contained within crisis management budget parameters; insurance coverage maximized and litigation exposure minimized.
+    - Supply chain partners retained with enhanced quality agreements; dealer network confidence maintained throughout process.
 
 ### Team Structure
 

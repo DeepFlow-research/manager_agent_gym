@@ -110,7 +110,7 @@ async def run_hello_manager_agent():
     preferences = create_basic_preferences()
     manager = ChainOfThoughtManagerAgent(
         preferences=preferences,
-        model_name="gpt-4.1 mini",  # Using cost-effective model for demo
+        model_name="gpt-4o-mini",  # Cost-effective model for demo
         manager_persona="Organized Project Coordinator",
     )
     print("✅ Manager agent created with quality-focused preferences")

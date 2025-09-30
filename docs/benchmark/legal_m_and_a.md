@@ -10,25 +10,11 @@
                 minimizing regulatory risk.
 
 ??? note "Primary deliverables"
-    - SPA drafts and a redline history with change rationales and crisp decision memos
-    - Evidence-linked disclosure schedules and consent lists mapped to diligence artifacts
-    - HSR submission (and CFIUS notice if elected) with waiting-period tracking and mitigations
-    - Funds-flow, sources/uses, signature packets, and a complete closing set with bring-down plan
-    - Risk register, RAID log, weekly status cadence, and board/committee approvals
+    - SPA drafts and a redline history with change rationales and crisp decision memos Evidence-linked disclosure schedules and consent lists mapped to diligence artifacts HSR submission (and CFIUS notice if elected) with waiting-period tracking and mitigations Funds-flow, sources/uses, signature packets, and a complete closing set with bring-down plan Risk register, RAID log, weekly status cadence, and board/committee approvals
 
 ??? success "Acceptance criteria (aligned with evaluators)"
-    - Drafting completeness/consistency across SPA core sections with coherent fallback ladders
-    - Disclosure schedules are precise, current, and cite supporting evidence from the data room
-    - Funds-flow and closing set are execution-ready; bring-down confirmations planned
-    - HSR/CFIUS filings prepared and submitted as required; third-party consents actively managed
-    - Governance artifacts captured; no hard gating items outstanding at close
-    - Team alignment (see team configuration and timeline):
-    - AI agents: deal_counsel_ai, diligence_reader, schedules_builder, redline_explainer,
-    - antitrust_analyst, cfius_analyst, tax_structuring_ai, funds_flow_coordinator,
-    - closing_checklist_manager, project_coordinator
-    - Human roles: lead_mna_partner, senior_mna_associate, regulatory/ip/privacy/employment/finance counsel,
-    - tax_partner, rwi_broker, acquirer GC/CFO, target CEO
-    - Preference dynamics emphasize early momentum (speed), then raise quality and compliance as signing approaches.
+    - Drafting completeness/consistency across SPA core sections with coherent fallback ladders Disclosure schedules are precise, current, and cite supporting evidence from the data room Funds-flow and closing set are execution-ready; bring-down confirmations planned HSR/CFIUS filings prepared and submitted as required; third-party consents actively managed Governance artifacts captured; no hard gating items outstanding at close Team alignment (see team configuration and timeline):
+    - AI agents: deal_counsel_ai, diligence_reader, schedules_builder, redline_explainer, antitrust_analyst, cfius_analyst, tax_structuring_ai, funds_flow_coordinator, closing_checklist_manager, project_coordinator Human roles: lead_mna_partner, senior_mna_associate, regulatory/ip/privacy/employment/finance counsel, tax_partner, rwi_broker, acquirer GC/CFO, target CEO Preference dynamics emphasize early momentum (speed), then raise quality and compliance as signing approaches.
 
 ### Team Structure
 

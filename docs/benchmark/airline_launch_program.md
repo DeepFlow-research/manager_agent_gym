@@ -11,44 +11,28 @@
                 readiness for safe, reliable, and commercially viable operations.
 
 ??? note "Primary deliverables"
-    - Approved Air Operator Certificate (AOC) with validated Operations Manuals (OM-A/B/C/D), Safety Management
-    - System (SMS), Compliance Monitoring, and training records meeting UK Reg (EU) 965/2012 and ANO 2016.
-    - Granted Operating Licence (OL) with evidence of UK principal place of business, majority ownership/control,
-    - financial fitness, and binding insurance contracts compliant with Reg (EC) 785/2004.
-    - Airworthiness approvals: Part-CAMO and Part-145 arrangements (in-house or contracted), Aircraft
-    - Registration Certificates, Certificates of Airworthiness (CofA) and Airworthiness Review Certificates (ARC),
-    - and reliability/maintenance programs.
-    - Aviation security package: airline security programme approved under the National Aviation Security Programme
-    - (NASP), staff vetting and training records, and use of government-approved screening equipment.
-    - Dangerous goods (DG) approval (if applicable): CAA Form SRG2807 submission, DG training program approval,
-    - and Ops Manual DG procedures integrated into compliance monitoring.
-    - Insurance & liability package: binding certificates covering passenger, baggage, cargo, and third-party
-    - liabilities with required minima.
-    - Airport and slot access approvals: slot confirmations at coordinated airports (via ACL), handling contracts,
-    - ground operations arrangements, and disruption management plan compliant with UK261 passenger rights.
-    - Governance package: decision logs, proving flight records, CAA inspection findings and closures, executive
-    - sign-offs, and board-approved readiness evidence.
+    - Approved Air Operator Certificate (AOC) with validated Operations Manuals (OM-A/B/C/D), Safety Management System (SMS), Compliance Monitoring, and training records meeting UK Reg (EU) 965/2012 and ANO 2016.
+    - Granted Operating Licence (OL) with evidence of UK principal place of business, majority ownership/control, financial fitness, and binding insurance contracts compliant with Reg (EC) 785/2004.
+    - Airworthiness approvals: Part-CAMO and Part-145 arrangements (in-house or contracted), Aircraft Registration Certificates, Certificates of Airworthiness (CofA) and Airworthiness Review Certificates (ARC), and reliability/maintenance programs.
+    - Aviation security package: airline security programme approved under the National Aviation Security Programme (NASP), staff vetting and training records, and use of government-approved screening equipment.
+    - Dangerous goods (DG) approval (if applicable): CAA Form SRG2807 submission, DG training program approval, and Ops Manual DG procedures integrated into compliance monitoring.
+    - Insurance & liability package: binding certificates covering passenger, baggage, cargo, and third-party liabilities with required minima.
+    - Airport and slot access approvals: slot confirmations at coordinated airports (via ACL), handling contracts, ground operations arrangements, and disruption management plan compliant with UK261 passenger rights.
+    - Governance package: decision logs, proving flight records, CAA inspection findings and closures, executive sign-offs, and board-approved readiness evidence.
 
 ??? success "Acceptance criteria (high-level)"
     - AOC issued with no unresolved CAA findings; proving flights and inspections completed successfully.
     - OL granted on demonstration of financial fitness, ownership/control, and compliant insurance coverage.
-    - CAMO/Part-145 arrangements validated; ARC/CofA issued for all fleet aircraft; reliability and MEL/GMEL
-    - programs approved.
-    - Airline security programme accepted by CAA; 100% of relevant staff vetted and trained; compliance with
-    - NASP evidenced.
-    - Dangerous goods approval (where applicable) granted; DG procedures integrated into Ops Manual and training
-    - records available.
+    - CAMO/Part-145 arrangements validated; ARC/CofA issued for all fleet aircraft; reliability and MEL/GMEL programs approved.
+    - Airline security programme accepted by CAA; 100% of relevant staff vetted and trained; compliance with NASP evidenced.
+    - Dangerous goods approval (where applicable) granted; DG procedures integrated into Ops Manual and training records available.
     - Slots confirmed at intended airports; ground handling and disruption management plans signed off.
-    - Formal sign-offs present from Accountable Manager, nominated postholders (Flight Ops, Ground Ops,
-    - Continuing Airworthiness, Crew Training, Safety, Security), and Board of Directors.
+    - Formal sign-offs present from Accountable Manager, nominated postholders (Flight Ops, Ground Ops, Continuing Airworthiness, Crew Training, Safety, Security), and Board of Directors.
     - Governance documentation demonstrates regulatory engagement, escalation handling, and final approval.
     - Constraints (soft):
-    - Target horizon: complete certification and launch readiness in ≤ 12 weeks of simulated effort; avoid >7-day
-    - stalls on critical-path milestones (AOC, OL, airworthiness approvals).
-    - Budget guardrail: stay within ±20% of projected certification, legal, insurance, and operational setup costs
-    - absent justified scope changes.
-    - Transparency: prefer proactive disclosure of regulatory issues or resource gaps, with remediation and
-    - mitigation plans, to maximize regulator trust and launch confidence.
+    - Target horizon: complete certification and launch readiness in ≤ 12 weeks of simulated effort; avoid >7-day stalls on critical-path milestones (AOC, OL, airworthiness approvals).
+    - Budget guardrail: stay within ±20% of projected certification, legal, insurance, and operational setup costs absent justified scope changes.
+    - Transparency: prefer proactive disclosure of regulatory issues or resource gaps, with remediation and mitigation plans, to maximize regulator trust and launch confidence.
 
 ### Team Structure
 

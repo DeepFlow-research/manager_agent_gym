@@ -10,13 +10,8 @@
                 conditions, demonstrate robust risk governance and model controls, and document recovery options.
 
 ??? note "Primary deliverables"
-    - Risk appetite statement with quantitative limits and early‑warning indicators
-    - Material risk inventory and qualitative assessment (inherent, controls, residual) with owners
-    - Scenario suite and stress testing results (credit, IRRBB, liquidity, operational, climate overlay)
-    - Capital plan with buffers vs NCUA RBC or CCULR leverage, plus management buffer policy
-    - Model risk framework evidence (inventory, validation, challenger outcomes) per SR 11‑7
-    - Liquidity adequacy analysis and contingency funding plan
-    - Board package: exec summary, key findings, capital decisions, and remediation actions
+    - Risk appetite statement with quantitative limits and early‑warning indicators Material risk inventory and qualitative assessment (inherent, controls, residual) with owners Scenario suite and stress testing results (credit, IRRBB, liquidity, operational, climate overlay)
+    - Capital plan with buffers vs NCUA RBC or CCULR leverage, plus management buffer policy Model risk framework evidence (inventory, validation, challenger outcomes) per SR 11‑7 Liquidity adequacy analysis and contingency funding plan Board package: exec summary, key findings, capital decisions, and remediation actions
 
 ### Team Structure
 

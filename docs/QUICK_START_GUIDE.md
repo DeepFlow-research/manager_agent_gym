@@ -7,13 +7,13 @@
 ## 🚀 What You'll Build
 
 By the end of this guide, you'll have:
-- A working manager agent that orchestrates complex workflows
-- Understanding of how AI agents coordinate and execute tasks
-- A complete example running on your machine
+- A working manager agent orchestrating a realistic workflow
+- An understanding of how manager and worker agents coordinate tasks
+- A complete example running locally with your chosen LLM provider
 
 ## 📋 Prerequisites
 
-- Python 3.12+
+- Python 3.11+
 - [uv](https://github.com/astral-sh/uv) package manager
 - OpenAI API key (get one at [platform.openai.com](https://platform.openai.com))
 
@@ -23,14 +23,17 @@ By the end of this guide, you'll have:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/manager-agent-gym
-cd manager-agent-gym
+git clone https://github.com/DeepFlow-research/manager_agent_gym
+cd manager_agent_gym
 
 # Install with uv (recommended)
 uv pip install -e .
 
+# Install provider integrations (LLM + agents tooling)
+uv pip install -e ".[openai,agents]"
+
 # Alternative: Install with pip
-pip install -e .
+pip install -e ".[openai,agents]"
 ```
 
 ### Step 2: Configure API Keys
@@ -50,10 +53,10 @@ cp .env.example .env
 ### Step 3: Run Your First Example
 
 ```bash
-# Run the hello world example
+# Run the hello world example (recommended)
 python examples/getting_started/hello_manager_agent.py
 
-# Or run simulations via the CLI (recommended)
+# Or launch the interactive CLI
 python -m examples.cli
 ```
 
@@ -103,7 +106,7 @@ preferences = PreferenceWeights(
 # Create the AI manager
 manager = ChainOfThoughtManagerAgent(
     preferences=preferences,
-    model_name="gpt-4o",  # Choose your LLM
+    model_name="gpt-4o-mini",  # Default cost-effective OpenAI model
     manager_persona="Strategic Project Coordinator"
 )
 ```
@@ -115,12 +118,12 @@ from manager_agent_gym import WorkflowExecutionEngine, AgentRegistry
 
 # Set up the execution environment
 engine = WorkflowExecutionEngine(
-    workflow=workflow,              # The work to be done
-    agent_registry=agent_registry,  # Available workers
-    manager_agent=manager,          # The AI manager
-    stakeholder_agent=stakeholder,  # The stakeholder
-    max_timesteps=20,              # Maximum simulation steps
-    seed=42                        # For reproducible results
+    workflow=workflow,
+    agent_registry=agent_registry,
+    manager_agent=manager,
+    stakeholder_agent=stakeholder,
+    max_timesteps=20,
+    seed=42,
 )
 
 # Run the simulation
@@ -133,7 +136,7 @@ results = await engine.run_full_execution()
 
 ```python
 # Strategic LLM-based manager (default)
-manager = ChainOfThoughtManagerAgent(preferences=prefs, model_name="gpt-4o")
+manager = ChainOfThoughtManagerAgent(preferences=prefs, model_name="gpt-4o-mini")
 
 # Random baseline for comparison
 from manager_agent_gym.core.manager_agent import RandomManagerAgentV2
@@ -231,11 +234,11 @@ from examples.run_examples import run_demo
 
 # Run a specific scenario
 results = await run_demo(
-    workflow_name="data_science_analytics",  # ML model development workflow
+    workflow_name="data_science_analytics",
     max_timesteps=30,
     model_name="gpt-4o",
     manager_agent_mode="cot",
-    seed=42
+    seed=42,
 )
 
 # Analyze results
@@ -309,7 +312,7 @@ Tracks multiple metrics beyond just task completion.
 ### Dive Deeper
 
 - Read the full [Library Documentation](LIBRARY_DOCUMENTATION.md)
-- Explore the research paper (`paper.md`)
+- Explore the research paper PDF in `docs/`
 - Check out advanced examples in `examples/`
 - Review the API reference in `docs/`
 
@@ -366,7 +369,7 @@ cp .env.example .env
 **Module Import Errors**
 ```bash
 # Ensure you're in the project directory
-cd manager-agent-gym
+cd manager_agent_gym
 
 # Reinstall with uv (recommended)
 uv pip install -e .

@@ -9,8 +9,7 @@
                 capital adequacy across economic and normative perspectives for a mid‑size EU retail bank.
 
 ??? note "Primary deliverables"
-    - Comprehensive risk inventory and materiality assessment (credit, market/CVA/IRRBB, liquidity, operational,
-    - concentration, model risk) with quantification methods and owners.
+    - Comprehensive risk inventory and materiality assessment (credit, market/CVA/IRRBB, liquidity, operational, concentration, model risk) with quantification methods and owners.
     - Economic capital computation with sensitivity analysis and consistency checks across models.
     - Institution‑wide stress testing (baseline/adverse/severe) and reverse stress testing with severity rationale.
     - 3‑year normative capital plan (CET1 vs OCR+CBR, P2R/P2G, MDA) and management buffer sizing.

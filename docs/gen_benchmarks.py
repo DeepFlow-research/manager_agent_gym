@@ -153,6 +153,71 @@ def summarize_workflow_stats(
     return stats
 
 
+def _merge_wrapped_bullets(raw_lines: list[str]) -> list[str]:
+    """Merge bullets that are wrapped across multiple hyphen-prefixed lines.
+
+    Robust heuristic:
+    - Strip leading list markers then scan line-by-line
+    - Treat a subsequent hyphen line as a continuation when EITHER
+      a) the accumulated text does not end with a terminal punctuation, OR
+      b) the next line begins lowercase or with a connector phrase (and/or/with/in/to/of/for/on/via/by/including)
+    - This captures human-wrapped bullets like ",\n- governance, ..." or line breaks after slashes/commas.
+    """
+    def _strip_leading_marker(s: str) -> str:
+        s = s.lstrip()
+        if s.startswith("- "):
+            return s[2:].strip()
+        if s.startswith("• "):
+            return s[2:].strip()
+        return s
+
+    def _is_terminal(text: str) -> bool:
+        if not text:
+            return False
+        terminal_chars = ".!?]:)};:"
+        return text.rstrip().endswith(tuple(terminal_chars))
+
+    connectors = (
+        "and ",
+        "or ",
+        "with ",
+        "in ",
+        "to ",
+        "of ",
+        "for ",
+        "on ",
+        "via ",
+        "by ",
+        "including ",
+        "incl. ",
+    )
+
+    cleaned: list[str] = []
+    for ln in raw_lines:
+        c = _strip_leading_marker(ln)
+        if c:
+            cleaned.append(c)
+
+    items: list[str] = []
+    current: str = ""
+    for next_line in cleaned:
+        if not current:
+            current = next_line
+            continue
+
+        next_lower = next_line[:1].islower()
+        next_conn = next_line.lower().startswith(connectors)
+        if not _is_terminal(current) or next_lower or next_conn:
+            current = f"{current.rstrip()} {next_line}"
+        else:
+            items.append(current.rstrip())
+            current = next_line
+
+    if current:
+        items.append(current.rstrip())
+    return items
+
+
 def format_goal(goal_text: str) -> list[str]:
     """Pretty-format a long workflow goal string into sections.
 
@@ -178,11 +243,9 @@ def format_goal(goal_text: str) -> list[str]:
         # Render deliverables bullets
         lines_out.append("\n")
         lines_out.append('??? note "Primary deliverables"\n')
-        for ln in rest[1:]:
-            ln = ln.strip(" -\t")
-            if not ln:
-                continue
-            lines_out.append(f"    - {ln}\n")
+        merged = _merge_wrapped_bullets(rest[1:])
+        for item in merged:
+            lines_out.append(f"    - {item}\n")
         lines_out.append("\n")
     else:
         lines_out.append('!!! info "Objective"\n')
@@ -198,11 +261,11 @@ def format_goal(goal_text: str) -> list[str]:
             heading = acc_lines[0].strip(": ")
             lines_out.append(f'??? success "{heading}"\n')
             bullet_block = acc_lines[1:]
-            for ln in bullet_block:
-                clean = ln.strip(" -\t")
-                if not clean:
+            merged = _merge_wrapped_bullets(bullet_block)
+            for item in merged:
+                if not item:
                     continue
-                lines_out.append(f"    - {clean}\n")
+                lines_out.append(f"    - {item}\n")
             lines_out.append("\n")
     return lines_out
 
@@ -588,9 +651,19 @@ def main() -> None:
         lines.append("### Preferences & Rubrics\n\n")
         lines.append(f"Defined: {pref_note}.\n\n")
         lines.append("#### Sources\n\n")
-        lines.append(f"- Workflow: `{dir_path / 'workflow.py'}`\n")
-        lines.append(f"- Team: `{dir_path / 'team.py'}`\n")
-        lines.append(f"- Preferences: `{dir_path / 'preferences.py'}`\n\n")
+        # Build GitHub links for source files based on repo structure
+        repo_base = "https://github.com/DeepFlow-research/manager_agent_gym/blob/main"
+        rel_dir = dir_path.relative_to(ROOT)
+        gh_workflow = f"{repo_base}/{rel_dir.as_posix()}/workflow.py"
+        gh_team = f"{repo_base}/{rel_dir.as_posix()}/team.py"
+        gh_prefs = f"{repo_base}/{rel_dir.as_posix()}/preferences.py"
+        lines.append(f"- Workflow: [{rel_dir.as_posix()}/workflow.py]({gh_workflow})\n")
+        lines.append(f"- Team: [{rel_dir.as_posix()}/team.py]({gh_team})\n")
+        lines.append(f"- Preferences: [{rel_dir.as_posix()}/preferences.py]({gh_prefs})\n\n")
+
+        # Convenience link to edit this benchmark page on GitHub
+        gh_doc_page = f"https://github.com/DeepFlow-research/manager_agent_gym/blob/main/docs/benchmark/{pkg_name}.md"
+        lines.append(f"[View this page on GitHub]({gh_doc_page})\n\n")
 
         if use_gen and mkdocs_gen_files is not None:
             with mkdocs_gen_files.open(f"{bench_rel}/{pkg_name}.md", "w") as f:

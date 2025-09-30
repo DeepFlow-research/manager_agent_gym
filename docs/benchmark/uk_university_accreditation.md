@@ -10,30 +10,19 @@
                 academic standards, protect student interests, and maintain international student sponsorship rights.
 
 ??? note "Primary deliverables"
-    - Comprehensive evidence pack against OfS conditions A–E, including mapped compliance to quality, standards,
-    - governance, financial sustainability, access & participation, and student protection requirements.
-    - Quality and standards matrix: course clusters mapped to B-conditions (B1–B6) with external examiner
-    - summaries, continuation/completion/progression KPIs, and remediation actions.
-    - Consumer law compliance audit: CMA-compliant prospectus and contracts with evidence of clear, fair, and
-    - transparent information on courses, costs, and contact hours.
-    - Updated Access and Participation Plan (APP) with monitoring data, gap analysis, and proposed adjustments
-    - in line with OfS regulatory advice and sector benchmarks.
-    - Governance package: Council, Senate, and Quality Committee minutes evidencing oversight, decisions, and
-    - sign-offs; risk registers and escalation logs.
-    - UKVI student sponsor compliance pack: attendance monitoring records, CAS issuance logs, and reporting
-    - evidence to confirm fitness as a licensed sponsor.
-    - Prevent duty documentation: risk assessment, training coverage, incident logs, and governing-body oversight
-    - consistent with OfS Prevent monitoring requirements.
-    - Data quality assurance pack: validated HESA Data Futures submissions, internal audit checks, and signed
-    - statements of data integrity.
-    - Student outcomes narrative aligned to Teaching Excellence Framework (TEF) indicators and evidence of
-    - continuous improvement initiatives.
+    - Comprehensive evidence pack against OfS conditions A–E, including mapped compliance to quality, standards governance, financial sustainability, access & participation, and student protection requirements.
+    - Quality and standards matrix: course clusters mapped to B-conditions (B1–B6) with external examiner summaries, continuation/completion/progression KPIs, and remediation actions.
+    - Consumer law compliance audit: CMA-compliant prospectus and contracts with evidence of clear, fair, and transparent information on courses, costs, and contact hours.
+    - Updated Access and Participation Plan (APP) with monitoring data, gap analysis, and proposed adjustments in line with OfS regulatory advice and sector benchmarks.
+    - Governance package: Council, Senate, and Quality Committee minutes evidencing oversight, decisions, and sign-offs; risk registers and escalation logs.
+    - UKVI student sponsor compliance pack: attendance monitoring records, CAS issuance logs, and reporting evidence to confirm fitness as a licensed sponsor.
+    - Prevent duty documentation: risk assessment, training coverage, incident logs, and governing-body oversight consistent with OfS Prevent monitoring requirements.
+    - Data quality assurance pack: validated HESA Data Futures submissions, internal audit checks, and signed statements of data integrity.
+    - Student outcomes narrative aligned to Teaching Excellence Framework (TEF) indicators and evidence of continuous improvement initiatives.
 
 ??? success "Acceptance criteria (high-level)"
-    - OfS evidence pack submitted on time with no material deficiencies; ≤2 rounds of clarifications from the
-    - regulator.
-    - Demonstrated compliance with all quality & standards baselines (B-conditions), supported by KPIs and
-    - external examiner validation.
+    - OfS evidence pack submitted on time with no material deficiencies; ≤2 rounds of clarifications from the regulator.
+    - Demonstrated compliance with all quality & standards baselines (B-conditions), supported by KPIs and external examiner validation.
     - APP accepted as valid and credible by OfS; demonstrable governance oversight of equality of opportunity.
     - CMA compliance confirmed by legal review; no unresolved findings on unfair terms or information clarity.
     - UKVI sponsorship compliance maintained with no major findings or risk of licence downgrade.
@@ -41,13 +30,9 @@
     - HESA Data Futures submissions validated with no critical data quality flags raised.
     - Council, Senate, and Board sign-offs documented for all key evidence packs.
     - Constraints (soft):
-    - Target horizon: complete renewal readiness within ≤ 8 weeks of simulated effort; avoid >5-day stalls on
-    - critical-path activities (e.g., quality evidence mapping, APP submission, HESA data checks).
-    - Budget guardrail: stay within ±20% of planned compliance, audit, and consultancy costs absent justified
-    - scope changes.
-    - Transparency: prefer proactive disclosure of known risks or weaknesses (e.g., low continuation in a
-    - subject area) with mitigation plans over concealment, to maximize regulator trust and institutional
-    - credibility.
+    - Target horizon: complete renewal readiness within ≤ 8 weeks of simulated effort; avoid >5-day stalls on critical-path activities (e.g., quality evidence mapping, APP submission, HESA data checks).
+    - Budget guardrail: stay within ±20% of planned compliance, audit, and consultancy costs absent justified scope changes.
+    - Transparency: prefer proactive disclosure of known risks or weaknesses (e.g., low continuation in a subject area) with mitigation plans over concealment, to maximize regulator trust and institutional credibility.
 
 ### Team Structure
 

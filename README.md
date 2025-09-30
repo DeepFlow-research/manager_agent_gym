@@ -44,75 +44,24 @@ The CLI entrypoint lives at `examples/cli.py`.
 
 ## 🚀 Your First Manager Agent
 
-```python
-import asyncio
-from manager_agent_gym import (
-    create_toy_workflow_example,
-    ChainOfThoughtManagerAgent,
-    WorkflowExecutionEngine,
-    AgentRegistry,
-    PreferenceWeights,
-    Preference,
-)
+The easiest way to launch a working manager agent is the `hello_manager_agent.py` example. Run:
 
-def create_basic_preferences() -> PreferenceWeights:
-    """Create simple preferences focused on quality and reasonable timelines."""
-    return PreferenceWeights(
-        preferences=[
-            Preference(name="quality", weight=0.4, description="High-quality deliverables"),
-            Preference(name="time", weight=0.3, description="Reasonable timeline"),
-            Preference(name="cost", weight=0.2, description="Cost-effective execution"),
-            Preference(name="oversight", weight=0.1, description="Manageable oversight"),
-        ]
-    )
-
-async def main():
-    # Create workflow and agent registry
-    workflow = create_toy_workflow_example()
-    agent_registry = AgentRegistry()
-    
-    # Register agents from the workflow
-    for agent in workflow.agents.values():
-        agent_registry.register_agent(agent)
-    
-    # Create manager agent with preferences
-    preferences = create_basic_preferences()
-    manager = ChainOfThoughtManagerAgent(
-        preferences=preferences,
-        model_name="o3",
-        manager_persona="Organized Project Coordinator",
-    )
-    
-    # Set up execution engine
-    engine = WorkflowExecutionEngine(
-        workflow=workflow,
-        agent_registry=agent_registry,
-        manager_agent=manager,
-        max_timesteps=20,
-        enable_timestep_logging=True,
-    )
-    
-    # Run the workflow
-    results = await engine.run_full_execution()
-    
-    print(f"Workflow completed: {workflow.is_complete()}")
-    print(f"Total timesteps: {len(results)}")
-    print(f"Tasks completed: {len(engine.completed_task_ids)}")
-
-if __name__ == "__main__":
-    asyncio.run(main())
+```bash
+python examples/getting_started/hello_manager_agent.py
 ```
+
+That script builds an `ICAAP` workflow, registers the agents, and executes a `ChainOfThoughtManagerAgent` using your configured model (default `gpt-4o-mini`).
 
 
 ## 📚 Documentation & Resources
 
 - **Online Docs**: [https://deepflow-research.github.io/manager_agent_gym](https://deepflow-research.github.io/manager_agent_gym)
 - **Repository Home**: [This repository](.)
-- **Docs Home**: [docs/index.md](docs/index.md)
-- **Quick Start**: [docs/QUICK_START_GUIDE.md](docs/QUICK_START_GUIDE.md)
-- **Library Guide**: [docs/LIBRARY_DOCUMENTATION.md](docs/LIBRARY_DOCUMENTATION.md)
-- **Technical Architecture**: [docs/TECHNICAL_ARCHITECTURE.md](docs/TECHNICAL_ARCHITECTURE.md)
-- **Research Paper (PDF)**: [docs/Orchestrating_Human_AI_Teams__The_Manager_Agent_as_a_Unifying_Research_Challenge.pdf](docs/Orchestrating_Human_AI_Teams__The_Manager_Agent_as_a_Unifying_Research_Challenge.pdf)
+- **Docs Home**: [docs/index.md](https://deepflow-research.github.io/manager_agent_gym/)
+- **Quick Start**: [Quick Start Guide](https://deepflow-research.github.io/manager_agent_gym/QUICK_START_GUIDE/)
+- **Library Guide**: [Library Documentation](https://deepflow-research.github.io/manager_agent_gym/LIBRARY_DOCUMENTATION/)
+- **Technical Architecture**: [Technical Architecture](https://deepflow-research.github.io/manager_agent_gym/TECHNICAL_ARCHITECTURE/)
+- **Research Paper (PDF)**: [Orchestrating Human-AI Teams (PDF)](docs/Orchestrating_Human_AI_Teams__The_Manager_Agent_as_a_Unifying_Research_Challenge.pdf)
 
 ## 🧪 Examples & Workflows
 

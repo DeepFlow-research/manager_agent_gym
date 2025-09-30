@@ -10,34 +10,21 @@
                 operational readiness, and compliance framework implementation.
 
 ??? note "Primary deliverables"
-    - Complete federal branch license application package (OCC Form, business plan, management profiles,
-    - capital documentation) with supporting legal and financial documentation.
-    - Comprehensive due diligence portfolio: beneficial ownership verification, AML/BSA compliance program,
-    - customer identification procedures, and enhanced due diligence protocols.
-    - Regulatory compliance framework: policies, procedures, and controls addressing Federal Reserve
-    - Regulation K, OCC guidelines, and FDIC requirements with documented governance structure.
-    - Operational readiness assessment: IT infrastructure, staffing plan, physical office setup,
-    - correspondent banking relationships, and service delivery capabilities.
-    - Risk management framework: credit risk policies, market risk controls, liquidity management
-    - procedures, operational risk assessment, and regulatory reporting systems.
-    - Stakeholder engagement strategy: regulator communication plan, legal counsel coordination,
-    - consultant management, and internal executive alignment.
-    - US market entry business plan: competitive analysis, target customer segments, product offerings,
-    - revenue projections, and 3-year growth strategy.
-    - Capital and funding structure: $50M minimum capital requirement, CED (Capital Equivalent Deposit)
-    - arrangements, liquidity facilities, and ongoing funding sources.
+    - Complete federal branch license application package (OCC Form, business plan, management profiles, capital documentation) with supporting legal and financial documentation.
+    - Comprehensive due diligence portfolio: beneficial ownership verification, AML/BSA compliance program, customer identification procedures, and enhanced due diligence protocols.
+    - Regulatory compliance framework: policies, procedures, and controls addressing Federal Reserve Regulation K, OCC guidelines, and FDIC requirements with documented governance structure.
+    - Operational readiness assessment: IT infrastructure, staffing plan, physical office setup, correspondent banking relationships, and service delivery capabilities.
+    - Risk management framework: credit risk policies, market risk controls, liquidity management procedures, operational risk assessment, and regulatory reporting systems.
+    - Stakeholder engagement strategy: regulator communication plan, legal counsel coordination, consultant management, and internal executive alignment.
+    - US market entry business plan: competitive analysis, target customer segments, product offerings, revenue projections, and 3-year growth strategy.
+    - Capital and funding structure: $50M minimum capital requirement, CED (Capital Equivalent Deposit) arrangements, liquidity facilities, and ongoing funding sources.
 
 ??? success "Acceptance criteria (high-level)"
-    - OCC preliminary and final approval obtained with all regulatory conditions satisfied; Federal Reserve
-    - non-objection secured.
-    - Home country regulator (ECB/national authority) approval for US market entry with comprehensive
-    - supervision attestation.
-    - Complete AML/BSA compliance program implemented with independent validation; no outstanding
-    - regulatory concerns.
-    - Operational infrastructure fully deployed and tested; correspondent banking relationships established
-    - and operational.
-    - Senior management team hired and background-checked; board governance framework established and
-    - documented.
+    - OCC preliminary and final approval obtained with all regulatory conditions satisfied; Federal Reserve non-objection secured.
+    - Home country regulator (ECB/national authority) approval for US market entry with comprehensive supervision attestation.
+    - Complete AML/BSA compliance program implemented with independent validation; no outstanding regulatory concerns.
+    - Operational infrastructure fully deployed and tested; correspondent banking relationships established and operational.
+    - Senior management team hired and background-checked; board governance framework established and documented.
     - Capital requirements satisfied with funds deposited; FDIC insurance application approved (if applicable).
 
 ### Team Structure

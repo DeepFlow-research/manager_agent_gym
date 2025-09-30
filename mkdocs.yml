@@ -50,12 +50,13 @@ nav:
     - Docs How-To: dev/building-docs.md
   - Benchmarks: benchmark/
   - API Reference:
-    - Core: api/core.md
-    - Schemas:
-      - Overview: api/schemas.md
-      - Core Models: api/schemas_core.md
-      - Execution Models: api/schemas_execution.md
-      - Preferences Models: api/schemas_preferences.md
+    - Systems:
+        - Core Systems: api/core.md
+        - Execution I/O: api/execution.md
+    - Data Models:
+        - Schemas Overview: api/schemas.md
+        - Core Models: api/schemas_core.md
+        - Execution Models: api/schemas_execution.md
+        - Preferences Models: api/schemas_preferences.md
     - Evaluation: api/evaluation.md
-    - Execution I/O: api/execution.md
 

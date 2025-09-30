@@ -104,7 +104,7 @@ Comprehensive multi-objective evaluation including:
 
 ### Requirements
 
-- Python 3.12+
+- Python 3.11+
 - [uv](https://github.com/astral-sh/uv) package manager (recommended)
 - OpenAI API key (for LLM-based agents)
 - Optional: Anthropic API key for Claude models
@@ -113,14 +113,17 @@ Comprehensive multi-objective evaluation including:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/manager-agent-gym
-cd manager-agent-gym
+git clone https://github.com/DeepFlow-research/manager_agent_gym
+cd manager_agent_gym
 
 # Install with uv (recommended)
 uv pip install -e .
 
+# Install provider integrations (LLM + agents tooling)
+uv pip install -e ".[openai,agents]"
+
 # Alternative: Install with pip
-pip install -e .
+pip install -e ".[openai,agents]"
 
 # Configure API keys
 cp .env.example .env
@@ -148,6 +151,9 @@ Key dependencies include:
 
 ```python
 import asyncio
+
+from examples.common_stakeholders import create_stakeholder_agent
+from examples.end_to_end_examples.icap.workflow import create_workflow
 from manager_agent_gym import (
     ChainOfThoughtManagerAgent,
     WorkflowExecutionEngine,
@@ -156,7 +162,8 @@ from manager_agent_gym import (
     Preference,
 )
 
-# Create preferences
+
+# Configure manager priorities
 preferences = PreferenceWeights(
     preferences=[
         Preference(name="quality", weight=0.4, description="High-quality deliverables"),
@@ -166,23 +173,24 @@ preferences = PreferenceWeights(
     ]
 )
 
-# Create manager agent
+
+# Instantiate the Chain-of-Thought manager
 manager = ChainOfThoughtManagerAgent(
     preferences=preferences,
-    model_name="gpt-4o",
+    model_name="gpt-4o-mini",
     manager_persona="Strategic Project Coordinator",
 )
 
-# Set up and run workflow
-async def run_workflow():
-    workflow = create_workflow()  # Your workflow creation
+
+async def run_workflow() -> None:
+    workflow = create_workflow()
     agent_registry = AgentRegistry()
-    
-    # Register agents
+
     for agent in workflow.agents.values():
         agent_registry.register_agent(agent)
-    
-    # Create execution engine
+
+    stakeholder = create_stakeholder_agent(persona="balanced", preferences=preferences)
+
     engine = WorkflowExecutionEngine(
         workflow=workflow,
         agent_registry=agent_registry,
@@ -191,13 +199,11 @@ async def run_workflow():
         max_timesteps=20,
         seed=42,
     )
-    
-    # Run execution
-    results = await engine.run_full_execution()
-    return results
 
-# Run the workflow
-results = asyncio.run(run_workflow())
+    await engine.run_full_execution()
+
+
+asyncio.run(run_workflow())
 ```
 
 ### Configuration Options
@@ -209,8 +215,7 @@ results = asyncio.run(run_workflow())
 
 **Model Selection:**
 - `"gpt-4o"`, `"gpt-4o-mini"`: OpenAI GPT-4 variants
-- `"gpt-5"`, `"gpt-5-mini"`: OpenAI GPT-5 (when available)
-- `"o3"`: OpenAI o3 model (default)
+- `"o3"`: OpenAI o3 reasoning model (default)
 - `"claude-3-5-sonnet"`: Anthropic Claude
 - `"gemini-2.0-flash"`: Google Gemini
 
@@ -495,17 +500,7 @@ The library provides analysis utilities in `analysis_outputs/`:
 
 ### Visualization Support
 
-```python
-# Matplotlib integration for metrics visualization
-import matplotlib.pyplot as plt
-from manager_agent_gym.analysis import plot_execution_metrics
-
-# Plot manager actions over time
-plot_execution_metrics(execution_results)
-
-# Generate performance reports
-generate_performance_report(results, output_dir="reports/")
-```
+See the scripts in `examples/analysis/` for plotting and reporting utilities that operate on saved simulation outputs (e.g., comparing manager strategies or building workflow timelines).
 
 ## 🧪 Testing
 
@@ -524,29 +519,14 @@ tests/
 # Run all tests
 pytest
 
-# Run specific test categories
+# Run integration suite only
 pytest tests/integration/
-pytest tests/unit/
 
 # Run with coverage
 pytest --cov=manager_agent_gym
 ```
 
-### Test Examples
-
-```python
-# Unit test example
-def test_workflow_validation():
-    workflow = create_test_workflow()
-    assert workflow.validate_task_graph()
-
-# Integration test example  
-async def test_manager_agent_execution():
-    manager = ChainOfThoughtManagerAgent(preferences)
-    observation = create_test_observation()
-    action = await manager.take_action(observation)
-    assert isinstance(action, BaseManagerAction)
-```
+Component-level tests live alongside the package modules (for example `tests/test_manager_actions.py`). See `tests/README.md` for fixtures and guidance on adding new coverage.
 
 ## 🔧 Configuration Reference
 
@@ -650,10 +630,10 @@ Available manager actions:
 
 ## 🔗 References
 
-- **Research Paper**: See `paper.md` for theoretical foundations
-- **API Documentation**: Complete reference in `docs/API.md`
-- **Architecture Guide**: Technical details in `docs/SIMULATOR_ARCHITECTURE.md`
-- **Research Guide**: Implementation guide in `docs/RESEARCH_GUIDE.md`
+- **Research Paper**: See `docs/Orchestrating_Human_AI_Teams__The_Manager_Agent_as_a_Unifying_Research_Challenge.pdf`
+- **API Documentation**: Generated reference in `docs/api/`
+- **Architecture Guide**: Technical details in `docs/TECHNICAL_ARCHITECTURE.md`
+- **Research Guide**: Implementation guide in `docs/dev/building-docs.md`
 
 ---
 
