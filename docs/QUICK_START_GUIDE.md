@@ -312,7 +312,7 @@ Tracks multiple metrics beyond just task completion.
 ### Dive Deeper
 
 - Read the full [Library Documentation](LIBRARY_DOCUMENTATION.md)
-- Explore the research paper PDF: https://arxiv.org/pdf/2510.02557
+- Explore the research paper PDF: https://arxiv.org/abs/2510.02557
 - Check out advanced examples in `examples/`
 - Review the API reference in `docs/`
 
