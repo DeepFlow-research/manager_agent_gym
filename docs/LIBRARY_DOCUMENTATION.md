@@ -1,12 +1,10 @@
 # Manager Agent Gym - Comprehensive Library Documentation
 
-> **📄 Paper Documentation**: Academic research documentation and guides can be found in `/docs`
-
 *Version 0.1.0*
 
 ## 🎯 Executive Summary
 
-**Manager Agent Gym** is a research platform for developing and evaluating autonomous agents that orchestrate complex workflows involving both human and AI collaborators. The library implements the **Autonomous Manager Agent** research challenge as described in the accompanying research paper, providing a complete POSG (Partially Observable Stochastic Game) framework for building and evaluating autonomous workflow management systems.
+**Manager Agent Gym** is a research platform for developing and evaluating autonomous agents that orchestrate complex workflows involving both human and AI collaborators. The library implements the **Autonomous Manager Agent** research challenge as described in the accompanying [research paper](https://arxiv.org/abs/2510.02557), providing a complete POSG (Partially Observable Stochastic Game) framework for building and evaluating autonomous workflow management systems.
 
 ### Key Capabilities
 
@@ -630,7 +628,7 @@ Available manager actions:
 
 ## 🔗 References
 
-- **Research Paper**: See `docs/Orchestrating_Human_AI_Teams__The_Manager_Agent_as_a_Unifying_Research_Challenge.pdf`
+- **Research Paper**: https://arxiv.org/abs/2510.02557
 - **API Documentation**: Generated reference in `docs/api/`
 - **Architecture Guide**: Technical details in `docs/TECHNICAL_ARCHITECTURE.md`
 - **Research Guide**: Implementation guide in `docs/dev/building-docs.md`
