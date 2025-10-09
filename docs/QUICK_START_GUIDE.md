@@ -1,7 +1,5 @@
 # Manager Agent Gym - Quick Start Guide
 
-> **📄 Paper Documentation**: Academic research documentation and guides can be found in `/docs`
-
 *Get up and running with autonomous workflow management in 10 minutes*
 
 ## 🚀 What You'll Build
