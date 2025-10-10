@@ -77,7 +77,7 @@ MIT License — see [LICENSE](LICENSE).
 
 If you use Manager Agent Gym in your work, please cite the accompanying paper:
 
-Charlie Masters, Advaith Vellanki, Jiangbo Shangguan, Bart Kultys, Alastair Moore, Stefano V. Albrecht. "Orchestrating Human-AI Teams: The Manager Agent as a Unifying Research Challenge." In Proceedings of the International Conference on Distributed Artificial Intelligence (DAI 2025), London, United Kingdom. Available at `docs/Orchestrating_Human_AI_Teams__The_Manager_Agent_as_a_Unifying_Research_Challenge.pdf`.
+Charlie Masters, Advaith Vellanki, Jiangbo Shangguan, Bart Kultys, Alastair Moore, Stefano V. Albrecht. "Orchestrating Human-AI Teams: The Manager Agent as a Unifying Research Challenge." In Proceedings of the International Conference on Distributed Artificial Intelligence (DAI 2025), London, United Kingdom. Available at `https://www.arxiv.org/abs/2510.02557`.
 
 ```bibtex
 @inproceedings{manager_agent_gym_2025,
