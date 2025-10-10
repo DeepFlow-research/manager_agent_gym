@@ -61,7 +61,7 @@ That script builds an `ICAAP` workflow, registers the agents, and executes a `Ch
 - **Quick Start**: [Quick Start Guide](https://deepflow-research.github.io/manager_agent_gym/QUICK_START_GUIDE/)
 - **Library Guide**: [Library Documentation](https://deepflow-research.github.io/manager_agent_gym/LIBRARY_DOCUMENTATION/)
 - **Technical Architecture**: [Technical Architecture](https://deepflow-research.github.io/manager_agent_gym/TECHNICAL_ARCHITECTURE/)
-- **Research Paper (PDF)**: [Orchestrating Human-AI Teams (PDF)](docs/Orchestrating_Human_AI_Teams__The_Manager_Agent_as_a_Unifying_Research_Challenge.pdf)
+- **Research Paper (PDF)**: [Orchestrating Human-AI Teams (PDF)](https://www.arxiv.org/abs/2510.02557)
 
 ## 🧪 Examples & Workflows
 
@@ -87,6 +87,6 @@ Charlie Masters, Advaith Vellanki, Jiangbo Shangguan, Bart Kultys, Alastair Moor
   year      = {2025},
   address   = {London, United Kingdom},
   note      = {Manager Agent Gym},
-  url       = {docs/Orchestrating_Human_AI_Teams__The_Manager_Agent_as_a_Unifying_Research_Challenge.pdf}
+  url       = {(https://www.arxiv.org/abs/2510.02557)}
 }
 ```
