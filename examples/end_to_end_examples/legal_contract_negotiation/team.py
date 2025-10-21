@@ -1,4 +1,4 @@
-from manager_agent_gym.schemas.workflow_agents import AIAgentConfig, HumanAgentConfig
+from manager_agent_gym.schemas.agents import AIAgentConfig, HumanAgentConfig
 
 
 def create_team_configs() -> dict[str, AIAgentConfig | HumanAgentConfig]:

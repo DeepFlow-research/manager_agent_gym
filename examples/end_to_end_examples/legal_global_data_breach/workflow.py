@@ -1,11 +1,12 @@
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.schemas.core.base import TaskStatus
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.domain.task import Task
+from manager_agent_gym.schemas.domain.base import TaskStatus
 from manager_agent_gym.schemas.preferences import Constraint
 from uuid import uuid4
 
 from examples.common_stakeholders import create_stakeholder_agent
 from .preferences import create_preferences  # if present later
+from manager_agent_gym.core.workflow.services import WorkflowMutations
 
 
 def create_workflow() -> Workflow:
@@ -358,7 +359,7 @@ def create_workflow() -> Workflow:
         board_brief,
         lessons_learned,
     ]:
-        wf.add_task(t)
+        WorkflowMutations.add_task(wf, t)
 
     # ---------------------------
     # CONSTRAINTS (Regulatory, Privilege, Documentation)
@@ -445,6 +446,6 @@ def create_workflow() -> Workflow:
 
     prefs = create_preferences()
     stakeholder = create_stakeholder_agent(persona="risk_averse", preferences=prefs)
-    wf.add_agent(stakeholder)
+    WorkflowMutations.add_agent(wf, stakeholder)
 
     return wf

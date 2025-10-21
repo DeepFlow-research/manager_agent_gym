@@ -1,30 +1,36 @@
 import pytest  # type: ignore[import-not-found]
 from uuid import uuid4
 
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.schemas.core.base import TaskStatus
-from manager_agent_gym.core.execution.engine import WorkflowExecutionEngine
-from manager_agent_gym.core.workflow_agents.interface import AgentInterface
-from manager_agent_gym.core.workflow_agents.registry import AgentRegistry
-from manager_agent_gym.schemas.unified_results import create_task_result
-from manager_agent_gym.schemas.config import OutputConfig
-from manager_agent_gym.schemas.preferences.preference import PreferenceWeights
-from manager_agent_gym.core.workflow_agents.stakeholder_agent import StakeholderAgent
-from manager_agent_gym.schemas.workflow_agents.stakeholder import StakeholderConfig
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.domain.task import Task
+from manager_agent_gym.schemas.domain.base import TaskStatus
+from manager_agent_gym.core.workflow.engine import WorkflowExecutionEngine
+from manager_agent_gym.core.agents.workflow_agents.common.interface import (
+    AgentInterface,
+)
+from manager_agent_gym.core.agents.workflow_agents.tools.registry import AgentRegistry
+from manager_agent_gym.core.execution.schemas.results import create_task_result
+from manager_agent_gym.core.workflow.schemas.config import OutputConfig
+from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
+from manager_agent_gym.core.agents.stakeholder_agent.stakeholder_agent import (
+    StakeholderAgent,
+)
+from manager_agent_gym.schemas.agents.stakeholder import StakeholderConfig
 from tests.helpers.stubs import (
     ManagerAssignFirstReady,
     StubAgent,
     ManagerNoOp,
     FailingStubAgent,
 )
+from manager_agent_gym.core.workflow.services import WorkflowQueries
+from manager_agent_gym.core.workflow.services import WorkflowMutations
 
 pytestmark = pytest.mark.integration
 
 
 class _StubAgent(AgentInterface):
     def __init__(self, agent_id: str):
-        from manager_agent_gym.schemas.workflow_agents import AgentConfig
+        from manager_agent_gym.schemas.agents import AgentConfig
 
         super().__init__(
             AgentConfig(
@@ -57,7 +63,7 @@ def _chain_workflow() -> Workflow:
     c = Task(name="C", description="d", dependency_task_ids=[b.id])
     for t in (a, b, c):
         t.assigned_agent_id = "worker-1"
-        w.add_task(t)
+        WorkflowMutations.add_task(w, t)
     return w
 
 
@@ -65,7 +71,7 @@ def _chain_workflow() -> Workflow:
 async def test_ready_state_and_chain_completion(tmp_path):
     w = _chain_workflow()
     agent = _StubAgent("worker-1")
-    w.add_agent(agent)
+    WorkflowMutations.add_agent(w, agent)
 
     stakeholder_cfg = StakeholderConfig(
         agent_id="stakeholder",
@@ -74,12 +80,12 @@ async def test_ready_state_and_chain_completion(tmp_path):
         model_name="o3",
         name="Stakeholder",
         role="Owner",
-        initial_preferences=PreferenceWeights(preferences=[]),
+        preference_data=PreferenceSnapshot(preferences=[]),
         agent_description="Stakeholder",
         agent_capabilities=["Stakeholder"],
     )
     stakeholder = StakeholderAgent(config=stakeholder_cfg)
-    w.add_agent(stakeholder)
+    WorkflowMutations.add_agent(w, stakeholder)
     engine = WorkflowExecutionEngine(
         workflow=w,
         agent_registry=AgentRegistry(),
@@ -95,7 +101,7 @@ async def test_ready_state_and_chain_completion(tmp_path):
     )
 
     # T0: A should be marked READY; B and C remain PENDING
-    ready0 = w.get_ready_tasks()
+    ready0 = WorkflowQueries.get_ready_tasks(w)
     if not ready0:
         assert False, "Could not find task A"
     assert any(t.name == "A" and t.status == TaskStatus.READY for t in ready0)
@@ -120,7 +126,7 @@ async def test_ready_state_and_chain_completion(tmp_path):
 
     await engine.execute_timestep()  # completes C
 
-    assert w.is_complete()
+    assert WorkflowQueries.is_complete(w)
 
 
 def _nested_subtask_workflow() -> Workflow:
@@ -148,7 +154,7 @@ def _nested_subtask_workflow() -> Workflow:
     parent.add_subtask(child_b)
 
     # Register only the parent at top-level; leaves will be auto-registered for readiness
-    w.add_task(parent)
+    WorkflowMutations.add_task(w, parent)
     # Assign agent ID for automatic start when ready
     for t in (ga, gb, hb1, hb2):
         t.assigned_agent_id = "worker-1"
@@ -159,12 +165,12 @@ def _nested_subtask_workflow() -> Workflow:
 async def test_nested_subtasks_chain_and_parallel(tmp_path):
     w = _nested_subtask_workflow()
     agent = _StubAgent("worker-1")
-    w.add_agent(agent)
+    WorkflowMutations.add_agent(w, agent)
     # Minimal stakeholder to satisfy engine requirement
-    from manager_agent_gym.core.workflow_agents.stakeholder_agent import (
+    from manager_agent_gym.core.agents.stakeholder_agent.stakeholder_agent import (
         StakeholderAgent,
     )
-    from manager_agent_gym.schemas.workflow_agents.stakeholder import StakeholderConfig
+    from manager_agent_gym.schemas.agents.stakeholder import StakeholderConfig
 
     stakeholder_cfg = StakeholderConfig(
         agent_id="stakeholder",
@@ -173,12 +179,12 @@ async def test_nested_subtasks_chain_and_parallel(tmp_path):
         model_name="o3",
         name="Stakeholder",
         role="Owner",
-        initial_preferences=PreferenceWeights(preferences=[]),
+        preference_data=PreferenceSnapshot(preferences=[]),
         agent_description="Stakeholder",
         agent_capabilities=["Stakeholder"],
     )
     stakeholder = StakeholderAgent(config=stakeholder_cfg)
-    w.add_agent(stakeholder)
+    WorkflowMutations.add_agent(w, stakeholder)
     engine = WorkflowExecutionEngine(
         workflow=w,
         agent_registry=AgentRegistry(),
@@ -194,7 +200,7 @@ async def test_nested_subtasks_chain_and_parallel(tmp_path):
     )
 
     # Initial ready should include GA, HB1, HB2; GB should not be ready yet
-    ready0 = {t.name for t in w.get_ready_tasks()}
+    ready0 = {t.name for t in WorkflowQueries.get_ready_tasks(w)}
     assert {"GA", "HB1", "HB2"} <= ready0
     assert "GB" not in ready0
 
@@ -275,10 +281,10 @@ async def test_parent_never_ready_or_running_and_only_completes_after_all_leaves
     c2.add_subtask(hc)
     parent.add_subtask(c1)
     parent.add_subtask(c2)
-    w.add_task(parent)
+    WorkflowMutations.add_task(w, parent)
 
     agent = StubAgent(agent_id="worker-1", agent_type="ai", seconds=0.0)
-    w.add_agent(agent)
+    WorkflowMutations.add_agent(w, agent)
     for leaf in (ga, gb, hc):
         leaf.assigned_agent_id = agent.agent_id
 
@@ -290,12 +296,12 @@ async def test_parent_never_ready_or_running_and_only_completes_after_all_leaves
             model_name="o3",
             name="Stakeholder",
             role="Owner",
-            initial_preferences=PreferenceWeights(preferences=[]),
+            preference_data=PreferenceSnapshot(preferences=[]),
             agent_description="Stakeholder",
             agent_capabilities=["Stakeholder"],
         )
     )
-    w.add_agent(stakeholder)
+    WorkflowMutations.add_agent(w, stakeholder)
 
     engine = WorkflowExecutionEngine(
         workflow=w,
@@ -311,7 +317,7 @@ async def test_parent_never_ready_or_running_and_only_completes_after_all_leaves
         seed=42,
     )
 
-    ready0 = {t.name for t in w.get_ready_tasks()}
+    ready0 = {t.name for t in WorkflowQueries.get_ready_tasks(w)}
     assert {"GA", "HC"} <= ready0
     assert "P" not in ready0 and "C1" not in ready0 and "C2" not in ready0
 
@@ -352,16 +358,16 @@ async def test_failed_leaf_blocks_dependents_and_parent_incomplete(tmp_path):
     b = Task(name="B", description="will succeed")
     parent.add_subtask(a)
     parent.add_subtask(b)
-    w.add_task(parent)
+    WorkflowMutations.add_task(w, parent)
 
     q = Task(name="Q", description="depends on P")
     q.dependency_task_ids = [parent.id]
-    w.add_task(q)
+    WorkflowMutations.add_task(w, q)
 
     failer = FailingStubAgent(agent_id="failer")
     ok = StubAgent(agent_id="ok", agent_type="ai", seconds=0.0)
-    w.add_agent(failer)
-    w.add_agent(ok)
+    WorkflowMutations.add_agent(w, failer)
+    WorkflowMutations.add_agent(w, ok)
     a.assigned_agent_id = "failer"
     b.assigned_agent_id = "ok"
 
@@ -373,12 +379,12 @@ async def test_failed_leaf_blocks_dependents_and_parent_incomplete(tmp_path):
             model_name="o3",
             name="Stakeholder",
             role="Owner",
-            initial_preferences=PreferenceWeights(preferences=[]),
+            preference_data=PreferenceSnapshot(preferences=[]),
             agent_description="Stakeholder",
             agent_capabilities=["Stakeholder"],
         )
     )
-    w.add_agent(stakeholder)
+    WorkflowMutations.add_agent(w, stakeholder)
 
     engine = WorkflowExecutionEngine(
         workflow=w,
@@ -401,5 +407,5 @@ async def test_failed_leaf_blocks_dependents_and_parent_incomplete(tmp_path):
         next(t for t in w.tasks.values() if t.name == "A").status == TaskStatus.FAILED
     )
     assert parent.status != TaskStatus.COMPLETED
-    ready = {t.id for t in w.get_ready_tasks()}
+    ready = {t.id for t in WorkflowQueries.get_ready_tasks(w)}
     assert q.id not in ready

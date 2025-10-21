@@ -1,12 +1,12 @@
 from typing import List
 from pydantic import BaseModel, Field, model_validator  # type: ignore
 
-from .evaluator import Evaluator
+from manager_agent_gym.schemas.preferences.evaluator import Rubric
 
 
 class Preference(BaseModel):
     """
-    A single preference dimension with its weight and associated evaluator.
+    A single preference dimension with its weight and associated rubric.
     """
 
     name: str = Field(..., description="Name of the preference dimension")
@@ -17,19 +17,19 @@ class Preference(BaseModel):
         default=None,
         description="Optional description of what this preference measures",
     )
-    evaluator: Evaluator | None = Field(
+    evaluator: Rubric | None = Field(
         default=None,
-        description="Evaluator defining rubrics and aggregation for this preference",
+        description="Rubric defining criteria and aggregation for this preference",
     )
 
     def get_rubric_names(self) -> List[str]:
-        """Get names of all rubrics in this preference's evaluator."""
+        """Get names of all criteria in this preference's rubric."""
         if self.evaluator is None:
             return []
-        return [rubric.name for rubric in self.evaluator.rubrics]
+        return [criterion.name for criterion in self.evaluator.criteria]
 
 
-class PreferenceWeights(BaseModel):
+class PreferenceSnapshot(BaseModel):
     """
     A collection of multi-objective preference weights for workflow optimization.
     Weights are automatically normalized to sum to 1.0 upon initialization.
@@ -43,7 +43,7 @@ class PreferenceWeights(BaseModel):
     )
 
     @model_validator(mode="after")
-    def normalize_weights(self) -> "PreferenceWeights":
+    def normalize_weights(self) -> "PreferenceSnapshot":
         total_weight = sum(p.weight for p in self.preferences)
         if total_weight > 0:
             for p in self.preferences:
@@ -62,22 +62,24 @@ class PreferenceWeights(BaseModel):
         """Get preferences as a dictionary mapping name to normalized weight."""
         return {pref.name: pref.weight for pref in self.preferences}
 
-    def normalize(self) -> "PreferenceWeights":
+    def normalize(self) -> "PreferenceSnapshot":
         """Return a new PreferenceWeights with normalized weights."""
-        return PreferenceWeights(preferences=[p.model_copy() for p in self.preferences])
+        return PreferenceSnapshot(
+            preferences=[p.model_copy() for p in self.preferences]
+        )
 
     def get_preference_summary(self) -> str:
         """Get a summary of the preferences."""
         return "\n".join([f"{pref.name}: {pref.weight}" for pref in self.preferences])
 
 
-class PreferenceChange(BaseModel):
+class PreferenceChangeEvent(BaseModel):
     """
     Minimal event representing a change of preferences at a specific timestep.
     """
 
     timestep: int = Field(..., ge=0, description="Timestep at which the change occurs")
-    preferences: PreferenceWeights = Field(
+    preferences: PreferenceSnapshot = Field(
         ..., description="The full set of preferences active after the change"
     )
     # Optional metadata for UI/logging/back-compat with earlier usage

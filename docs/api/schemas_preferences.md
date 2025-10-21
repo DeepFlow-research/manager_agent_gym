@@ -5,7 +5,7 @@ workflow outcomes.
 
 ### Preference
 
-A single objective with weight, description, and evaluator metadata.
+A single objective with weight, description, and rubric metadata.
 
 ::: manager_agent_gym.schemas.preferences.preference.Preference
 
@@ -17,13 +17,13 @@ A collection of weighted objectives that drive manager optimization and evaluati
 
 ### Evaluation Result
 
-Structured output from preference evaluators summarising scores and reasoning.
+Structured output from preference rubrics summarising scores and reasoning.
 
 ::: manager_agent_gym.schemas.preferences.evaluation.EvaluationResult
 
-### Workflow Rubric
+### Rubric Criteria
 
-Declarative rubric configuration for rule-based or LLM-based evaluation hooks.
+Declarative criteria configuration for rule-based or LLM-based evaluation hooks.
 
-::: manager_agent_gym.schemas.preferences.rubric.WorkflowRubric
+::: manager_agent_gym.schemas.preferences.rubric.RubricCriteria
 

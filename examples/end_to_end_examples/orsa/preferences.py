@@ -9,24 +9,24 @@ Preferences selected (4):
 
 Schema parity:
   * PreferenceWeights / Preference
-  * Evaluator(aggregation=AggregationStrategy.WEIGHTED_AVERAGE, rubrics=[WorkflowRubric...])
-  * WorkflowRubric with llm_prompt or evaluator_function
+  * Rubric(aggregation=AggregationStrategy.WEIGHTED_AVERAGE, criteria=[RubricCriteria...])
+  * RubricCriteria with llm_prompt or evaluator_function
   * create_*_preference_update_requests(): absolute, normalized timeline updates
 """
 
 from typing import List
 from manager_agent_gym.schemas.preferences.preference import (
     Preference,
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric, RunCondition
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria, RunCondition
 from manager_agent_gym.schemas.preferences import PreferenceWeightUpdateRequest
-from manager_agent_gym.schemas.core import Workflow
-from manager_agent_gym.schemas.core.base import TaskStatus
+from manager_agent_gym.schemas.domain import Workflow
+from manager_agent_gym.schemas.domain.base import TaskStatus
 
 
 # ---------------------------
@@ -148,8 +148,8 @@ def rule_audit_trail_verified(workflow: Workflow) -> float:
 # ---------------------------
 # LLM Rubrics
 # ---------------------------
-capital_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+capital_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="capital_buffers_vs_requirements",
         llm_prompt=(
             "Evaluate capital adequacy: Does the capital plan meet applicable requirements for a US credit union "
@@ -160,7 +160,7 @@ capital_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="loss_estimation_coherence",
         llm_prompt=(
             "Assess coherence of loss and earnings projections feeding capital: consistency of PD/LGD/EAD (or proxies), "
@@ -170,13 +170,13 @@ capital_rubrics: List[WorkflowRubric] = [
         max_score=8.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_capital_policy_ready",
         evaluator_function=rule_capital_policy_ready,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_scenario_suite_built",
         evaluator_function=rule_scenario_suite_built,
         max_score=1.0,
@@ -184,8 +184,8 @@ capital_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-liquidity_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+liquidity_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="contingency_funding_plan_quality",
         llm_prompt=(
             "Evaluate the contingency funding plan (CFP): stress scenarios, trigger framework, playbooks, "
@@ -195,7 +195,7 @@ liquidity_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="liquidity_survival_horizon",
         llm_prompt=(
             "Assess survival horizon analysis quality and assumptions (deposit outflows, secured/unsecured market access), "
@@ -204,7 +204,7 @@ liquidity_rubrics: List[WorkflowRubric] = [
         max_score=8.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_liquidity_cfp_ready",
         evaluator_function=rule_liquidity_cfp_ready,
         max_score=1.0,
@@ -212,8 +212,8 @@ liquidity_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-model_risk_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+model_risk_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="sr11_7_controls_completeness",
         llm_prompt=(
             "Evaluate SR 11‑7 compliance: inventory coverage, materiality ratings, validation scope/results, "
@@ -223,13 +223,13 @@ model_risk_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_model_inventory_done",
         evaluator_function=rule_model_inventory_done,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_validation_executed",
         evaluator_function=rule_validation_executed,
         max_score=1.0,
@@ -237,8 +237,8 @@ model_risk_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-governance_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+governance_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="board_oversight_and_decisions",
         llm_prompt=(
             "Evaluate Board/Risk Committee oversight quality: evidence of challenge, decisions on risk appetite and "
@@ -247,7 +247,7 @@ governance_rubrics: List[WorkflowRubric] = [
         max_score=8.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="documentation_reproducibility_audit_trail",
         llm_prompt=(
             "Assess documentation quality and reproducibility: versioned artifacts, evidence index, "
@@ -256,19 +256,19 @@ governance_rubrics: List[WorkflowRubric] = [
         max_score=8.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_board_approved",
         evaluator_function=rule_board_approved,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_audit_trail_verified",
         evaluator_function=rule_audit_trail_verified,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="orsa_adversarial_scenarios",
         llm_prompt=(
             """Evaluate handling of ORSA adversarial scenarios and regulatory challenges:
@@ -282,7 +282,7 @@ governance_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="cost_realism_validation",
         evaluator_function=_validate_cost_realism,
         max_score=1.0,
@@ -294,48 +294,48 @@ governance_rubrics: List[WorkflowRubric] = [
 # ---------------------------
 # Preferences + Evaluators
 # ---------------------------
-def create_preferences() -> PreferenceWeights:
+def create_preferences() -> PreferenceSnapshot:
     """Initial stakeholder evaluation preferences for the ORSA‑style assessment (t=0 snapshot)."""
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="capital_adequacy",
                 weight=0.35,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="capital_eval",
                     description="Capital adequacy vs RBC/CCULR, buffers, scenario coherence.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=capital_rubrics,
+                    criteria=capital_rubrics,
                 ),
             ),
             Preference(
                 name="liquidity_resilience",
                 weight=0.25,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="liquidity_eval",
                     description="Liquidity survival horizon and CFP quality.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=liquidity_rubrics,
+                    criteria=liquidity_rubrics,
                 ),
             ),
             Preference(
                 name="model_risk_hygiene",
                 weight=0.2,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="model_risk_eval",
                     description="SR 11‑7 inventory, validation, monitoring, and challenge documentation.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=model_risk_rubrics,
+                    criteria=model_risk_rubrics,
                 ),
             ),
             Preference(
                 name="governance_quality",
                 weight=0.2,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="governance_eval",
                     description="Board oversight, approvals, documentation, and audit trail.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=governance_rubrics,
+                    criteria=governance_rubrics,
                 ),
             ),
         ]
@@ -347,135 +347,135 @@ def create_preferences() -> PreferenceWeights:
 # ---------------------------
 def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     """Stakeholder's weight changes over time (absolute, normalized)."""
-    timeline: dict[int, PreferenceWeights] = {
-        0: PreferenceWeights(
+    timeline: dict[int, PreferenceSnapshot] = {
+        0: PreferenceSnapshot(
             preferences=[
                 Preference(
                     name="capital_adequacy",
                     weight=0.35,
-                    evaluator=Evaluator(
+                    evaluator=Rubric(
                         name="capital_eval",
                         description="c",
                         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                        rubrics=capital_rubrics,
+                        criteria=capital_rubrics,
                     ),
                 ),
                 Preference(
                     name="liquidity_resilience",
                     weight=0.25,
-                    evaluator=Evaluator(
+                    evaluator=Rubric(
                         name="liquidity_eval",
                         description="l",
                         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                        rubrics=liquidity_rubrics,
+                        criteria=liquidity_rubrics,
                     ),
                 ),
                 Preference(
                     name="model_risk_hygiene",
                     weight=0.2,
-                    evaluator=Evaluator(
+                    evaluator=Rubric(
                         name="model_risk_eval",
                         description="m",
                         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                        rubrics=model_risk_rubrics,
+                        criteria=model_risk_rubrics,
                     ),
                 ),
                 Preference(
                     name="governance_quality",
                     weight=0.2,
-                    evaluator=Evaluator(
+                    evaluator=Rubric(
                         name="governance_eval",
                         description="g",
                         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                        rubrics=governance_rubrics,
+                        criteria=governance_rubrics,
                     ),
                 ),
             ]
         ),
-        20: PreferenceWeights(
+        20: PreferenceSnapshot(
             preferences=[
                 Preference(
                     name="capital_adequacy",
                     weight=0.4,
-                    evaluator=Evaluator(
+                    evaluator=Rubric(
                         name="capital_eval",
                         description="c",
                         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                        rubrics=capital_rubrics,
+                        criteria=capital_rubrics,
                     ),
                 ),
                 Preference(
                     name="liquidity_resilience",
                     weight=0.3,
-                    evaluator=Evaluator(
+                    evaluator=Rubric(
                         name="liquidity_eval",
                         description="l",
                         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                        rubrics=liquidity_rubrics,
+                        criteria=liquidity_rubrics,
                     ),
                 ),
                 Preference(
                     name="model_risk_hygiene",
                     weight=0.2,
-                    evaluator=Evaluator(
+                    evaluator=Rubric(
                         name="model_risk_eval",
                         description="m",
                         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                        rubrics=model_risk_rubrics,
+                        criteria=model_risk_rubrics,
                     ),
                 ),
                 Preference(
                     name="governance_quality",
                     weight=0.1,
-                    evaluator=Evaluator(
+                    evaluator=Rubric(
                         name="governance_eval",
                         description="g",
                         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                        rubrics=governance_rubrics,
+                        criteria=governance_rubrics,
                     ),
                 ),
             ]
         ),
-        40: PreferenceWeights(
+        40: PreferenceSnapshot(
             preferences=[
                 Preference(
                     name="capital_adequacy",
                     weight=0.25,
-                    evaluator=Evaluator(
+                    evaluator=Rubric(
                         name="capital_eval",
                         description="c",
                         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                        rubrics=capital_rubrics,
+                        criteria=capital_rubrics,
                     ),
                 ),
                 Preference(
                     name="liquidity_resilience",
                     weight=0.2,
-                    evaluator=Evaluator(
+                    evaluator=Rubric(
                         name="liquidity_eval",
                         description="l",
                         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                        rubrics=liquidity_rubrics,
+                        criteria=liquidity_rubrics,
                     ),
                 ),
                 Preference(
                     name="model_risk_hygiene",
                     weight=0.2,
-                    evaluator=Evaluator(
+                    evaluator=Rubric(
                         name="model_risk_eval",
                         description="m",
                         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                        rubrics=model_risk_rubrics,
+                        criteria=model_risk_rubrics,
                     ),
                 ),
                 Preference(
                     name="governance_quality",
                     weight=0.35,
-                    evaluator=Evaluator(
+                    evaluator=Rubric(
                         name="governance_eval",
                         description="g",
                         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                        rubrics=governance_rubrics,
+                        criteria=governance_rubrics,
                     ),
                 ),
             ]
@@ -501,11 +501,11 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     return requests
 
 
-def create_evaluator_to_measure_goal_achievement() -> Evaluator:
+def create_evaluator_to_measure_goal_achievement() -> Rubric:
     """Create goal achievement evaluator for US Co-op Bank internal risk and solvency assessment."""
     goal_achievement_rubrics = [
         # Critical risk assessment and regulatory deliverables (must have for supervisory approval)
-        WorkflowRubric(
+        RubricCriteria(
             name="board_approved_assessment_complete",
             llm_prompt=(
                 "Does complete board-approved assessment exist with: Board approval secured, "
@@ -515,7 +515,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=18.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="risk_appetite_statement_quantified",
             llm_prompt=(
                 "Does quantified risk appetite statement exist with: quantitative limits established, "
@@ -525,7 +525,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="capital_plan_ncua_compliant",
             llm_prompt=(
                 "Does NCUA-compliant capital plan exist with: NCUA RBC or CCULR leverage requirements met, "
@@ -535,7 +535,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="scenario_stress_testing_comprehensive",
             llm_prompt=(
                 "Does comprehensive scenario stress testing exist with: credit/IRRBB/liquidity/operational scenarios executed, "
@@ -546,7 +546,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Major risk management and governance deliverables (8-10 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="material_risk_inventory_assessed",
             llm_prompt=(
                 "Does assessed material risk inventory exist with: inherent risks identified, "
@@ -556,7 +556,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="model_risk_framework_sr11_7",
             llm_prompt=(
                 "Does SR 11-7 compliant model risk framework exist with: model inventory maintained, "
@@ -566,7 +566,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="liquidity_adequacy_contingency_plan",
             llm_prompt=(
                 "Does liquidity adequacy and contingency plan exist with: liquidity adequacy analysis completed, "
@@ -576,7 +576,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="board_package_supervisory_ready",
             llm_prompt=(
                 "Does supervisory-ready board package exist with: executive summary prepared, "
@@ -586,7 +586,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="governance_proportionality_documented",
             llm_prompt=(
                 "Does documented governance proportionality exist with: credit union scale considerations addressed, "
@@ -597,7 +597,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Important supporting deliverables (5-7 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="strategic_plan_budget_linkage",
             llm_prompt=(
                 "Does strategic plan and budget linkage exist with: linkages to strategic plan confirmed, "
@@ -607,7 +607,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="climate_risk_overlay_included",
             llm_prompt=(
                 "Does included climate risk overlay exist with: climate risk scenarios incorporated, "
@@ -617,7 +617,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="raci_roles_responsibilities",
             llm_prompt=(
                 "Do RACI roles and responsibilities exist with: Board/Risk Committee roles defined, "
@@ -627,7 +627,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="recovery_options_documented",
             llm_prompt=(
                 "Do documented recovery options exist with: recovery strategies identified, "
@@ -637,7 +637,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="operational_risk_assessment",
             llm_prompt=(
                 "Does operational risk assessment exist with: operational risks identified and quantified, "
@@ -648,7 +648,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Supporting deliverables (3-4 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="documentation_standards_audit_trail",
             llm_prompt=(
                 "Do documentation standards and audit trail exist with: documentation standards defined, "
@@ -658,7 +658,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="data_foundations_validated",
             llm_prompt=(
                 "Do validated data foundations exist with: data quality confirmed, "
@@ -668,7 +668,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_examination_readiness",
             llm_prompt=(
                 "Does regulatory examination readiness exist with: examination preparation complete, "
@@ -678,7 +678,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=3.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="risk_culture_assessment",
             llm_prompt=(
                 "Does risk culture assessment exist with: risk culture evaluated, "
@@ -690,9 +690,9 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
         ),
     ]
 
-    return Evaluator(
+    return Rubric(
         name="orsa_goal_achievement_eval",
         description="US Co-op Bank internal risk and solvency assessment deliverable achievement measurement",
         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-        rubrics=goal_achievement_rubrics,
+        criteria=goal_achievement_rubrics,
     )

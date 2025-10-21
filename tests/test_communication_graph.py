@@ -1,7 +1,7 @@
 import pytest
 
 from manager_agent_gym.core.communication.service import CommunicationService
-from manager_agent_gym.schemas.core.communication import MessageType
+from manager_agent_gym.schemas.domain.communication import MessageType
 
 
 @pytest.mark.asyncio

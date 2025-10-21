@@ -1,16 +1,19 @@
 import pytest
 from uuid import uuid4
 
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.core.workflow_agents.interface import AgentInterface
-from manager_agent_gym.schemas.workflow_agents import AgentConfig
-from manager_agent_gym.schemas.unified_results import create_task_result
-from manager_agent_gym.schemas.core.resources import Resource
-from manager_agent_gym.schemas.execution.manager_actions import (
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.domain.task import Task
+from manager_agent_gym.core.agents.workflow_agents.common.interface import (
+    AgentInterface,
+)
+from manager_agent_gym.schemas.agents import AgentConfig
+from manager_agent_gym.core.execution.schemas.results import create_task_result
+from manager_agent_gym.schemas.domain.resource import Resource
+from manager_agent_gym.core.agents.manager_agent.actions import (
     AssignTaskAction,
     AssignAllPendingTasksAction,
 )
+from manager_agent_gym.core.workflow.services import WorkflowMutations
 
 
 class _StubAgent(AgentInterface[AgentConfig]):
@@ -39,9 +42,9 @@ class _StubAgent(AgentInterface[AgentConfig]):
 def _workflow_with_task_and_agent() -> tuple[Workflow, Task, _StubAgent]:
     w = Workflow(name="w", workflow_goal="d", owner_id=uuid4())
     t = Task(name="T", description="d")
-    w.add_task(t)
+    WorkflowMutations.add_task(w, t)
     agent = _StubAgent("agent-1")
-    w.add_agent(agent)
+    WorkflowMutations.add_agent(w, agent)
     return w, t, agent
 
 
@@ -93,15 +96,15 @@ async def test_assign_task_invalid_ids() -> None:
 async def test_assign_all_pending_tasks_assigns_unassigned_only() -> None:
     w = Workflow(name="w", workflow_goal="d", owner_id=uuid4())
     a1 = _StubAgent("a1")
-    w.add_agent(a1)
+    WorkflowMutations.add_agent(w, a1)
 
     t1 = Task(name="t1", description="d")
     t2 = Task(name="t2", description="d")
     t3 = Task(name="t3", description="d")
     t3.assigned_agent_id = "preassigned"
-    w.add_task(t1)
-    w.add_task(t2)
-    w.add_task(t3)
+    WorkflowMutations.add_task(w, t1)
+    WorkflowMutations.add_task(w, t2)
+    WorkflowMutations.add_task(w, t3)
 
     action = AssignAllPendingTasksAction(
         reasoning="bulk", agent_id=a1.agent_id, success=True, result_summary="assign"

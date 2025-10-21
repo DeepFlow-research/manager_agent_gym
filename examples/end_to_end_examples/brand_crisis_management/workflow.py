@@ -14,10 +14,11 @@ Demonstrates:
 
 from uuid import uuid4
 
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.schemas.core.base import TaskStatus
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.domain.task import Task
+from manager_agent_gym.schemas.domain.base import TaskStatus
 from manager_agent_gym.schemas.preferences import Constraint
+from manager_agent_gym.core.workflow.services import WorkflowMutations
 
 
 def create_brand_crisis_management_workflow() -> Workflow:
@@ -432,7 +433,7 @@ def create_brand_crisis_management_workflow() -> Workflow:
         crisis_communication_hub,
         stakeholder_feedback_integration,
     ]:
-        workflow.add_task(task)
+        WorkflowMutations.add_task(workflow, task)
 
     # Constraints for crisis response discipline and confidentiality
     workflow.constraints.extend(

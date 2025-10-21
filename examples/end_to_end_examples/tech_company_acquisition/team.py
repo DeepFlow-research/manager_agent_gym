@@ -11,7 +11,7 @@ Demonstrates:
 - Risk mitigation through specialized roles for compliance, technology, and human capital integration
 """
 
-from manager_agent_gym.schemas.workflow_agents import AIAgentConfig, HumanAgentConfig
+from manager_agent_gym.schemas.agents import AIAgentConfig, HumanAgentConfig
 
 
 def create_tech_acquisition_team_configs():

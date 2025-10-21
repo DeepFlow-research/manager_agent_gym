@@ -163,6 +163,7 @@ def _merge_wrapped_bullets(raw_lines: list[str]) -> list[str]:
       b) the next line begins lowercase or with a connector phrase (and/or/with/in/to/of/for/on/via/by/including)
     - This captures human-wrapped bullets like ",\n- governance, ..." or line breaks after slashes/commas.
     """
+
     def _strip_leading_marker(s: str) -> str:
         s = s.lstrip()
         if s.startswith("- "):
@@ -505,9 +506,9 @@ def extract_team_schedule(
 
 
 def has_preferences(module: Any) -> bool:
-    # Heuristic: presence of evaluator/rubric constructors
+    # Heuristic: presence of rubric/criteria constructors
     text = inspect.getsource(module) if module else ""
-    return any(k in text for k in ["WorkflowRubric", "Evaluator", "PreferenceWeights"])
+    return any(k in text for k in ["RubricCriteria", "Rubric", "PreferenceWeights"])
 
 
 def main() -> None:
@@ -659,7 +660,9 @@ def main() -> None:
         gh_prefs = f"{repo_base}/{rel_dir.as_posix()}/preferences.py"
         lines.append(f"- Workflow: [{rel_dir.as_posix()}/workflow.py]({gh_workflow})\n")
         lines.append(f"- Team: [{rel_dir.as_posix()}/team.py]({gh_team})\n")
-        lines.append(f"- Preferences: [{rel_dir.as_posix()}/preferences.py]({gh_prefs})\n\n")
+        lines.append(
+            f"- Preferences: [{rel_dir.as_posix()}/preferences.py]({gh_prefs})\n\n"
+        )
 
         # Convenience link to edit this benchmark page on GitHub
         gh_doc_page = f"https://github.com/DeepFlow-research/manager_agent_gym/blob/main/docs/benchmark/{pkg_name}.md"

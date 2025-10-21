@@ -1,27 +1,32 @@
 from uuid import uuid4
 import pytest
 from typing import Literal
-from manager_agent_gym.core.execution.engine import WorkflowExecutionEngine
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.workflow_agents.stakeholder import (
+from manager_agent_gym.core.workflow.engine import WorkflowExecutionEngine
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.agents.stakeholder import (
     StakeholderPublicProfile,
 )
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric, RunCondition
+from manager_agent_gym.core.workflow.services import WorkflowDisplay
+from manager_agent_gym.core.workflow.services import WorkflowQueries
+from manager_agent_gym.core.workflow.services import WorkflowMutations
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria, RunCondition
 from manager_agent_gym.schemas.preferences.preference import (
     Preference,
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
-from manager_agent_gym.core.manager_agent.interface import ManagerAgent
-from manager_agent_gym.schemas.execution.manager import ManagerObservation
-from manager_agent_gym.schemas.execution.manager_actions import BaseManagerAction
-from manager_agent_gym.core.workflow_agents.registry import AgentRegistry
-from manager_agent_gym.core.workflow_agents.stakeholder_agent import StakeholderAgent
-from manager_agent_gym.schemas.workflow_agents.stakeholder import StakeholderConfig
-from manager_agent_gym.schemas.execution.state import ExecutionState
+from manager_agent_gym.core.agents.manager_agent.common.interface import ManagerAgent
+from manager_agent_gym.schemas.manager.observation import ManagerObservation
+from manager_agent_gym.core.agents.manager_agent.actions import BaseManagerAction
+from manager_agent_gym.core.agents.workflow_agents.tools.registry import AgentRegistry
+from manager_agent_gym.core.agents.stakeholder_agent.stakeholder_agent import (
+    StakeholderAgent,
+)
+from manager_agent_gym.schemas.agents.stakeholder import StakeholderConfig
+from manager_agent_gym.core.execution.schemas.state import ExecutionState
 
 
 class DummyAction(BaseManagerAction):
@@ -29,7 +34,7 @@ class DummyAction(BaseManagerAction):
     action_type: Literal["noop"] = "noop"
 
     async def execute(self, workflow, communication_service=None):
-        from manager_agent_gym.schemas.execution.manager_actions import ActionResult
+        from manager_agent_gym.core.agents.manager_agent.actions import ActionResult
 
         return ActionResult(
             summary="executed",
@@ -42,26 +47,27 @@ class DummyAction(BaseManagerAction):
 class DummyManagerAgent(ManagerAgent):
     def __init__(self):
         super().__init__(
-            agent_id="dummy", preferences=PreferenceWeights(preferences=[])
+            agent_id="dummy", preferences=PreferenceSnapshot(preferences=[])
         )
 
     async def create_observation(
         self,
         workflow: Workflow,
         execution_state: ExecutionState,
-        stakeholder_profile: StakeholderPublicProfile,
-        current_timestep,
-        running_tasks,
-        completed_task_ids,
-        failed_task_ids,
+        current_timestep: int = 0,
+        running_tasks: dict | None = None,
+        completed_task_ids: set | None = None,
+        failed_task_ids: set | None = None,
         communication_service=None,
-        preference_change_events=None,
-        recent_preference_change=None,
+        stakeholder_profile=None,
     ) -> ManagerObservation:
         # Provide a minimal valid observation
+        running_tasks = running_tasks or {}
+        completed_task_ids = completed_task_ids or set()
+        failed_task_ids = failed_task_ids or set()
         return ManagerObservation(
             timestep=current_timestep,
-            workflow_summary=workflow.pretty_print(),
+            workflow_summary=WorkflowDisplay.pretty_print(workflow),
             workflow_id=workflow.id,
             execution_state=str(execution_state),
             task_status_counts={},
@@ -70,7 +76,7 @@ class DummyManagerAgent(ManagerAgent):
             completed_task_ids=list(completed_task_ids),
             failed_task_ids=list(failed_task_ids),
             available_agent_metadata=[
-                a.config for a in workflow.get_available_agents()
+                a.config for a in WorkflowQueries.get_available_agents(workflow)
             ],
             # Avoid embedding functions in observation to keep JSON serialization simple
             recent_messages=[],
@@ -81,7 +87,6 @@ class DummyManagerAgent(ManagerAgent):
             task_ids=list(workflow.tasks.keys()),
             resource_ids=list(workflow.resources.keys()),
             agent_ids=list(workflow.agents.keys()),
-            stakeholder_profile=stakeholder_profile,
         )
 
     async def take_action(self, observation: ManagerObservation) -> BaseManagerAction:
@@ -91,16 +96,16 @@ class DummyManagerAgent(ManagerAgent):
         self,
         workflow: Workflow,
         execution_state: ExecutionState,
-        stakeholder_profile: StakeholderPublicProfile,
-        current_timestep: int,
-        running_tasks: dict,
-        completed_task_ids: set,
-        failed_task_ids: set,
+        stakeholder_profile: StakeholderPublicProfile | None = None,
+        current_timestep: int = 0,
+        running_tasks: dict | None = None,
+        completed_task_ids: set | None = None,
+        failed_task_ids: set | None = None,
         communication_service=None,
         previous_reward: float = 0.0,
         done: bool = False,
     ) -> BaseManagerAction:
-        from manager_agent_gym.schemas.execution.manager_actions import NoOpAction
+        from manager_agent_gym.core.agents.manager_agent.actions import NoOpAction
 
         return NoOpAction(reasoning="noop", success=True, result_summary="noop")
 
@@ -126,17 +131,17 @@ def rubric_score_completed_tasks(workflow: Workflow) -> float:
 @pytest.mark.asyncio
 async def test_engine_accepts_preferences_and_exposes_methods() -> None:
     wf = make_workflow()
-    prefs = PreferenceWeights(
+    prefs = PreferenceSnapshot(
         preferences=[
             Preference(
                 name="quality",
                 weight=0.6,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="quality_eval",
                     description="",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=[
-                        WorkflowRubric(
+                    criteria=[
+                        RubricCriteria(
                             name="completed",
                             evaluator_function=rubric_score_completed_tasks,
                             max_score=1.0,
@@ -147,12 +152,12 @@ async def test_engine_accepts_preferences_and_exposes_methods() -> None:
             Preference(
                 name="cost",
                 weight=0.4,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="cost_eval",
                     description="",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=[
-                        WorkflowRubric(
+                    criteria=[
+                        RubricCriteria(
                             name="constant",
                             evaluator_function=lambda wf: 1.0,
                             max_score=1.0,
@@ -171,12 +176,12 @@ async def test_engine_accepts_preferences_and_exposes_methods() -> None:
         model_name="o3",
         name="Stakeholder",
         role="Owner",
-        initial_preferences=prefs,
+        preference_data=prefs,
         agent_description="Stakeholder",
         agent_capabilities=["Stakeholder"],
     )
     stakeholder = StakeholderAgent(config=stakeholder_cfg)
-    wf.add_agent(stakeholder)
+    WorkflowMutations.add_agent(wf, stakeholder)
 
     engine = WorkflowExecutionEngine(
         workflow=wf,
@@ -206,17 +211,17 @@ async def test_engine_accepts_preferences_and_exposes_methods() -> None:
 @pytest.mark.asyncio
 async def test_engine_evaluates_preferences_each_timestep_and_tracks_history() -> None:
     wf = make_workflow()
-    prefs = PreferenceWeights(
+    prefs = PreferenceSnapshot(
         preferences=[
             Preference(
                 name="quality",
                 weight=0.5,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="quality_eval",
                     description="",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=[
-                        WorkflowRubric(
+                    criteria=[
+                        RubricCriteria(
                             name="constant",
                             evaluator_function=lambda wf: 1.0,
                             max_score=1.0,
@@ -234,12 +239,12 @@ async def test_engine_evaluates_preferences_each_timestep_and_tracks_history() -
         model_name="o3",
         name="Stakeholder",
         role="Owner",
-        initial_preferences=prefs,
+        preference_data=prefs,
         agent_description="Stakeholder",
         agent_capabilities=["Stakeholder"],
     )
     stakeholder = StakeholderAgent(config=stakeholder_cfg)
-    wf.add_agent(stakeholder)
+    WorkflowMutations.add_agent(wf, stakeholder)
 
     engine = WorkflowExecutionEngine(
         workflow=wf,
@@ -263,17 +268,17 @@ async def test_engine_evaluates_preferences_each_timestep_and_tracks_history() -
 @pytest.mark.asyncio
 async def test_engine_evaluate_now_appends_history_even_when_on_completion() -> None:
     wf = make_workflow()
-    prefs = PreferenceWeights(
+    prefs = PreferenceSnapshot(
         preferences=[
             Preference(
                 name="quality",
                 weight=1.0,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="quality_eval",
                     description="",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=[
-                        WorkflowRubric(
+                    criteria=[
+                        RubricCriteria(
                             name="const",
                             evaluator_function=lambda wf: 1.0,
                             max_score=1.0,
@@ -291,12 +296,12 @@ async def test_engine_evaluate_now_appends_history_even_when_on_completion() -> 
         model_name="o3",
         name="Stakeholder",
         role="Owner",
-        initial_preferences=prefs,
+        preference_data=prefs,
         agent_description="Stakeholder",
         agent_capabilities=["Stakeholder"],
     )
     stakeholder = StakeholderAgent(config=stakeholder_cfg)
-    wf.add_agent(stakeholder)
+    WorkflowMutations.add_agent(wf, stakeholder)
 
     engine = WorkflowExecutionEngine(
         workflow=wf,
@@ -323,17 +328,17 @@ async def test_engine_evaluate_now_appends_history_even_when_on_completion() -> 
 @pytest.mark.asyncio
 async def test_engine_preference_change_emission_and_observation_propagation() -> None:
     wf = make_workflow()
-    p1 = PreferenceWeights(
+    p1 = PreferenceSnapshot(
         preferences=[
             Preference(
                 name="a",
                 weight=1.0,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="a_eval",
                     description="",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=[
-                        WorkflowRubric(
+                    criteria=[
+                        RubricCriteria(
                             name="r", evaluator_function=lambda wf: 1.0, max_score=1.0
                         )
                     ],
@@ -341,17 +346,17 @@ async def test_engine_preference_change_emission_and_observation_propagation() -
             )
         ]
     )
-    p2 = PreferenceWeights(
+    p2 = PreferenceSnapshot(
         preferences=[
             Preference(
                 name="b",
                 weight=1.0,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="b_eval",
                     description="",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=[
-                        WorkflowRubric(
+                    criteria=[
+                        RubricCriteria(
                             name="r2", evaluator_function=lambda wf: 1.0, max_score=1.0
                         )
                     ],
@@ -367,12 +372,12 @@ async def test_engine_preference_change_emission_and_observation_propagation() -
         model_name="o3",
         name="Stakeholder",
         role="Owner",
-        initial_preferences=p1,
+        preference_data=p1,
         agent_description="Stakeholder",
         agent_capabilities=["Stakeholder"],
     )
     stakeholder = StakeholderAgent(config=stakeholder_cfg)
-    wf.add_agent(stakeholder)
+    WorkflowMutations.add_agent(wf, stakeholder)
 
     engine = WorkflowExecutionEngine(
         workflow=wf,
@@ -398,17 +403,17 @@ async def test_rubric_cadence_filtering() -> None:
     def one(_: Workflow) -> float:
         return 1.0
 
-    prefs = PreferenceWeights(
+    prefs = PreferenceSnapshot(
         preferences=[
             Preference(
                 name="q_each",
                 weight=0.5,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="q_each_eval",
                     description="placeholder",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=[
-                        WorkflowRubric(
+                    criteria=[
+                        RubricCriteria(
                             name="each",
                             evaluator_function=one,
                             max_score=1.0,
@@ -420,12 +425,12 @@ async def test_rubric_cadence_filtering() -> None:
             Preference(
                 name="q_final",
                 weight=0.5,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="q_final_eval",
                     description="placeholder",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=[
-                        WorkflowRubric(
+                    criteria=[
+                        RubricCriteria(
                             name="final",
                             evaluator_function=one,
                             max_score=1.0,
@@ -444,12 +449,12 @@ async def test_rubric_cadence_filtering() -> None:
         model_name="o3",
         name="Stakeholder",
         role="Owner",
-        initial_preferences=prefs,
+        preference_data=prefs,
         agent_description="Stakeholder",
         agent_capabilities=["Stakeholder"],
     )
     stakeholder = StakeholderAgent(config=stakeholder_cfg)
-    wf.add_agent(stakeholder)
+    WorkflowMutations.add_agent(wf, stakeholder)
 
     engine = WorkflowExecutionEngine(
         workflow=wf,
@@ -479,17 +484,17 @@ async def test_engine_handles_preference_weight_normalization_and_aggregation() 
     def half_score(_: Workflow) -> float:
         return 0.5
 
-    prefs = PreferenceWeights(
+    prefs = PreferenceSnapshot(
         preferences=[
             Preference(
                 name="a",
                 weight=0.6,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="a_eval",
                     description="placeholder",
                     aggregation=AggregationStrategy.MIN,
-                    rubrics=[
-                        WorkflowRubric(
+                    criteria=[
+                        RubricCriteria(
                             name="r1", evaluator_function=half_score, max_score=1.0
                         )
                     ],
@@ -498,21 +503,21 @@ async def test_engine_handles_preference_weight_normalization_and_aggregation() 
             Preference(
                 name="b",
                 weight=0.4,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="b_eval",
                     description="placeholder",
                     aggregation=AggregationStrategy.MIN,
-                    rubrics=[],
+                    criteria=[],
                 ),
             ),
             Preference(
                 name="c",
                 weight=0.2,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="c_eval",
                     description="placeholder",
                     aggregation=AggregationStrategy.MAX,
-                    rubrics=[],
+                    criteria=[],
                 ),
             ),
         ]
@@ -525,12 +530,12 @@ async def test_engine_handles_preference_weight_normalization_and_aggregation() 
         model_name="o3",
         name="Stakeholder",
         role="Owner",
-        initial_preferences=prefs,
+        preference_data=prefs,
         agent_description="Stakeholder",
         agent_capabilities=["Stakeholder"],
     )
     stakeholder = StakeholderAgent(config=stakeholder_cfg)
-    wf.add_agent(stakeholder)
+    WorkflowMutations.add_agent(wf, stakeholder)
 
     engine = WorkflowExecutionEngine(
         workflow=wf,

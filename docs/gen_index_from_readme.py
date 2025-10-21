@@ -21,5 +21,3 @@ def write_index_from_readme() -> None:
 
 if __name__ == "__main__":
     write_index_from_readme()
-
-

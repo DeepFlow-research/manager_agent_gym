@@ -11,13 +11,13 @@ Demonstrates:
 - Cross-functional team coordination between academic, administrative, and external stakeholders
 """
 
-from manager_agent_gym.schemas.workflow_agents import (
+from manager_agent_gym.schemas.agents import (
     AIAgentConfig,
     HumanAgentConfig,
     StakeholderConfig,
 )
 from manager_agent_gym.schemas.preferences.preference import (
-    PreferenceWeights,
+    PreferenceSnapshot,
     Preference,
 )
 
@@ -320,7 +320,7 @@ def create_team_configs():
         clarification_reply_rate=0.85,
         strictness=0.7,
         verbosity=3,
-        initial_preferences=PreferenceWeights(
+        preference_data=PreferenceSnapshot(
             preferences=[
                 Preference(name="regulatory_compliance", weight=0.4),
                 Preference(name="academic_quality", weight=0.3),

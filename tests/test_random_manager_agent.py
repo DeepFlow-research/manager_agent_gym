@@ -1,10 +1,12 @@
 import pytest  # type: ignore[import-not-found]
 from uuid import uuid4
 
-from manager_agent_gym.core.manager_agent.random_manager import RandomManagerAgent
-from manager_agent_gym.schemas.preferences.preference import PreferenceWeights
-from manager_agent_gym.schemas.execution.manager import ManagerObservation
-from manager_agent_gym.schemas.workflow_agents.stakeholder import (
+from manager_agent_gym.core.agents.manager_agent.implementations.random_manager import (
+    RandomManagerAgent,
+)
+from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
+from manager_agent_gym.schemas.manager.observation import ManagerObservation
+from manager_agent_gym.schemas.agents.stakeholder import (
     StakeholderPublicProfile,
 )
 
@@ -38,12 +40,12 @@ async def test_random_manager_action_type_and_ids(monkeypatch) -> None:
     # Eliminate sleep delay
     monkeypatch.setattr("time.sleep", lambda *_args, **_kwargs: None)
 
-    mgr = RandomManagerAgent(preferences=PreferenceWeights(preferences=[]), seed=42)
+    mgr = RandomManagerAgent(preferences=PreferenceSnapshot(preferences=[]), seed=42)
 
     # Case 1: both ready and available -> may choose AssignTaskAction
     action = await mgr.take_action(_obs(ready=True, available=True))
     # Must be one of the allowed action classes
-    from manager_agent_gym.schemas.execution.manager_actions import (
+    from manager_agent_gym.core.agents.manager_agent.actions import (
         AssignTaskAction,
         NoOpAction,
         GetWorkflowStatusAction,

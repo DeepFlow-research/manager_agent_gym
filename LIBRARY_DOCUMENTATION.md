@@ -43,7 +43,7 @@ manager_agent_gym/
 │   ├── core/                 # POSG state components
 │   ├── execution/            # Runtime state and actions
 │   ├── evaluation/           # Success criteria and metrics
-│   ├── preferences/          # Preferences and evaluators
+│   ├── preferences/          # Preferences and rubrics
 │   └── workflow_agents/      # Agent configurations and outputs
 └── examples/               # Progressive tutorials and demos
 ```
@@ -92,7 +92,7 @@ The simulation environment that:
 ### Evaluation Framework
 
 Comprehensive multi-objective evaluation including:
-- **Preference adherence** via rubric-based scoring
+- **Preference adherence** via criteria-based scoring
 - **Constraint compliance** validation
 - **Workflow quality metrics** (completion rate, coordination efficiency)
 - **Human-centric metrics** (oversight burden, transparency)
@@ -414,30 +414,30 @@ def create_custom_manager(preferences: PreferenceWeights) -> ManagerAgent:
     return CustomManagerAgent(preferences)
 ```
 
-### Custom Evaluation Rubrics
+### Custom Evaluation Criteria
 
 ```python
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria
 
-# Code-based rubric
+# Code-based criteria
 def quality_validator(context: ValidationContext) -> EvaluatedScore:
     # Custom validation logic
     score = evaluate_quality(context.workflow)
     return EvaluatedScore(score=score, reasoning="Quality assessment")
 
-quality_rubric = WorkflowRubric(
+quality_criteria = RubricCriteria(
     name="quality_check",
-    validator=quality_validator,
+    evaluator_function=quality_validator,
     max_score=1.0,
     run_condition=RunCondition.EACH_TIMESTEP
 )
 
-# LLM-based rubric
-llm_rubric = WorkflowRubric(
+# LLM-based criteria
+llm_criteria = RubricCriteria(
     name="stakeholder_satisfaction",
     llm_prompt="Evaluate stakeholder satisfaction based on communication quality...",
     max_score=1.0,
-    model="gpt-4o"
+    llm_model="gpt-4o"
 )
 ```
 
@@ -458,7 +458,7 @@ class CustomAgent(AgentInterface[AgentConfig]):
 
 ```python
 # Save workflow state
-from manager_agent_gym.core.execution.state_restorer import WorkflowStateRestorer
+from manager_agent_gym.core.execution.state.state_restorer import WorkflowStateRestorer
 
 restorer = WorkflowStateRestorer()
 checkpoint = await restorer.create_checkpoint(workflow, timestep=10)
@@ -601,7 +601,7 @@ ruff format manager_agent_gym/
    - `create_preferences()`
    - `create_team_timeline()`
    - `create_preference_update_requests()`
-   - `create_evaluator_to_measure_goal_achievement()`
+   - `create_rubric_to_measure_goal_achievement()`
 3. Register in `examples/scenarios.py`
 
 ### Adding New Manager Agents
@@ -632,9 +632,9 @@ ruff format manager_agent_gym/
 - `CommunicationService`: Inter-agent messaging
 
 **Evaluation:**
-- `ValidationEngine`: Rubric-based evaluation
-- `Evaluator`: Preference evaluation configuration
-- `WorkflowRubric`: Individual evaluation criteria
+- `ValidationEngine`: Criteria-based evaluation
+- `Rubric`: Preference evaluation configuration
+- `RubricCriteria`: Individual evaluation criterion
 
 ### Manager Actions
 

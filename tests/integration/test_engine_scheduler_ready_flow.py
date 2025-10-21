@@ -1,26 +1,32 @@
 import pytest  # type: ignore[import-not-found]
 from uuid import uuid4
 
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.schemas.core.base import TaskStatus
-from manager_agent_gym.schemas.preferences.preference import PreferenceWeights
-from manager_agent_gym.schemas.config import OutputConfig
-from manager_agent_gym.core.execution.engine import WorkflowExecutionEngine
-from manager_agent_gym.core.workflow_agents.interface import AgentInterface
-from manager_agent_gym.core.workflow_agents.registry import AgentRegistry
-from manager_agent_gym.schemas.unified_results import create_task_result
-from manager_agent_gym.core.workflow_agents.stakeholder_agent import StakeholderAgent
-from manager_agent_gym.schemas.workflow_agents.stakeholder import StakeholderConfig
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.domain.task import Task
+from manager_agent_gym.schemas.domain.base import TaskStatus
+from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
+from manager_agent_gym.core.workflow.schemas.config import OutputConfig
+from manager_agent_gym.core.workflow.engine import WorkflowExecutionEngine
+from manager_agent_gym.core.agents.workflow_agents.common.interface import (
+    AgentInterface,
+)
+from manager_agent_gym.core.agents.workflow_agents.tools.registry import AgentRegistry
+from manager_agent_gym.core.execution.schemas.results import create_task_result
+from manager_agent_gym.core.agents.stakeholder_agent.stakeholder_agent import (
+    StakeholderAgent,
+)
+from manager_agent_gym.schemas.agents.stakeholder import StakeholderConfig
 from typing import cast
 from tests.helpers.stubs import ManagerAssignFirstReady
+from manager_agent_gym.core.workflow.services import WorkflowMutations
+from manager_agent_gym.core.workflow.services import WorkflowQueries
 
 pytestmark = pytest.mark.integration
 
 
 class _StubAgent(AgentInterface):
     def __init__(self, agent_id: str):
-        from manager_agent_gym.schemas.workflow_agents import AgentConfig
+        from manager_agent_gym.schemas.agents import AgentConfig
 
         super().__init__(
             AgentConfig(
@@ -52,11 +58,11 @@ def _workflow_three_step_chain() -> Workflow:
     t1 = Task(name="A", description="d")
     t2 = Task(name="B", description="d", dependency_task_ids=[t1.id])
     t3 = Task(name="C", description="d", dependency_task_ids=[t2.id])
-    w.add_task(t1)
-    w.add_task(t2)
-    w.add_task(t3)
+    WorkflowMutations.add_task(w, t1)
+    WorkflowMutations.add_task(w, t2)
+    WorkflowMutations.add_task(w, t3)
     agent = _StubAgent("worker-1")
-    w.add_agent(agent)
+    WorkflowMutations.add_agent(w, agent)
     # Minimal stakeholder with empty preferences to satisfy evaluation
     stakeholder_cfg = StakeholderConfig(
         agent_id="stakeholder",
@@ -65,11 +71,11 @@ def _workflow_three_step_chain() -> Workflow:
         model_name="o3",
         name="Stakeholder",
         role="Owner",
-        initial_preferences=PreferenceWeights(preferences=[]),
+        preference_data=PreferenceSnapshot(preferences=[]),
         agent_description="Stakeholder",
         agent_capabilities=["Stakeholder"],
     )
-    w.add_agent(StakeholderAgent(config=stakeholder_cfg))
+    WorkflowMutations.add_agent(w, StakeholderAgent(config=stakeholder_cfg))
     return w
 
 
@@ -140,7 +146,7 @@ async def test_scheduler_moves_ready_to_running_then_completed_in_chain(tmp_path
     # Timestep 5: engine completes C; workflow complete
     res5 = await engine.execute_timestep()
     assert get_task("C").status == TaskStatus.COMPLETED
-    assert engine.workflow.is_complete()
+    assert WorkflowQueries.is_complete(engine.workflow)
     assert res5.metadata.get("tasks_completed", []) == [str(get_task("C").id)]
 
     # Now extend with a composite task having two atomic children that depend on C
@@ -155,9 +161,9 @@ async def test_scheduler_moves_ready_to_running_then_completed_in_chain(tmp_path
     # Attach as subtasks for hierarchy and also register atomic children for execution
     parent.add_subtask(child1)
     parent.add_subtask(child2)
-    engine.workflow.add_task(parent)
-    engine.workflow.add_task(child1)
-    engine.workflow.add_task(child2)
+    WorkflowMutations.add_task(engine.workflow, parent)
+    WorkflowMutations.add_task(engine.workflow, child1)
+    WorkflowMutations.add_task(engine.workflow, child2)
 
     # Execute forward until both children complete. Parent must not be considered complete
     # while any child remains incomplete. Also, parent should never appear in ready tasks.
@@ -165,7 +171,7 @@ async def test_scheduler_moves_ready_to_running_then_completed_in_chain(tmp_path
     for _ in range(10):
         res = await engine.execute_timestep()
         # Parent is composite: not in ready list
-        ready_ids = {t.id for t in engine.workflow.get_ready_tasks()}
+        ready_ids = {t.id for t in WorkflowQueries.get_ready_tasks(engine.workflow)}
         assert parent.id not in ready_ids
         # Mark any completed child
         for cid_str in res.metadata.get("tasks_completed", []):
@@ -180,13 +186,13 @@ async def test_scheduler_moves_ready_to_running_then_completed_in_chain(tmp_path
                 remaining.remove(cid)
         # If any child remains, workflow must not be complete
         if remaining:
-            assert not engine.workflow.is_complete()
+            assert not WorkflowQueries.is_complete(engine.workflow)
         else:
             break
 
     # After loop, both children should be completed and therefore workflow complete
     assert not remaining
-    assert engine.workflow.is_complete()
+    assert WorkflowQueries.is_complete(engine.workflow)
 
 
 def _workflow_n_step_chain(n: int) -> Workflow:
@@ -197,9 +203,9 @@ def _workflow_n_step_chain(n: int) -> Workflow:
             t = Task(name=f"T{i + 1}", description="d")
         else:
             t = Task(name=f"T{i + 1}", description="d", dependency_task_ids=[prev])
-        w.add_task(t)
+        WorkflowMutations.add_task(w, t)
         prev = t.id
-    w.add_agent(_StubAgent("worker-1"))
+    WorkflowMutations.add_agent(w, _StubAgent("worker-1"))
     # Minimal stakeholder with empty preferences to satisfy evaluation
     stakeholder_cfg = StakeholderConfig(
         agent_id="stakeholder",
@@ -208,11 +214,11 @@ def _workflow_n_step_chain(n: int) -> Workflow:
         model_name="o3",
         name="Stakeholder",
         role="Owner",
-        initial_preferences=PreferenceWeights(preferences=[]),
+        preference_data=PreferenceSnapshot(preferences=[]),
         agent_description="Stakeholder",
         agent_capabilities=["Stakeholder"],
     )
-    w.add_agent(StakeholderAgent(config=stakeholder_cfg))
+    WorkflowMutations.add_agent(w, StakeholderAgent(config=stakeholder_cfg))
     return w
 
 
@@ -240,7 +246,7 @@ async def test_20_node_chain_completes_within_500_timesteps(tmp_path):
 
     await engine.run_full_execution()
     # Completed successfully and did not exhaust timestep budget
-    assert engine.workflow.is_complete()
+    assert WorkflowQueries.is_complete(engine.workflow)
     assert engine.current_timestep <= 500
     # All 20 top-level tasks should be completed
     statuses = [

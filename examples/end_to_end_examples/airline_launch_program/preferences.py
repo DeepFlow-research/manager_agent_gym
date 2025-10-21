@@ -18,18 +18,18 @@ from examples.end_to_end_examples.standard_rules import (
 )
 from manager_agent_gym.schemas.preferences.preference import (
     Preference,
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
-from manager_agent_gym.schemas.core import Workflow
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric, RunCondition
+from manager_agent_gym.schemas.domain import Workflow
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria, RunCondition
 from manager_agent_gym.schemas.preferences import PreferenceWeightUpdateRequest
 
 
-def create_preferences() -> PreferenceWeights:
+def create_preferences() -> PreferenceSnapshot:
     # ---------------------------
     # Deterministic helper rules
     # ---------------------------
@@ -316,7 +316,7 @@ def create_preferences() -> PreferenceWeights:
     # AVIATION SAFETY & SMS
     # ---------------------------
     aviation_safety_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="sms_implementation_completeness",
             llm_prompt=(
                 """Evaluate SMS implementation completeness against ICAO Annex 19. Award partial credit for:
@@ -329,7 +329,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="safety_risk_assessment_quality",
             llm_prompt=(
                 """Assess quality of safety risk assessments and hazard identification processes.
@@ -339,7 +339,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="proving_flight_safety_readiness",
             llm_prompt=(
                 """Evaluate safety readiness for proving flights: (1) aircraft airworthiness validation,
@@ -349,7 +349,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="safety_culture_development",
             llm_prompt=(
                 """Assess development of safety culture and reporting systems including just culture principles,
@@ -358,13 +358,13 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="aviation_safety_artifact_density",
             evaluator_function=aviation_safety_artifact_density,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="proving_flight_readiness",
             evaluator_function=proving_flight_readiness,
             max_score=1.0,
@@ -376,7 +376,7 @@ def create_preferences() -> PreferenceWeights:
     # REGULATORY COMPLIANCE
     # ---------------------------
     regulatory_compliance_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="aoc_application_completeness",
             llm_prompt=(
                 """Evaluate AOC application completeness against CAA requirements. Award partial credit for:
@@ -386,7 +386,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="operating_licence_requirements",
             llm_prompt=(
                 """Assess Operating Licence requirements compliance: UK principal place of business,
@@ -396,7 +396,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=9.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="operations_manual_regulatory_alignment",
             llm_prompt=(
                 """Evaluate Operations Manual (OM-A/B/C/D) alignment with UK Reg (EU) 965/2012 and ANO 2016.
@@ -406,7 +406,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="caa_inspection_response_quality",
             llm_prompt=(
                 """Assess quality of CAA inspection response and finding closure processes.
@@ -416,7 +416,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="aviation_security_nasp_compliance",
             llm_prompt=(
                 """Evaluate aviation security programme compliance with NASP requirements including
@@ -426,13 +426,13 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_compliance_coverage",
             evaluator_function=regulatory_compliance_coverage,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="security_programme_completeness",
             evaluator_function=security_programme_completeness,
             max_score=1.0,
@@ -444,7 +444,7 @@ def create_preferences() -> PreferenceWeights:
     # AIRWORTHINESS & MAINTENANCE
     # ---------------------------
     airworthiness_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="camo_part145_arrangements_validation",
             llm_prompt=(
                 """Evaluate CAMO and Part-145 arrangements: organizational approvals, maintenance program development,
@@ -454,7 +454,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=9.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="aircraft_certification_completeness",
             llm_prompt=(
                 """Assess aircraft certification completeness: registration certificates, certificates of airworthiness (CofA),
@@ -464,7 +464,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="maintenance_program_quality",
             llm_prompt=(
                 """Evaluate maintenance program quality including scheduled maintenance planning,
@@ -474,7 +474,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="airworthiness_documentation_presence",
             evaluator_function=airworthiness_documentation_presence,
             max_score=1.0,
@@ -486,7 +486,7 @@ def create_preferences() -> PreferenceWeights:
     # OPERATIONAL READINESS
     # ---------------------------
     operational_readiness_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="airport_operations_coordination",
             llm_prompt=(
                 """Evaluate airport operations coordination: slot confirmations, ground handling contracts,
@@ -496,7 +496,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="financial_fitness_demonstration",
             llm_prompt=(
                 """Assess financial fitness demonstration including business plan quality, cash flow projections,
@@ -506,7 +506,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="crew_training_program_readiness",
             llm_prompt=(
                 """Evaluate crew training program readiness including OM-D development, competency standards,
@@ -515,19 +515,19 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="operations_manual_integration",
             evaluator_function=operations_manual_integration,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="financial_fitness_evidence_strength",
             evaluator_function=financial_fitness_evidence_strength,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="airport_coordination_effectiveness",
             evaluator_function=airport_coordination_effectiveness,
             max_score=1.0,
@@ -539,7 +539,7 @@ def create_preferences() -> PreferenceWeights:
     # GOVERNANCE & OVERSIGHT
     # ---------------------------
     governance_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="nominated_postholder_compliance",
             llm_prompt=(
                 """Evaluate nominated postholder appointments and compliance: competency validation,
@@ -549,7 +549,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="corporate_governance_structure",
             llm_prompt=(
                 """Assess corporate governance structure including UK corporate establishment,
@@ -559,7 +559,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="launch_readiness_governance",
             llm_prompt=(
                 """Evaluate launch readiness governance including final approvals, go/no-go decision processes,
@@ -568,7 +568,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="caa_engagement_tracking",
             evaluator_function=caa_engagement_tracking,
             max_score=1.0,
@@ -580,7 +580,7 @@ def create_preferences() -> PreferenceWeights:
     # SPEED
     # ---------------------------
     speed_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="certification_timeline_adherence",
             llm_prompt=(
                 """Evaluate adherence to certification timeline including AOC and Operating Licence application processing,
@@ -590,7 +590,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_response_timeliness",
             llm_prompt=(
                 """Assess timeliness of regulatory responses including CAA finding closure,
@@ -599,7 +599,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="speed_efficiency",
             evaluator_function=speed_rubric,
             max_score=1.0,
@@ -611,13 +611,13 @@ def create_preferences() -> PreferenceWeights:
     # COST
     # ---------------------------
     cost_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_efficiency",
             evaluator_function=cost_rubric,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="certification_cost_optimization",
             llm_prompt=(
                 """Assess certification cost optimization including efficient use of consultants,
@@ -627,7 +627,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="operational_setup_cost_effectiveness",
             llm_prompt=(
                 """Evaluate operational setup cost effectiveness including insurance arrangements,
@@ -636,7 +636,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="airline_adversarial_scenarios",
             llm_prompt=(
                 """Evaluate handling of airline launch adversarial scenarios and regulatory challenges:
@@ -650,7 +650,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_realism_validation",
             evaluator_function=_validate_cost_realism,
             max_score=1.0,
@@ -658,76 +658,76 @@ def create_preferences() -> PreferenceWeights:
         ),
     ]
 
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="aviation_safety",
                 weight=0.3,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="aviation_safety_eval",
                     description="aviation safety and SMS evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=aviation_safety_rubrics,
+                    criteria=aviation_safety_rubrics,
                 ),
             ),
             Preference(
                 name="regulatory_compliance",
                 weight=0.25,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="regulatory_compliance_eval",
                     description="regulatory compliance evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=regulatory_compliance_rubrics,
+                    criteria=regulatory_compliance_rubrics,
                 ),
             ),
             Preference(
                 name="airworthiness",
                 weight=0.2,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="airworthiness_eval",
                     description="airworthiness and maintenance evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=airworthiness_rubrics,
+                    criteria=airworthiness_rubrics,
                 ),
             ),
             Preference(
                 name="operational_readiness",
                 weight=0.15,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="operational_readiness_eval",
                     description="operational readiness evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=operational_readiness_rubrics,
+                    criteria=operational_readiness_rubrics,
                 ),
             ),
             Preference(
                 name="governance",
                 weight=0.06,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="governance_eval",
                     description="governance and oversight evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=governance_rubrics,
+                    criteria=governance_rubrics,
                 ),
             ),
             Preference(
                 name="speed",
                 weight=0.03,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="speed_eval",
                     description="speed and timeliness evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=speed_rubrics,
+                    criteria=speed_rubrics,
                 ),
             ),
             Preference(
                 name="cost",
                 weight=0.01,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="cost_eval",
                     description="cost efficiency evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=cost_rubrics,
+                    criteria=cost_rubrics,
                 ),
             ),
         ]
@@ -740,27 +740,27 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     Timeline shifts from initial setup and safety foundation to regulatory compliance
     focus as AOC and Operating Licence submissions approach.
     """
-    timeline: dict[int, PreferenceWeights] = {
-        0: PreferenceWeights(
+    timeline: dict[int, PreferenceSnapshot] = {
+        0: PreferenceSnapshot(
             preferences=[
                 Preference(
                     name="aviation_safety",
                     weight=0.35,
-                    evaluator=Evaluator(
+                    evaluator=Rubric(
                         name="aviation_safety_eval",
                         description="placeholder",
                         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                        rubrics=[],
+                        criteria=[],
                     ),
                 ),
                 Preference(
                     name="regulatory_compliance",
                     weight=0.2,
-                    evaluator=Evaluator(
+                    evaluator=Rubric(
                         name="regulatory_compliance_eval",
                         description="placeholder",
                         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                        rubrics=[],
+                        criteria=[],
                     ),
                 ),
                 Preference(name="airworthiness", weight=0.2),
@@ -770,7 +770,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.01),
             ]
         ),
-        15: PreferenceWeights(
+        15: PreferenceSnapshot(
             preferences=[
                 Preference(name="aviation_safety", weight=0.3),
                 Preference(name="regulatory_compliance", weight=0.25),
@@ -781,7 +781,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.01),
             ]
         ),
-        25: PreferenceWeights(
+        25: PreferenceSnapshot(
             preferences=[
                 Preference(name="aviation_safety", weight=0.25),
                 Preference(name="regulatory_compliance", weight=0.35),
@@ -792,7 +792,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.01),
             ]
         ),
-        35: PreferenceWeights(
+        35: PreferenceSnapshot(
             preferences=[
                 Preference(name="aviation_safety", weight=0.2),
                 Preference(name="regulatory_compliance", weight=0.4),
@@ -823,11 +823,11 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     return requests
 
 
-def create_evaluator_to_measure_goal_achievement() -> Evaluator:
+def create_evaluator_to_measure_goal_achievement() -> Rubric:
     """Create goal achievement evaluator based on actual airline launch requirements."""
     goal_achievement_rubrics = [
         # Critical regulatory deliverables (absolutely must have for legal operation)
-        WorkflowRubric(
+        RubricCriteria(
             name="aoc_application_package_ready",
             llm_prompt=(
                 "Does ready AOC application package exist with: complete CAA application forms prepared, "
@@ -837,7 +837,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="operating_licence_application_prepared",
             llm_prompt=(
                 "Does prepared Operating Licence application exist with: comprehensive application documentation ready, "
@@ -847,7 +847,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="airworthiness_certification_framework_ready",
             llm_prompt=(
                 "Does ready airworthiness certification framework exist with: CofA application documentation prepared, "
@@ -857,7 +857,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=12.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="aviation_security_programme_documented",
             llm_prompt=(
                 "Does documented aviation security programme exist with: NASP compliance framework established, "
@@ -868,7 +868,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Major operational deliverables (8-9 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="operations_manual_comprehensive",
             llm_prompt=(
                 "Does comprehensive Operations Manual exist with: OM-A General Procedures documented, "
@@ -878,7 +878,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=9.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="safety_management_system_operational",
             llm_prompt=(
                 "Does operational Safety Management System exist with: safety policy implementation, "
@@ -888,7 +888,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=9.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="camo_part145_arrangements_validated",
             llm_prompt=(
                 "Do validated airworthiness arrangements exist with: Part-CAMO approval or contracts, "
@@ -898,7 +898,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="insurance_coverage_binding",
             llm_prompt=(
                 "Do binding insurance certificates exist with: passenger liability coverage, "
@@ -908,7 +908,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="nominated_postholders_appointed",
             llm_prompt=(
                 "Are nominated postholders appointed with: Flight Operations postholder, "
@@ -920,7 +920,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Important supporting deliverables (5-6 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="proving_flights_completed",
             llm_prompt=(
                 "Do completed proving flights exist with: successful flight demonstrations, "
@@ -930,7 +930,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="airport_slots_confirmed",
             llm_prompt=(
                 "Do confirmed airport slots exist with: slot confirmations at coordinated airports, "
@@ -940,7 +940,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="staff_vetting_training_complete",
             llm_prompt=(
                 "Does complete staff vetting and training exist with: 100% security vetting completion, "
@@ -950,7 +950,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="ground_handling_contracts_finalized",
             llm_prompt=(
                 "Do finalized ground handling contracts exist with: passenger handling agreements, "
@@ -960,7 +960,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="maintenance_programs_approved",
             llm_prompt=(
                 "Do approved maintenance programs exist with: aircraft maintenance programs, "
@@ -970,7 +970,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="financial_fitness_demonstrated",
             llm_prompt=(
                 "Does demonstrated financial fitness exist with: business plan documentation, "
@@ -981,7 +981,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Supporting deliverables (3-4 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="uk_principal_place_business",
             llm_prompt=(
                 "Does UK principal place of business exist with: UK corporate structure, "
@@ -991,7 +991,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="disruption_management_procedures",
             llm_prompt=(
                 "Do disruption management procedures exist with: disruption management plans, "
@@ -1001,7 +1001,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="dangerous_goods_approval",
             llm_prompt=(
                 "Does dangerous goods approval exist with: CAA Form SRG2807 submission, "
@@ -1011,7 +1011,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=3.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="final_governance_approvals",
             llm_prompt=(
                 "Do final governance approvals exist with: Board of Directors approval, "
@@ -1021,7 +1021,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=3.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="caa_inspection_findings_closed",
             llm_prompt=(
                 "Are CAA inspection findings closed with: inspection completion records, "
@@ -1033,9 +1033,9 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
         ),
     ]
 
-    return Evaluator(
+    return Rubric(
         name="airline_launch_goal_achievement_eval",
         description="Aviation-specific deliverable achievement measurement for airline launch certification",
         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-        rubrics=goal_achievement_rubrics,
+        criteria=goal_achievement_rubrics,
     )

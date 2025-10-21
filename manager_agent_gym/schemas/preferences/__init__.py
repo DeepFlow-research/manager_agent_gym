@@ -1,31 +1,41 @@
-from .rubric import WorkflowRubric
-from .preference import Preference, PreferenceWeights
-from .weight_update import (
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria
+from manager_agent_gym.schemas.preferences.preference import (
+    Preference,
+    PreferenceSnapshot,
+    PreferenceChangeEvent,
+)
+from manager_agent_gym.schemas.preferences.weight_update import (
     PreferenceWeightUpdateRequest,
     WeightUpdateMode,
     MissingPreferencePolicy,
     RedistributionStrategy,
 )
-from .evaluator import Evaluator, AggregationStrategy
-from .evaluation import (
+from manager_agent_gym.schemas.preferences.evaluator import (
+    Rubric,
+    AggregationStrategy,
+    PreferenceExemplar,
+)
+from manager_agent_gym.schemas.preferences.evaluation import (
     RubricResult,
     PreferenceScore,
     EvaluationResult,
 )
-from .constraints import Constraint
+from manager_agent_gym.schemas.preferences.constraints import Constraint
 
 __all__ = [
-    "WorkflowRubric",
+    "RubricCriteria",
     "Preference",
-    "PreferenceWeights",
+    "PreferenceSnapshot",
     "PreferenceWeightUpdateRequest",
     "WeightUpdateMode",
     "MissingPreferencePolicy",
     "RedistributionStrategy",
     "AggregationStrategy",
-    "Evaluator",
+    "Rubric",
     "RubricResult",
     "PreferenceScore",
     "EvaluationResult",
     "Constraint",
+    "PreferenceChangeEvent",
+    "PreferenceExemplar",
 ]

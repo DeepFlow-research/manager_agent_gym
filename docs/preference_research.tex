@@ -1,0 +1,831 @@
+\documentclass[sigconf]{acmart}
+\usepackage{adjustbox}  % In the preamble
+
+\newcommand{\MG}[1]{\textcolor{blue}{#1}}
+
+\AtBeginDocument{%
+  \providecommand\BibTeX{{%
+    Bib\TeX}}}
+
+\setcopyright{acmlicensed}
+\copyrightyear{2025}
+\acmYear{2025}
+\acmDOI{XXXXXXX.XXXXXXX}
+
+\acmConference[DAI '25]{Conference on Distributed Artificial Intelligence}{November 21--24, 2025}{London, UK}
+\acmISBN{978-1-4503-XXXX-X/2025/11}
+
+\usepackage{enumitem}
+\usepackage{microtype}
+\emergencystretch=1em
+
+\begin{document}
+
+\title{Challenges in Preference Modeling for Human-Aligned AI Systems}
+
+\author{CM MG}
+\affiliation{%
+  \institution{Anonymous Institution}
+  \city{Anonymous City}
+  \country{Anonymous Country}}
+\email{anonymous@anonymous.org}
+
+\renewcommand{\shortauthors}{CM MG}
+
+\begin{abstract}
+This paper explores open research problems in preference modeling, with an emphasis on the foundations, failure modes, and opportunities for improving RLHF and other alignment techniques. We provide a research agenda that spans five core problem domains: transitivity violations, evolving preferences, confounded preference signals, uncertainty quantification, and multi-objective trade-offs. We also outline sample-efficient strategies for preference elicitation and compare recent approaches in the literature. Our aim is to provide a structured map of the problem landscape to guide empirical and theoretical progress.
+\end{abstract}
+
+\begin{CCSXML}
+<ccs2012>
+ <concept>
+  <concept_id>10010147.10010178.10010179.10010180</concept_id>
+  <concept_desc>Computing methodologies~Multi-agent systems</concept_desc>
+  <concept_significance>500</concept_significance>
+ </concept>
+ <concept>
+  <concept_id>10010147.10010178.10010205.10010209</concept_id>
+  <concept_desc>Computing methodologies~Reinforcement learning</concept_desc>
+  <concept_significance>300</concept_significance>
+ </concept>
+ <concept>
+  <concept_id>10010147.10010178.10010179.10010182</concept_id>
+  <concept_desc>Computing methodologies~Planning and scheduling</concept_desc>
+  <concept_significance>300</concept_significance>
+ </concept>
+ <concept>
+  <concept_id>10003456.10003457.10003521.10003525</concept_id>
+  <concept_desc>Human-centered computing~User models</concept_desc>
+  <concept_significance>300</concept_significance>
+ </concept>
+</ccs2012>
+\end{CCSXML}
+
+\ccsdesc[500]{Computing methodologies~Multi-agent systems}
+\ccsdesc[300]{Computing methodologies~Reinforcement learning}
+\ccsdesc[300]{Computing methodologies~Planning and scheduling}
+\ccsdesc[300]{Human-centered computing~User models}
+
+\keywords{preference modeling, reinforcement learning, alignment, multi-objective optimization, RLHF, uncertainty, causal inference, sample efficiency}
+
+\maketitle
+
+\section{Introduction}
+
+\subsection{Deadlines / Conferences ect}
+
+\begin{table}[h]
+\caption{Candidate Venues for an RLHF Paper Finishing circa Dec 2025}
+\begin{adjustbox}{width=\linewidth}
+\begin{tabular}{|p{3cm}|p{3.9cm}|p{5cm}|p{4.2cm}|}
+\hline
+\textbf{Venue (Edition)} & \textbf{Submission Deadlines (AoE)} & \textbf{Why It Is a Good Fit / Relevant Track} & \textbf{Other Key Dates} \\ \hline
+AAAI‑26 (Singapore) & Abstract: 25 Jul 2025\\Paper: 1 Aug 2025 & Has \emph{AI Alignment} special track; 7‑page main paper; strong RLHF/alignment community & Notification: 3 Nov 2025; Camera‑ready: 13 Nov 2025; Conf: 20--27 Jan 2026 \\ \hline
+SaTML 2026 (Munich) & Paper: 24 Sep 2025 & Safety, robustness \& alignment focus; RLHF mis‑specification work welcomed & Interactive revision closes 3 Dec 2025; Decision: 10 Dec 2025; Conf: 23--25 Mar 2026 \\ \hline
+ICLR 2026 (TBA) & Abstract: 19 Sep 2025\\Paper: 24 Sep 2025 & Flagship for LLM fine‑tuning \& RLHF; open‑review, fast cycle & Reviews: 11 Nov 2025; Decision: 22 Jan 2026; Conf (est.): Apr/May 2026 \\ \hline
+AAMAS 2026 (Paphos) & Abstract: 1 Oct 2025\\Paper: 8 Oct 2025 & Multi‑agent learning and value‑alignment sessions & Rebuttal: 21--25 Nov 2025; Decision: 22 Dec 2025; Camera‑ready: 11 Feb 2026; Conf: May 2026 \\ \hline
+AISTATS 2026 (TBA) & \textit{Proj.}\ Abstract: 3 Oct 2025\\\textit{Proj.}\ Paper: 10 Oct 2025 & Stats‑oriented reviewers; 9‑page format suits theory + empirics & Decisions: Jan 2026; Conf (est.): May 2026 \\ \hline
+CVPR 2026 (Denver) & Abstract: 7 Nov 2025\\Paper: 14 Nov 2025 & Vision‑language RLHF papers fit the new Alignment \& Trust spotlight & Conf: 17--21 Jun 2026 \\ \hline
+ICML 2026 (Seoul) & \textit{Proj.}\ Abstract: 31 Jan 2026\\\textit{Proj.}\ Paper: 7 Feb 2026 & Largest ML venue; RLHF regularly accepted; Seoul location confirmed & Decisions: Apr 2026; Conf: 6--12 Jul 2026 \\ \hline
+FAccT 2026 (Athens) & \textit{Est.}\ Abstract: 14 Jan 2026\\\textit{Est.}\ Paper: 21 Jan 2026 & Fairness, accountability \& transparency track invites alignment analyses & Decisions: Apr 2026; Conf: late Jun 2026 \\ \hline
+CHI 2026 (Barcelona) & Resubmission: 15 Jan 2026 & User‑study / preference‑elicitation work suits AI‑for‑HCI subcommittee & Initial submission: 11 Sep 2025; Decisions: Feb 2026; Conf: late Apr 2026 \\ \hline
+IJCAI--ECAI 2026 (Bremen) & \textit{Est.}\ Abstract: 16 Jan 2026\\\textit{Est.}\ Paper: 23 Jan 2026 & Broad AI scope; prior alignment sessions & Conf: 8--14 Aug 2026 \\ \hline
+ACL 2026 (TBA) & Full paper: 15 Feb 2026 & Flagship NLP venue; Generation \& Alignment track & Reviews: Apr 2026; Decisions: May 2026; Conf: late Jul 2026 \\ \hline
+IFAC World Congress 2026 (Busan) & Dissemination paper: 28 Feb 2026 & Control‑theoretic angle on RLHF; AI‑for‑Control theme & Congress: 12--17 Jul 2026 \\ \hline
+NeurIPS 2026 (TBA) & \textit{Proj.}\ Abstract: 11 May 2026\\\textit{Proj.}\ Paper: 15 May 2026 & Top visibility; recurring Alignment \& Safety workshops & Notification: Sep 2026; Conf: early Dec 2026 \\ \hline
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+
+
+
+
+note log: 
+26.07.2025: copied doc contents over and did some manual work on a lit review for all this. 
+
+
+In modern LLM post-training pipelines, preference learning plays a central role in shaping model behavior. 
+For example, models such as TULU-3 \cite{tulu3} and Qwen-3 \cite{qwen3} follow a pipeline that includes instruction tuning, collection of policy preferences, and reinforcement learning with human or verifiable reward feedback. Although this approach has become widespread, recent critiques \cite{sun2024rethinking, zhixuan2024beyond} call into question the foundational assumptions behind preference modeling, and empirical studies highlight failure modes such as non-transitive rankings \cite{non_transitivity_llm_evaluators_paper, yu2025elspr}, perverse incentives \cite{xu2023rlhf}, failure to model evolutions of preference over time \cite{temporal_drift} and a series of other issues.
+
+This document stores some of the key research problems in preference modelling for LLMs, and where we think we could push the frontier.
+
+\section{Research Challenges}
+
+\subsection{Modeling Non-Transitive Preferences in LLMs}
+
+There is good evidence that human preference is non-transitive \cite{tversky1969intransitivity}, but this directly violates BT models of preference \cite{foundation_book_on_bt} which assume stochastic transitivity.
+
+This is backed up by \cite{non_transitivity_llm_evaluators_paper}, \cite{tournament_graphs_to_clean_up_non_transitivity}
+Recent studies \cite{non_transitivity_llm_evaluators_paper, tournament_graphs_to_clean_up_non_transitivity} show that learned preferences in LLM-based judges violate transitivity, affecting reliable ranking.
+
+\textbf{Research Question:} Can we show that for systems with true non transitivity in preference, that the reward from BT models fails to capture the data? Can we improve on it?
+
+\textbf{Potential Directions:}
+\begin{itemize}
+    \item Explore alternatives to Bradley-Terry models that accommodate partial orderings.
+\end{itemize}
+
+\begin{table}[h]
+\caption{Transitivity in LLM Preference Modeling}
+\begin{adjustbox}{width=\linewidth}
+
+\begin{tabular}{|p{1cm}|p{4cm}|p{4cm}|p{3cm}|}
+\hline
+\textbf{Paper} & \textbf{Key Contribution} & \textbf{Proof / Evidence} & \textbf{Missing Aspects} \\
+\hline
+\cite{tournament_graphs_to_clean_up_non_transitivity} & Showed frequent non-transitive cycles in pairwise judgments & Constructed tournament graphs from LLM rankings & Lacked integration with live inference tasks \\
+\hline
+\cite{non_transitivity_llm_evaluators_paper} & Evaluated logical consistency in ranking models & Conducted stress tests with synthetic preference chains & No proposals for correction mechanisms \\
+\hline
+\cite{tournament_graphs_to_clean_up_non_transitivity} & Used graph algorithms to resolve ranking cycles & Applied feedback arc set minimization to clean data & Only post-hoc; doesn't guide learning \\
+\hline
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\textbf{Success Indicators:} Look into \cite{non_transitivity_llm_evaluators_paper} to get eval metrics, datasets, ect.. 
+
+\subsection{Handling Evolving Preferences}
+
+\section*{Static Preference Assumption in BT Models}
+
+BT model assumes that the underlying preference or skill scores of items or agents are \textbf{static over time}. Formally, for a pairwise comparison between items $i$ and $j$, the probability that item $i$ is preferred over item $j$ is modeled as:
+
+\[
+P(i \succ j) = \frac{e^{\theta_i}}{e^{\theta_i} + e^{\theta_j}} = \frac{1}{1 + e^{-(\theta_i - \theta_j)}}
+\]
+
+where:
+\begin{itemize}
+  \item $\theta_i$ and $\theta_j$ represent the latent utility or skill scores of items $i$ and $j$ respectively.
+  \item These scores are assumed to be \textbf{fixed parameters} during training and across the dataset.
+\end{itemize}
+
+This static assumption means the model does not account for temporal drift, context-dependent preferences, or evolving item performance. In temporal datasets, this can lead to mismodeling if preferences shift over time (e.g., due to changing trends, item updates, or user learning).
+
+For datasets with potential non-stationarity, extensions such as time-dependent BT models or dynamic Bayesian variants may be more appropriate.
+
+\textbf{Problem Statement} How can preference models adapt efficiently to non-stationary distributions over time?
+
+\begin{table}[h]
+\caption{Handling Evolving preferences  in LLM Preference Modeling}
+\begin{adjustbox}{width=\linewidth}
+
+\begin{tabular}{|p{1cm}|p{4cm}|p{4cm}|p{3cm}|}
+\hline
+\textbf{Paper} & \textbf{Key Contribution} & \textbf{Proof / Evidence} & \textbf{Missing Aspects} \\
+\hline
+\cite{multi_vector_rlhf} & Handles conflicting objectives (that could appear over time, links to 2.5) using multi vector idea of RLHF & needs notes & needs notes \\
+\hline
+\cite{dpo_with_uncertainty} & Introduces uncertainty-aware penalization schemes for Direct Preference Optimization (DPO) to mitigate overfitting on ambiguous or mislabeled preference pairs. & Uses LCB addition and Energy Factor multiplication that modify loss gradients based on preference uncertainty. Energy factor multiplication is $\hat{r}_\theta(x, y) \leftarrow \hat{r}_\theta(x, y) \cdot e^{-u(y|x)/\tau}$, which down scales implicit rewards by an exponential function of uncertainty to attenuate updates on uncertain samples. I like its analysis of when DPO to find when samples are the most theoretically impactful to misalignment & It applies mainly to better policies because of high uncertainty in samples, not sample conflicts particularly. Also only uses anthropic HH, limited scope.\\
+\hline
+\cite{temporal_drift_recsys_cool_drift_detection} & LLMs in domain of dynamically shifting user preference (job ads). & Uses hypergraph wavelet to detect preference shift (novel method) and probably an interesting domain for evaluation of shifting preferences. & Not really an allignment paper, more recsys. \\ 
+\hline
+\cite{non_stationary_bandits} & Tries to solve outside context of LLMs for non stationary bandits & Good theory paper, maybe can use the datasets? & Not really an alignment paper, more rec-sys. \\
+\hline
+\cite{kim2025drift} & User-specific preference adaptation (minimal data, no retraining)	 & Implicit few-shot personalization at decode time; represent preferences as attribute vectors; steer a frozen LLM & Need to read more, not really an alignment paper, more personalization heavy (need to read). \\ 
+\hline
+\cite{errors_in_rl_preference_learning} & Interesting paper which models learning preferences using regret, performs well on robotic manipulation tasks. & Very good theory underpinning & Not very relevent task set. \\ 
+\hline 
+\cite{chen2024preferencelearningalgorithmslearn} & Derives 'difficult of learning data point' similar to what we envisioned as 'optimal transform' distance. & Supports winrate as an offline evaluation metric.
+
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\textbf{Evaluation}
+\begin{itemize}
+    \item Simulated preference drift experiments.
+    \item Real-world datasets with timestamped annotations. We can build a dataset by following some method like \cite{non_transitivity_llm_evaluators_paper} to find intransitive preferences, then enforce some kind of temporal ordering on them. 
+\end{itemize}
+
+Interesting question: *why* are preferences transitive? I wonder if theres some interesting grokking of true data to find patterns, my intuition is this could be posed causally as a distribution shift of causal factors? This framing would solve basically every problem, but I'm not sure if its actually tractable haha. 
+
+
+\subsection{Mitigating Confounded Preference Inference}
+
+Confounding variables (e.g., annotator demographics) can lead to spurious correlations and unfair models.
+
+\textbf{Approach:}
+\begin{itemize}
+    \item Use causal inference tools to model the true drivers of preferences.
+    \item Design counterfactual and intervention-based evaluation pipelines.
+    \item Conduct demographic audits and fairness evaluations.
+\end{itemize}
+
+\subsection{Quantifying Uncertainty in Preference Judgments}
+
+LLMs often express preference with high certainty even when underlying data is ambiguous.
+
+\textbf{Key Metrics:}
+\begin{itemize}
+    \item Agreement variance across annotators.
+    \item Calibrated confidence metrics aligned with preference stability.
+    \item Abstention and deferral modeling.
+\end{itemize}
+
+\subsection{Handling Multi-Objective Preference Trade-offs}
+
+Preferences often reflect competing objectives (e.g., creativity vs. safety). Scalar preference scores lose nuance.
+
+paper to read: 
+The Reward Hypothesis is False 
+
+
+\textbf{Ideas:}
+\begin{itemize}
+    \item Model Pareto frontiers and non-dominance.
+    \item Enable contextual trade-off weighting.
+    \item Train interpretable preference models capable of explaining decisions in terms of multi-objective reasoning.
+\end{itemize}
+
+\subsection{Improving Sample Efficiency}
+
+
+\begin{table}[h]
+\caption{Multi objective tradeoff}
+\begin{adjustbox}{width=\linewidth}
+
+\begin{tabular}{|p{1cm}|p{4cm}|p{4cm}|p{3cm}|}
+\hline
+\textbf{Paper} & \textbf{Key Contribution} & \textbf{Proof / Evidence} & \textbf{Missing Aspects} \\
+\hline
+\cite{yang2024rewardsincontextmultiobjectivealignmentfoundation} & g & g & g \\
+\hline
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+
+\textbf{Goal:} Use active learning and optimal comparison selection to reduce annotation burden.
+
+\textbf{Approaches:}
+\begin{itemize}
+    \item Uncertainty-aware comparison generation.
+    \item Budget-constrained learning curve benchmarks.
+    \item Evaluation via data efficiency curves.
+\end{itemize}
+
+\section{Problem Statement}\label{sec:problem}
+
+As language models are deployed in increasingly complex environments, reinforcement learning (RL) has proved effective at \emph{eliciting} reasoning behaviors that solve hard problems with \emph{verifiable} utility (e.g., mathematics, science). In such domains, RL with verifiable rewards (RLVR) poses an RL problem with sparse terminal rewards and learns capable policies. However, as the average task size handled by LLM-based agents and multi-agent systems (MAS) grows, stakeholders increasingly care about \emph{how} work is performed (e.g., governance, safety, cost, quality), not only about binary correctness.
+
+Traditional alignment methods act primarily at \textbf{training time}: RLHF and Constitutional AI optimize a single scalar signal reflecting \emph{average} annotator preferences or fixed constitutions. While effective for coarse alignment, these approaches face structural limitations documented in recent critiques of preference modeling and utility design~\cite{sun2024rethinking,zhixuan2024beyond,xu2023rlhf}: (i) fundamental misalignment when user-specific preferences deviate from population averages, (ii) averaging effects that collapse heterogeneous preferences, (iii) non-stationarity in preferences over time, and (iv) loss of causal structure when multi-aspect comparisons are compressed into a single scalar label.
+
+This motivates \emph{test-time alignment}: enabling agents to align with a user-stated preference \(p\) (reflecting latent stakeholder preferences \(\mathcal{P}\)) by constructing \emph{proxy utilities} on the fly and using them to guide inference and selection without modifying the base model’s parameters.
+
+\subsection{Formalization}\label{sec:formalization}
+
+\paragraph{Model distribution.}
+An LLM parameterized by \(\theta\) induces a distribution over outputs
+\begin{equation}
+P_\theta(y \mid x) \;=\; \prod_{t=1}^{T} P_\theta(y_t \mid x, y_{<t}),
+\end{equation}
+where \(x\) is the input and \(y=(y_1,\dots,y_T)\) is a candidate output.
+
+\paragraph{Preference statements.}
+A user provides a natural-language preference \(p\) specifying how outputs should be evaluated (e.g., “be correct and concise, and cite references”). We denote the unobserved \emph{true} stakeholder preference by \(\mathcal{P}\).
+
+\paragraph{True and proxy utilities.}
+For any \(y\), the stakeholder’s true utility is
+\[
+u^*(y \mid x,p),
+\]
+and the agent builds a \emph{proxy utility}
+\[
+\hat u(y \mid x,p),
+\]
+intended to approximate \(u^*\). Utilities are latent functions; individual rewards are sample-level evaluations. For an instance \((x_i,y_i,p_i)\),
+\[
+r(y_i)=u^*(y_i\mid x_i,p_i), \qquad r'(y_i)=\hat u(y_i\mid x_i,p_i).
+\]
+
+\paragraph{Objective.}
+We seek proxy utilities whose induced rewards track the true rewards:
+\begin{equation}
+\hat u^{\min} \;=\; \arg\min_{\hat u}\;
+\mathbb{E}_{(x,p,y) \sim \mathcal{D}}\Big[(r(y) - r'(y))^2\Big].
+\label{eq:utility-gap}
+\end{equation}
+
+\subsection{Rubric decomposition and proxy utilities}
+\label{sec:rubrics}
+
+We never observe the true stakeholder utility \(u^*\) directly.  
+Instead, we observe \emph{exemplars} \(y^\star\) drawn from a latent target policy
+\(\pi^\star(\cdot \mid x,p)\), where each exemplar represents a desirable output under the stakeholder's
+true preference.  
+Our goal is to learn a \emph{rubric decomposer} \(\mathfrak{D}_\phi\) that, given a task \(x\) and
+preference description \(p\), produces a structured scoring function \(g_\phi(x,p,y)\)
+that approximates \(u^*(y\mid x,p)\).
+
+\paragraph{Rubrics.}
+A rubric \(R\) defines a set of criteria 
+\(\{c_j\}_{j=1}^M\), each associated with a nonnegative weight 
+\(\mathbf{w}=(w_1,\dots,w_M)\in\Delta^M\).  
+Each criterion \(c_j\) evaluates a specific aspect of an output
+(e.g., factuality, conciseness, politeness) and is paired with a \emph{verifier}
+\(\nu_j(c_j, x, y)\in[0,1]\) that measures the degree to which the criterion is satisfied.
+Verifiers may be rule-based (e.g., regex checks) or model-based (e.g., entailment classifiers or LLM evaluators).
+
+ 
+Collecting these verifier outputs yields the vector
+\[
+\boldsymbol{\nu}(c,x,y)
+=
+[\nu_1(c_1,x,y),\dots,\nu_M(c_M,x,y)]^\top,
+\]
+
+
+\paragraph{Decomposition and scoring.}
+The rubric decomposer produces both the set of criteria and their corresponding weights:
+\[
+\mathfrak{D}_\phi:(x,p)\mapsto R=\{(c_1,w_1),\dots,(c_M,w_M)\}.
+\]
+Given this rubric, the proxy utility (or rubric score) is computed as the weighted combination of verifier outputs:
+\[
+\hat u(y\mid x,p)
+= g_\phi(\boldsymbol{\nu}(x,y))
+= \mathbf{w}_\phi(x,p)^\top \boldsymbol{\nu}(x,y).
+\]
+This provides a scalar estimate of the \emph{absolute goodness} of an output under the stakeholder’s stated preference.
+
+\paragraph{Remark 1 (Relation to ranking objectives).}
+Although later sections optimise a listwise (InfoNCE) objective that operates on
+\emph{relative} orderings within candidate sets, the learned rubric scores
+\(g_\phi(x,p,y)\) remain estimators of \emph{absolute} utility.
+Under mild rank-consistency assumptions (Appendix~\ref{lemma:consistency}),
+optimising local orderings yields a monotone transformation of the true utility,
+a standard result in listwise ranking and contrastive learning.  
+Thus, while the optimisation is contrastive, the rubrics themselves act as
+absolute evaluators of output quality.
+
+\paragraph{Rubric-scaled policy.}
+Let \(\pi_{\mathrm{ref}}(y\mid x)\) denote a frozen base model.  
+We form a \emph{rubric-scaled policy}
+\[
+\pi'_{\mathrm{ref}}(y\mid x,p)
+\;\equiv\;
+\pi_{\mu,g_\phi}(y\mid x,p),
+\]
+where \(\mu\) is a scaling operator
+(e.g., Gibbs tilt, best-of-\(K\), or beam search).  
+Intuitively, \(\pi'_{\mathrm{ref}}\) represents the base model
+filtered through the rubric scores.
+
+\paragraph{Policy-gap view.}
+Ideally, we would like the rubric-scaled policy to match the target policy:
+\[
+\phi^\star
+= 
+\arg\min_\phi
+\mathbb{E}_{(x,p)}\!
+\Big[
+D\!\big(
+\pi^\star(\cdot\mid x,p)
+\;\|\;
+\pi'_{\mathrm{ref}}(\cdot\mid x,p)
+\big)
+\Big].
+\]
+However, since \(\pi^\star\) is only observed indirectly through exemplars,
+this objective is intractable.  
+In practice, we replace it with a tractable \emph{listwise surrogate}
+(Section~\ref{sec:listwise}) that enforces correct orderings
+within sampled candidate groups, providing a contrastive estimate of this policy gap.
+
+\paragraph{Cross-policy generalization.}
+The formulation above assumes a single reference policy
+\(\pi_{\mathrm{ref}}\) and verifier configuration, which can
+cause \(g_\phi\) to overfit to the artifacts of that particular pair.
+To promote transferability, we minimize the expected divergence over a
+distribution of reference policies and verifier classes:
+\begin{equation}
+\phi^\star
+=\arg\min_\phi\;
+\mathbb{E}_{\pi\sim\Pi,\;v\sim\mathcal{V}}
+\;
+\mathbb{E}_{(x,p)\sim\mathcal{D}}
+\Big[
+D\!\big(
+\pi^\star(\cdot\mid x,p)
+\;\|\;
+\pi'_{\mathrm{ref},v}(\cdot\mid x,p)
+\big)
+\Big],
+\label{eq:cross-policy-gap}
+\end{equation}
+where \(\Pi\) denotes a mixture of reference policies
+and \(\mathcal{V}\) a family of verifier classes.
+Each $\pi'_{\mathrm{ref},v}$ applies the rubric-scoring function
+under verifier configuration $v$.
+Training in expectation over $(\pi,v)$ discourages co-adaptation between
+any particular generator and its evaluators and yields a rubric mapping
+that captures alignment structure invariant across model families.
+
+Because the target policy \(\pi^\star\) is observed only through exemplars
+\(y^\star\), Eq.~\eqref{eq:cross-policy-gap} remains intractable in
+practice.  We therefore introduce a tractable \emph{listwise surrogate}
+that estimates this divergence using candidate groups and exemplar
+comparisons.
+
+
+\subsection{Candidate sets and soft group distribution}\label{sec:candidate-sets}
+
+For each input $(x,p,y^\star)$, we draw a candidate group
+\[
+C \sim \big(\pi'_{\text{ref}}(\cdot\mid x,p)\big)^{\otimes K},\qquad 
+C^+ = C \cup \{y^\star\}.
+\]
+Within the group we define a soft selection distribution:
+\begin{equation}
+q_\phi(y\mid x,p,C;\tau)
+\;=\;
+\frac{\exp\{g_\phi(x,p,y)/\tau\}}
+{\sum_{y'\in C^+}\exp\{g_\phi(x,p,y')/\tau\}},
+\qquad \tau>0.
+\label{eq:softmax}
+\end{equation}
+This formulation unifies hard selection (best-of-$K$) and softer Gibbs tilts through the temperature~$\tau$.
+
+\subsection{Listwise (InfoNCE) training objective}\label{sec:listwise}
+
+We minimize a contrastive, listwise cross-entropy over each candidate group:
+\begin{equation}
+\mathcal{L}_{\mathrm{list}}(\phi)
+\;=\;
+-\,\log q_\phi(y^\star\mid x,p,C;\tau)
+\;+\;
+\lambda\,\Omega(\phi),
+\label{eq:listwise}
+\end{equation}
+where $\Omega(\phi)$ denotes an optional regularizer
+(e.g., sparsity or complexity penalties on rubrics or decompositions).  
+The gradient identity
+\begin{equation}
+\nabla_\phi \mathcal{L}_{\mathrm{list}}
+\;=\;
+\sum_{y\in C^+}
+\Big(q_\phi(y)-\mathbf{1}[y=y^\star]\Big)\,
+\nabla_\phi \log q_\phi(y)
+\label{eq:listwise-grad}
+\end{equation}
+shows that the update is a stable, low-variance
+\emph{contrastive} (InfoNCE/ListNet-style) signal that pushes
+probability mass onto the exemplar within the sampled group.
+
+\paragraph{Differentiability.}
+Because $q_\phi$ is a softmax over $g_\phi$, we have
+\[
+\nabla_\phi \log q_\phi(y)
+=\tfrac{1}{\tau}\Big(\nabla_\phi g_\phi(x,p,y)
+- \mathbb{E}_{y'\sim q_\phi}[\nabla_\phi g_\phi(x,p,y')]\Big),
+\]
+so the objective is end-to-end differentiable in~$\phi$.
+We do not backpropagate through the sampling of~$C$;
+the candidate group acts as a Monte-Carlo context
+(as in negative sampling).
+
+\paragraph{Remark 1 (Relation to ranking objectives).}
+Although the listwise loss optimizes relative orderings within candidate sets, 
+the learned rubric scores $g_\phi(x,p,y)$ are designed to approximate 
+\emph{absolute} stakeholder utilities rather than pairwise preferences. 
+This surrogate is justified by the classical result that optimizing 
+listwise or pairwise cross-entropies recovers a monotone transform of the 
+underlying utility function under rank-consistency assumptions 
+(Appendix A, Lemma 1). 
+Hence, while the optimization is contrastive, the learned rubrics remain 
+absolute evaluators of output quality.
+
+\paragraph{Connection to reinforcement learning.}
+Although expressed in contrastive form, the update in
+Eq.~\eqref{eq:listwise-grad} is \emph{policy-gradient–equivalent}
+with an optimal group-level baseline (Appendix A, Lemma “Policy-gradient equivalence”).
+This grounds the method in RL theory while retaining the numerical stability
+of listwise training.
+
+\subsection{Intuition}\label{sec:intuition}
+
+\begin{itemize}
+    \item \textbf{Why rubrics?} They provide interpretable, modular criteria grounded in verifiers, enabling compositional proxy utilities from natural-language preferences.
+    \item \textbf{Why listwise contrastive?} We observe exemplars rather than numeric utilities. A listwise cross-entropy over candidate groups supplies a stable surrogate that enforces the desired ordering locally—precisely where the model samples during inference.
+    \item \textbf{Why groups?} Enforcing correct rankings within sampled groups is a tractable approximation to the intractable policy-gap objective in Eq.~\eqref{eq:cross-policy-gap}, focusing learning on regions of the output space that matter at inference time.
+\end{itemize}
+
+
+\subsection{Environment constraints: clarifications and compute}\label{sec:env}
+
+In deployment, agents interact with stakeholders over multiple turns. Clarifications consume human time; automated verifiers incur monetary/compute costs. We encode these constraints via
+\begin{equation}
+\Omega(\phi) \;=\; 
+\lambda_{\mathrm{int}}\, C_{\text{clarify}}(\hat u_\phi) 
+\;+\; \beta_{\mathrm{comp}}\, C_{\text{verify}}(\hat u_\phi),
+\end{equation}
+where \(C_{\text{clarify}}\) penalizes clarification turns and \(C_{\text{verify}}\) penalizes compute-intensive scoring. Coefficients \(\lambda_{\mathrm{int}},\beta_{\mathrm{comp}}\ge 0\) implement budgets for interaction and compute. The stakeholder oracle is modeled as an \emph{agent} emitting exemplars \(y^\star\sim \pi^\star(\cdot\mid x,p)\) and answering structured queries; a clarification policy \(\pi_{\text{clarify}}\) can be invoked when \(p\) is underspecified, subject to the budget.
+
+\paragraph{Remark 2 (Differentiability of regularizers).}
+Both cost terms are implemented using smooth surrogate functions of the proxy 
+utility $\hat u_\phi$ to ensure end-to-end differentiability.  
+For instance, clarification cost can be approximated by a soft budget term 
+\[
+C_{\mathrm{clarify}}(\hat u_\phi)
+= \sigma_\tau\!\big(N_{\mathrm{clarify}}(\hat u_\phi) - Q\big),
+\]
+where $\sigma_\tau(z)=\frac{1}{1+e^{-z/\tau}}$ is a temperature-controlled
+sigmoid that softly penalizes exceeding the clarification budget~$Q$.  
+Similarly, verifier cost can be modeled as a smooth weighted sum over verifier
+invocations,
+\[
+C_{\mathrm{verify}}(\hat u_\phi)
+= \sum_j \alpha_j\,\sigma_\tau\!\big(\nu_j(c_j,x,y)-\kappa_j\big),
+\]
+where $\alpha_j$ controls compute weight and $\kappa_j$ sets a tolerance
+threshold.  
+No gradients are propagated through discrete sampling of clarification queries
+or verifier calls; instead, we use continuous relaxations or stop-gradient
+estimators to keep $\Omega(\phi)$ differentiable in expectation.
+
+
+
+\subsection{Extension I: multi-objective utilities via sets of rubrics}\label{sec:mo}
+
+Preferences are often multi-objective. Let \(\mathcal{R}=\{R^{(1)},\dots,R^{(K)}\}\) be \(K\) rubric decompositions, each inducing a proxy utility \(\hat u^{(k)}(y\mid x,p)\) and proxy reward \(r'^{(k)}(y)\). An aggregation operator \(\mathcal{O}\) combines them:
+\begin{equation}
+r'(y)\;=\;\mathcal{O}\!\big(\{\hat u^{(k)}(y\mid x,p)\}_{k=1}^K\big).
+\end{equation}
+\paragraph{Task-specific scalarization.} 
+We learn \(\mathbf{a}(x,p)=(\alpha^1,\dots,\alpha^K)\in\Delta^K\) and use
+\begin{equation}
+r'_{\text{MO,task}}(y\mid x,p)\;=\;\sum_{k=1}^K \alpha^k(x,p)\,r'^{(k)}(y\mid x,p),
+\end{equation}
+treating the \(\alpha^k\) as task- and preference-specific weights on aspects of a single underlying utility. The operator abstraction also permits Pareto/hypervolume selection when budgets allow (non-dominated sorting \(O(M^2K)\) naively; faster for \(K{=}2\)).
+
+\subsection{Extension II: belief-state proxy utilities for uncertainty}\label{sec:belief}
+
+We face uncertainty in (i) rubric set choice, (ii) rule fidelity within a rubric, and (iii) verifier noise. We maintain a belief distribution \(b\) over rubric configurations and verifier reliabilities. Decisions maximize expected utility under \(b\):
+\[
+y^\star=\arg\max_y \;\mathbb{E}_{\theta\sim b}[\,u_\theta(y\mid x,p)\,],
+\]
+and clarifications update \(b\). A belief-aware counterpart to \eqref{eq:utility-gap} augments the objective with interaction and compute costs:
+\begin{equation}
+\begin{aligned}
+\hat u^{\min} = \arg\min_{\hat u}\;&
+\mathbb{E}_{(x,p,y)}\,\mathbb{E}_{\theta \sim b}
+\Big[(u_\theta(y \mid x,p) - \hat u(y \mid x,p))^2\Big] \\
+&+ \lambda_{\mathrm{int}}\, C_{\text{clarify}}(\pi_{\text{clarify}})
++ \beta_{\mathrm{comp}}\, C_{\text{verify}}(\hat u).
+\end{aligned}
+\end{equation}
+Practical procedures include Bayesian model averaging, Thompson sampling, value-of-information queries, and robust optimization against worst-case plausible rubrics.
+
+\subsection{Extension III: non-stationary preference structures}\label{sec:drift}
+
+Preferences may drift over time due to changing contexts or priorities. We model drift either in the rubric space \(\mathcal{R}\) (structural change) or in the weights \(\mathbf{w}\) (relative importance of fixed criteria). Introduce a time index \(t\) and learn a sequence \(\hat u_t\) that tracks \(u_t\) via active learning with pairwise comparisons.
+
+\paragraph{Active querying.}
+At time \(t\), form candidate pairs \(\mathcal{Y}_t=\{(y_A^{(i)},y_B^{(i)})\}\). With belief \(b_{t-1}(\mathbf{w})\) over weights and feature difference \(\Delta\mathbf{v}=\mathbf{v}(x,y_A)-\mathbf{v}(x,y_B)\),
+\[
+P(y_A\succ y_B\mid b_{t-1})=\int \sigma(\mathbf{w}^\top \Delta\mathbf{v})\,b_{t-1}(\mathbf{w})\,d\mathbf{w},
+\]
+and predictive uncertainty
+\[
+U_t=-P\log_2 P-(1-P)\log_2(1-P).
+\]
+Query the most informative pair if \(U_t\) exceeds a threshold (set by interaction cost) or via \(\epsilon\)-greedy exploration.
+
+\paragraph{Weight drift.}
+When a new preference datum \(D_t=(y_A^\ast \succ y_B^\ast)\) arrives, update the belief via Bayesian update with misfit \(L_t=-\log P(D_t\mid b_{t-1})\), and add small process noise \(Q\) to avoid variance collapse: \(\Sigma_t'=\Sigma_t+Q\).
+
+\paragraph{Concept drift.}
+Track two EMAs: average uncertainty \(\bar U_t\) (proactive) and average misfit \(\bar L_t\) (reactive). Flag drift if \((\bar U_t>\tau_U)\lor(\bar L_t>\tau_L)\). On trigger: (i) re-decompose to obtain new rubrics \(\mathcal{R}_{\mathrm{new}}\), (ii) expand the active space \(\mathcal{R}_{t+1}=\mathcal{R}_t\cup \mathcal{R}_{\mathrm{new}}\), (iii) reset the belief to a diffuse prior over the enlarged weight space.
+
+\paragraph{Summary.}
+Section~\ref{sec:listwise} introduces a stable, listwise surrogate that enforces exemplar-preferred orderings in candidate groups and approximates the policy-gap~\eqref{eq:policy-gap}. Appendix~A proves (i) consistency of the listwise objective with a KL view and (ii) its policy-gradient equivalence with an optimal group baseline.
+
+
+\section{Conclusion}
+
+Preference modeling sits at the center of modern alignment research, but foundational cracks are emerging. To build trustworthy systems, we must go beyond simplistic binary rankings toward causal, uncertain, and temporally dynamic representations of human preferences. This paper outlines key research areas and proposes directions for advancing the field.
+
+\section*{Appendix A: Listwise Training — Consistency and Policy-Gradient Equivalence}
+
+This appendix formalizes why the listwise (InfoNCE) objective introduced in
+Section~\ref{sec:listwise} is a sound surrogate for the intractable
+policy-gap objective (Equation~\ref{eq:cross-policy-gap}).
+We show that, under mild assumptions about how exemplars are selected, the same loss both  
+(i) minimizes a Kullback–Leibler (KL) divergence between the model’s induced
+group distribution and the oracle’s preference distribution, and  
+(ii) corresponds to a scaled policy-gradient update.
+Together, these two lemmas establish the theoretical foundation for
+rubric-based contrastive training.
+
+---
+
+\subsection*{A.1 Setup and Assumptions}
+
+\paragraph{Candidate groups.}
+For each task–preference pair $(x,p)$, we construct a \emph{candidate group}
+\[
+C \sim \big(\pi_{\text{ref}}'(\cdot\mid x,p)\big)^{\otimes K},
+\qquad
+C^+ = C \cup \{y^\star\}.
+\]
+We treat $C^+$ as a \emph{multiset}: duplicates are permitted and counted in the
+normalization below.
+Allowing duplicates is important because the reference model samples i.i.d.;
+the same output $y$ may appear multiple times, and its empirical probability
+should scale with that frequency. This keeps normalization unbiased when the
+group is used as a Monte Carlo approximation of the underlying distribution.
+
+\paragraph{Assumption (Exemplar selection).}
+Although $y^\star$ is observed as the chosen exemplar, we rarely know why it was
+selected.  
+To connect this to a probabilistic model, we assume the oracle (or human)
+selects exemplars according to a Boltzmann or Plackett–Luce style rule over
+true utilities:
+\[
+P(y^\star = y \mid x,p,C)
+\;\propto\;
+\exp\{\beta\,u^\*(y\mid x,p)\},
+\qquad
+\beta>0.
+\]
+This expresses the probability that a candidate $y$ would be chosen from $C$
+given its latent utility under the stakeholder’s true preference $u^*$.
+The deterministic case
+$y^\star=\arg\max_{y\in C^+}u^\*(y\mid x,p)$
+emerges as $\beta\!\to\!\infty$.
+
+Intuitively, this models \emph{bounded rationality} in exemplar choice:
+high-utility exemplars are more likely, but imperfect selections still occur.
+
+---
+
+\subsection*{A.2 Lemma 1 — Consistency of the Listwise Objective}
+\label{lemma:consistency}
+
+Before stating the result, we first define the two induced probability
+distributions and the objective that links them.
+
+\paragraph{Oracle and model distributions.}
+Within each group $C^+$, the oracle’s true preference structure defines
+\[
+q^\*(y\mid x,p,C)
+\;\propto\;
+\exp\{\beta\,u^\*(y\mid x,p)\},
+\qquad
+\beta>0,
+\]
+while the model, parameterized by $\phi$, induces its own distribution
+via the learned rubric:
+\[
+q_\phi(y\mid x,p,C;\tau)
+\;\propto\;
+\exp\{g_\phi(x,p,y)/\tau\},
+\qquad
+\tau>0.
+\]
+Both are normalized over the same multiset $C^+$ and describe how likely each
+candidate $y$ is to be preferred—according to the oracle and according to the
+model, respectively.
+
+\paragraph{Listwise (InfoNCE) objective.}
+The model is penalized when it assigns low probability to the oracle’s chosen
+exemplar:
+\[
+\mathcal{L}_{\mathrm{list}}(\phi)
+\;=\;
+-\,\log q_\phi(y^\star\mid x,p,C;\tau).
+\]
+This loss can be viewed as the cross-entropy between the oracle’s preference
+distribution and the model’s predicted distribution within the sampled group.
+
+\paragraph{Lemma 1 (Surrogate consistency).}
+Under the exemplar-selection assumption above,
+\begin{align*}
+\mathbb{E}_{C}\!\left[\mathcal{L}_{\mathrm{list}}(\phi)\right]
+&= H(q^\*, q_\phi) \\[2pt]
+&= H(q^\*) + D_{\mathrm{KL}}(q^\*\|q_\phi).
+\end{align*}
+
+where \(H(q^\*, q_\phi)\) is the cross-entropy between the oracle and model
+distributions, and \(H(q^\*)\) is constant in~\(\phi\).
+Hence minimizing the listwise loss is equivalent to minimizing the groupwise
+KL divergence \(D_{\mathrm{KL}}(q^\*\|q_\phi)\).
+
+\paragraph{Intuition.}
+The listwise cross-entropy is therefore not a heuristic: it is a statistically
+consistent estimator of the divergence between the oracle’s and model’s
+preference distributions.  
+If $q_\phi=q^\*$, the learned rubric $g_\phi(x,p,y)$ reproduces the oracle’s
+relative rankings within the candidate group.  
+Rank-consistency then implies that convergence of $q_\phi$ to $q^\*$
+ensures that the model’s scalar proxy utility $\hat u$ approximates
+the true stakeholder utility $u^\*$ up to a monotone transform.
+
+\paragraph{Proof sketch.}
+Taking expectations over $C$ and over the oracle’s sampling rule,
+\begin{align*}
+\mathbb{E}_{C}\!\left[\mathcal{L}_{\mathrm{list}}(\phi)\right]
+&= -\,\mathbb{E}_{C}\,
+     \mathbb{E}_{y^\star\sim q^\*}
+     \!\left[\log q_\phi(y^\star\mid x,p,C;\tau)\right] \\[4pt]
+&= H(q^\*, q_\phi) \\[2pt]
+&= H(q^\*) + D_{\mathrm{KL}}(q^\*\|q_\phi).
+\end{align*}
+
+The term $H(q^\*)$ does not depend on $\phi$, so minimizing
+$\mathcal{L}_{\mathrm{list}}$ minimizes the groupwise KL divergence.  
+This yields a tractable, sample-based surrogate for the intractable
+policy-gap objective.
+
+\paragraph{Implication.}
+Minimizing $\mathcal{L}_{\mathrm{list}}$ thus provides an unbiased,
+finite-sample estimator of the desired divergence:
+\[
+\min_\phi \mathbb{E}_{(x,p)} D(\pi^\*\|\pi'_{\mathrm{ref}})
+\;\approx\;
+\min_\phi \mathbb{E}_{C} D_{\mathrm{KL}}(q^\*\|q_\phi).
+\]
+The listwise loss therefore aligns the model’s rubric with the oracle’s
+preferences in expectation over candidate groups.
+
+---
+
+\subsection*{A.3 Lemma 2 — Policy-Gradient Proportionality}
+\label{lemma:pg-equivalence}
+
+\paragraph{Statement.}
+Let the group policy be
+\[
+q_\phi(y\mid x,p,C;\tau)
+\propto
+\exp\{g_\phi(x,p,y)/\tau\},
+\]
+and define the group reward $R(y)=\mathbf{1}[y=y^\star]$.
+Then
+\[
+\nabla_\phi\,\mathbb{E}_{y\sim q_\phi}[R(y)]
+= q_\phi(y^\star\mid x,p,C;\tau)\,
+  \nabla_\phi\log q_\phi(y^\star\mid x,p,C;\tau),
+\]
+and, equivalently,
+\[
+\nabla_\phi \mathcal{L}_{\mathrm{list}}
+= -\,\nabla_\phi\log q_\phi(y^\star\mid x,p,C;\tau)
+= -\,\frac{1}{q_\phi(y^\star\mid x,p,C;\tau)}\,
+  \nabla_\phi\,\mathbb{E}_{y\sim q_\phi}[R(y)].
+\]
+
+\paragraph{Intuition.}
+This shows that the gradient of the listwise loss is
+\emph{proportional} to a policy-gradient (REINFORCE-style) update.
+Within each sampled group, the oracle-chosen exemplar plays the role of the
+positive-reward outcome.  
+The proportionality factor rescales the update but does not affect its fixed
+points, explaining the empirical stability of listwise optimization.
+
+\paragraph{Proof sketch.}
+Starting from
+$\mathbb{E}_{y\sim q_\phi}[R(y)]$,
+apply the log-derivative trick:
+\[
+\nabla_\phi \mathbb{E}_{y\sim q_\phi}[R(y)]
+= \mathbb{E}_{y\sim q_\phi}[R(y)\,\nabla_\phi\log q_\phi(y)].
+\]
+Substituting $R(y)=\mathbf{1}[y=y^\star]$ gives
+$q_\phi(y^\star)\,\nabla_\phi\log q_\phi(y^\star)$,
+and rearranging yields the proportionality with the listwise gradient.
+
+\paragraph{Implication.}
+The listwise loss thus performs a scaled policy-gradient update, sharing the
+same stationary points but enjoying lower variance thanks to the normalized
+softmax form.  
+This bridges the method to reinforcement-learning formulations such as RLHF
+and GRPO while preserving the numerical stability of cross-entropy training.
+
+---
+
+\subsection*{A.4 Summary: What These Lemmas Buy Us}
+
+Together, the two lemmas show that the listwise (InfoNCE) objective enjoys both
+a \emph{statistical} and a \emph{control-theoretic} interpretation:
+
+\begin{itemize}[leftmargin=2em]
+    \item \textbf{Lemma 1 — Consistency:}  
+          Minimizing $\mathcal{L}_{\mathrm{list}}$ aligns $q_\phi$ with $q^\*$,
+          ensuring the learned rubric is a statistically consistent proxy for
+          the oracle’s preference distribution.
+    \item \textbf{Lemma 2 — Policy-gradient proportionality:}  
+          The same gradient update corresponds to a scaled policy-gradient
+          step, explaining why the method inherits both the interpretability of
+          RLHF and the stability of supervised training.
+\end{itemize}
+
+This dual view—cross-entropy as KL minimization (\emph{statistical}) and as
+scaled policy-gradient ascent (\emph{reinforcement-learning})—justifies the
+listwise loss as a principled and stable surrogate for the policy-gap
+objective.
+
+\end{document}

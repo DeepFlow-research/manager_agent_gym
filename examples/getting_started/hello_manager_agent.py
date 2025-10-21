@@ -18,62 +18,63 @@ from manager_agent_gym import (
     ChainOfThoughtManagerAgent,
     WorkflowExecutionEngine,
     AgentRegistry,
-    PreferenceWeights,
+    PreferenceSnapshot,
     Preference,
 )
+from manager_agent_gym.core.workflow.services import WorkflowQueries
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
 from examples.common_stakeholders import create_stakeholder_agent
 
 
-def create_basic_preferences() -> PreferenceWeights:
+def create_basic_preferences() -> PreferenceSnapshot:
     """Create simple preferences focused on quality and reasonable timelines."""
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="quality",
                 weight=0.4,
                 description="High-quality deliverables",
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="quality_eval",
                     description="placeholder",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=[],
+                    criteria=[],
                 ),
             ),
             Preference(
                 name="time",
                 weight=0.3,
                 description="Reasonable timeline",
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="time_eval",
                     description="placeholder",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=[],
+                    criteria=[],
                 ),
             ),
             Preference(
                 name="cost",
                 weight=0.2,
                 description="Cost-effective execution",
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="cost_eval",
                     description="placeholder",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=[],
+                    criteria=[],
                 ),
             ),
             Preference(
                 name="oversight",
                 weight=0.1,
                 description="Manageable oversight",
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="oversight_eval",
                     description="placeholder",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=[],
+                    criteria=[],
                 ),
             ),
         ]
@@ -162,7 +163,7 @@ async def run_hello_manager_agent():
             print(f"• {action_type}: {count} times")
 
         print("\n💯 WORKFLOW STATUS:")
-        print(f"• Workflow completed: {workflow.is_complete()}")
+        print(f"• Workflow completed: {WorkflowQueries.is_complete(workflow)}")
         print(f"• Failed tasks: {len(engine.failed_task_ids)}")
 
         if completion_rate == 100:

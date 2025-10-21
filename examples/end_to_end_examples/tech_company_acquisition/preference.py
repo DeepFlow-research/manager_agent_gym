@@ -16,18 +16,18 @@ from examples.end_to_end_examples.standard_rules import (
 )
 from manager_agent_gym.schemas.preferences.preference import (
     Preference,
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
-from manager_agent_gym.schemas.core import Workflow
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric, RunCondition
+from manager_agent_gym.schemas.domain import Workflow
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria, RunCondition
 from manager_agent_gym.schemas.preferences import PreferenceWeightUpdateRequest
 
 
-def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
+def create_tech_acquisition_integration_preferences() -> PreferenceSnapshot:
     # ---------------------------
     # Deterministic helper rules
     # ---------------------------
@@ -358,7 +358,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
     # QUALITY
     # ---------------------------
     quality_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="technology_due_diligence_depth",
             llm_prompt=(
                 """Evaluate technology due diligence depth. Award partial credit for:
@@ -371,7 +371,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="business_due_diligence_thoroughness",
             llm_prompt=(
                 """Assess business due diligence thoroughness: (1) SaaS metrics validation accuracy,
@@ -381,7 +381,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="integration_strategy_quality",
             llm_prompt=(
                 """Evaluate integration strategy quality across technology, human capital, and customer dimensions.
@@ -391,13 +391,13 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="due_diligence_completeness_measure",
             evaluator_function=due_diligence_completeness,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="systems_integration_excellence",
             llm_prompt=(
                 """Assess systems integration excellence: data migration planning, API integration design,
@@ -407,13 +407,13 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="systems_integration_quality_measure",
             evaluator_function=systems_integration_quality,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="integration_artifact_density_measure",
             evaluator_function=integration_artifact_density,
             max_score=1.0,
@@ -425,7 +425,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
     # COMPLIANCE (Acquisition-focused)
     # ---------------------------
     compliance_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_compliance_completeness",
             llm_prompt=(
                 """Evaluate regulatory compliance completeness: HSR filing preparation, antitrust clearance coordination,
@@ -435,7 +435,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="ip_ownership_validation",
             llm_prompt=(
                 """Assess IP ownership validation thoroughness: software licensing compliance, intellectual property
@@ -445,7 +445,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="data_privacy_security_compliance",
             llm_prompt=(
                 """Evaluate data privacy and security compliance: GDPR/CCPA adherence, data handling protocols,
@@ -455,7 +455,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="legal_documentation_quality",
             llm_prompt=(
                 """Assess legal documentation quality: contract analysis completeness, legal risk assessment depth,
@@ -464,13 +464,13 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_approval_progress_measure",
             evaluator_function=regulatory_approval_progress,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="multi_jurisdiction_coordination",
             llm_prompt=(
                 """Evaluate multi-jurisdiction regulatory coordination: North America and Europe compliance management,
@@ -479,7 +479,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="acquisition_crisis_scenarios",
             llm_prompt=(
                 """Evaluate handling of tech acquisition crisis scenarios:
@@ -493,7 +493,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_realism_validation",
             evaluator_function=_validate_cost_realism,
             max_score=1.0,
@@ -505,7 +505,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
     # GOVERNANCE
     # ---------------------------
     governance_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="integration_management_effectiveness",
             llm_prompt=(
                 """Evaluate integration management office effectiveness: governance structure clarity, cross-functional
@@ -515,7 +515,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="stakeholder_coordination_quality",
             llm_prompt=(
                 """Assess stakeholder coordination quality: executive steering committee engagement, cross-functional
@@ -525,7 +525,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="risk_management_framework",
             llm_prompt=(
                 """Evaluate risk management framework: integration risk identification, mitigation strategies,
@@ -535,7 +535,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="decision_tracking_accountability",
             llm_prompt=(
                 """Assess decision tracking and accountability: decision documentation quality, approval workflows,
@@ -544,7 +544,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="stakeholder_communication_management",
             llm_prompt=(
                 """Evaluate stakeholder communication management: communication strategy effectiveness, progress reporting
@@ -561,7 +561,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
     # ---------------------------
     speed_rubrics = [
         # Acquisition-specific timing measures
-        WorkflowRubric(
+        RubricCriteria(
             name="critical_timeline_adherence",
             llm_prompt=(
                 """Evaluate adherence to critical acquisition timelines: 90-day systems integration, 180-day full
@@ -571,13 +571,13 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="integration_timeline_adherence_measure",
             evaluator_function=integration_timeline_adherence,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="due_diligence_efficiency",
             llm_prompt=(
                 """Assess due diligence process efficiency: technology, business, and regulatory workstream coordination,
@@ -587,7 +587,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Standard speed measures
-        WorkflowRubric(
+        RubricCriteria(
             name="speed_efficiency",
             evaluator_function=speed_rubric,
             max_score=1.0,
@@ -599,13 +599,13 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
     # COST
     # ---------------------------
     cost_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_efficiency",
             evaluator_function=cost_rubric,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="integration_budget_management",
             llm_prompt=(
                 """Evaluate integration budget management: cost containment within ±10% variance, resource allocation
@@ -614,7 +614,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="synergy_cost_effectiveness",
             llm_prompt=(
                 """Assess synergy realization cost-effectiveness: operational efficiency improvements, cost savings
@@ -623,7 +623,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="due_diligence_cost_optimization",
             llm_prompt=(
                 """Evaluate due diligence cost optimization: resource utilization efficiency, external advisor
@@ -638,7 +638,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
     # INTEGRATION SUCCESS
     # ---------------------------
     integration_success_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="talent_retention_achievement",
             llm_prompt=(
                 """Evaluate talent retention achievement: >85% retention target for technical leadership,
@@ -648,7 +648,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="customer_retention_preservation",
             llm_prompt=(
                 """Assess customer retention preservation: <5% churn target achievement, service continuity maintenance,
@@ -658,7 +658,7 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="service_continuity_excellence",
             llm_prompt=(
                 """Evaluate service continuity excellence: >99.5% uptime achievement, zero customer data loss,
@@ -667,19 +667,19 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="stakeholder_retention_tracking_measure",
             evaluator_function=stakeholder_retention_tracking,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="synergy_realization_progress_measure",
             evaluator_function=synergy_realization_progress,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cultural_integration_success",
             llm_prompt=(
                 """Assess cultural integration success: unified values establishment, collaborative workflow development,
@@ -690,66 +690,66 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
         ),
     ]
 
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="quality",
                 weight=0.25,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="quality",
                     description="Measures the quality of the acquisition and integration",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=quality_rubrics,
+                    criteria=quality_rubrics,
                 ),
             ),
             Preference(
                 name="compliance",
                 weight=0.20,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="compliance",
                     description="Measures the compliance of the acquisition and integration",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=compliance_rubrics,
+                    criteria=compliance_rubrics,
                 ),
             ),
             Preference(
                 name="governance",
                 weight=0.20,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="governance",
                     description="Measures the governance of the acquisition and integration",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=governance_rubrics,
+                    criteria=governance_rubrics,
                 ),
             ),
             Preference(
                 name="speed",
                 weight=0.15,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="speed",
                     description="Measures the speed of the acquisition and integration",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=speed_rubrics,
+                    criteria=speed_rubrics,
                 ),
             ),
             Preference(
                 name="cost",
                 weight=0.10,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="cost",
                     description="Measures the cost of the acquisition and integration",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=cost_rubrics,
+                    criteria=cost_rubrics,
                 ),
             ),
             Preference(
                 name="integration_success",
                 weight=0.10,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="integration_success",
                     description="Measures the success of the acquisition and integration",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=integration_success_rubrics,
+                    criteria=integration_success_rubrics,
                 ),
             ),
         ]
@@ -758,8 +758,8 @@ def create_tech_acquisition_integration_preferences() -> PreferenceWeights:
 
 def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     """Return weight update requests for acquisition → integration dynamics."""
-    timeline: dict[int, PreferenceWeights] = {
-        0: PreferenceWeights(
+    timeline: dict[int, PreferenceSnapshot] = {
+        0: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.35),
                 Preference(name="compliance", weight=0.25),
@@ -769,7 +769,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="integration_success", weight=0.05),
             ]
         ),
-        8: PreferenceWeights(
+        8: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.30),
                 Preference(name="compliance", weight=0.20),
@@ -779,7 +779,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="integration_success", weight=0.05),
             ]
         ),
-        15: PreferenceWeights(
+        15: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.25),
                 Preference(name="compliance", weight=0.15),
@@ -789,7 +789,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="integration_success", weight=0.15),
             ]
         ),
-        25: PreferenceWeights(
+        25: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.20),
                 Preference(name="compliance", weight=0.10),
@@ -820,11 +820,11 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     return requests
 
 
-def create_evaluator_to_measure_goal_achievement() -> Evaluator:
+def create_evaluator_to_measure_goal_achievement() -> Rubric:
     """Create goal achievement evaluator for technology company acquisition and integration."""
     goal_achievement_rubrics = [
         # Critical technology and business integration deliverables (must have for successful acquisition)
-        WorkflowRubric(
+        RubricCriteria(
             name="technology_integration_strategy_ready",
             llm_prompt=(
                 "Does ready technology integration strategy exist with: comprehensive integration roadmap documented, "
@@ -834,7 +834,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=20.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="talent_retention_strategy_developed",
             llm_prompt=(
                 "Does developed talent retention strategy exist with: comprehensive retention framework designed, "
@@ -844,7 +844,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="customer_retention_framework_established",
             llm_prompt=(
                 "Does established customer retention framework exist with: customer retention strategy documented, "
@@ -854,7 +854,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_compliance_framework_ready",
             llm_prompt=(
                 "Does ready regulatory compliance framework exist with: regulatory approval strategy documented, "
@@ -865,7 +865,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Major due diligence and compliance deliverables (8-10 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="technology_due_diligence_complete",
             llm_prompt=(
                 "Does complete technology due diligence exist with: software architecture assessed, "
@@ -875,7 +875,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="business_financial_validation",
             llm_prompt=(
                 "Does business and financial validation exist with: SaaS metrics validated (ARR, churn, CAC, LTV), "
@@ -886,7 +886,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Important supporting deliverables (5-7 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="customer_relationship_preservation",
             llm_prompt=(
                 "Are there artifacts indicating a plan to preserve customer relationships with: "
@@ -896,7 +896,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="data_migration_security_validated",
             llm_prompt=(
                 "Are there artifacts indicating a plan to migrate data securely with: "
@@ -908,7 +908,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Supporting deliverables (3-4 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="ip_ownership_transfer_validated",
             llm_prompt=(
                 "Are there artifacts indicating a plan to transfer IP ownership with: "
@@ -919,7 +919,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="service_continuity_protocols_maintained",
             llm_prompt=(
                 "Do maintained service continuity protocols exist with: customer-facing system stability prioritized, "
@@ -929,7 +929,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="infrastructure_scalability_validated",
             llm_prompt=(
                 "Does validated infrastructure scalability exist with: scalability assessment completed, "
@@ -939,7 +939,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=3.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="operational_workflow_integration",
             llm_prompt=(
                 "Does operational workflow integration exist with: workflows harmonized, "
@@ -951,9 +951,9 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
         ),
     ]
 
-    return Evaluator(
+    return Rubric(
         name="tech_company_acquisition_goal_achievement_eval",
         description="Technology company acquisition and integration deliverable achievement measurement",
         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-        rubrics=goal_achievement_rubrics,
+        criteria=goal_achievement_rubrics,
     )

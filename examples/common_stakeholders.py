@@ -2,13 +2,15 @@
 Common stakeholder personas and helpers for end-to-end examples.
 """
 
-from manager_agent_gym.schemas.preferences.preference import PreferenceWeights
-from manager_agent_gym.schemas.workflow_agents.stakeholder import StakeholderConfig
-from manager_agent_gym.core.workflow_agents.stakeholder_agent import StakeholderAgent
+from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
+from manager_agent_gym.schemas.agents.stakeholder import StakeholderConfig
+from manager_agent_gym.core.agents.stakeholder_agent.stakeholder_agent import (
+    StakeholderAgent,
+)
 
 
 def _build_persona_config(
-    persona: str, preferences: PreferenceWeights
+    persona: str, preferences: PreferenceSnapshot
 ) -> StakeholderConfig:
     persona_lower = persona.lower().strip()
 
@@ -23,7 +25,7 @@ def _build_persona_config(
             ),
             system_prompt="Stakeholder agent (nitpicky persona)",
             model_name="o3",
-            initial_preferences=preferences,
+            preference_data=preferences,
             response_latency_steps_min=0,
             response_latency_steps_max=1,
             push_probability_per_timestep=0.5,
@@ -50,7 +52,7 @@ def _build_persona_config(
             ),
             system_prompt="Stakeholder agent (hands-off persona)",
             model_name="o3",
-            initial_preferences=preferences,
+            preference_data=preferences,
             response_latency_steps_min=1,
             response_latency_steps_max=3,
             push_probability_per_timestep=0.0,
@@ -77,7 +79,7 @@ def _build_persona_config(
         ),
         system_prompt="Stakeholder agent (balanced persona)",
         model_name="o3",
-        initial_preferences=preferences,
+        preference_data=preferences,
         response_latency_steps_min=0,
         response_latency_steps_max=2,
         push_probability_per_timestep=0.1,
@@ -96,7 +98,7 @@ def _build_persona_config(
 
 def create_stakeholder_agent(
     persona: str,
-    preferences: PreferenceWeights,
+    preferences: PreferenceSnapshot,
 ) -> StakeholderAgent:
     cfg = _build_persona_config(persona, preferences)
     return StakeholderAgent(config=cfg)

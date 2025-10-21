@@ -17,18 +17,18 @@ from examples.end_to_end_examples.standard_rules import (
 from math import exp
 from manager_agent_gym.schemas.preferences.preference import (
     Preference,
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
-from manager_agent_gym.schemas.core import Workflow
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric, RunCondition
+from manager_agent_gym.schemas.domain import Workflow
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria, RunCondition
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
 from manager_agent_gym.schemas.preferences import PreferenceWeightUpdateRequest
 
 
-def create_brand_crisis_management_preferences() -> PreferenceWeights:
+def create_brand_crisis_management_preferences() -> PreferenceSnapshot:
     # ---------------------------
     # Deterministic helper rules
     # ---------------------------
@@ -286,7 +286,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
     # QUALITY
     # ---------------------------
     quality_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="crisis_assessment_thoroughness",
             llm_prompt=(
                 """Evaluate crisis assessment thoroughness. Award partial credit for:
@@ -299,7 +299,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="messaging_framework_quality",
             llm_prompt=(
                 """Assess messaging framework quality: (1) brand value alignment, (2) legal compliance,
@@ -309,7 +309,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="stakeholder_communication_effectiveness",
             llm_prompt=(
                 """Evaluate stakeholder communication effectiveness across customers, employees, media, investors, and partners.
@@ -318,13 +318,13 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="crisis_response_timeliness_measure",
             evaluator_function=crisis_response_timeliness,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="digital_reputation_recovery_depth",
             llm_prompt=(
                 """Assess digital reputation recovery strategy depth: SEO optimization, positive content creation,
@@ -334,13 +334,13 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="stakeholder_engagement_coverage_measure",
             evaluator_function=stakeholder_engagement_coverage,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="crisis_artifact_density_measure",
             evaluator_function=crisis_artifact_density,
             max_score=1.0,
@@ -352,7 +352,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
     # COMPLIANCE (Crisis-focused)
     # ---------------------------
     compliance_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="legal_risk_assessment_completeness",
             llm_prompt=(
                 """Evaluate legal risk assessment completeness: litigation risk analysis, regulatory compliance review,
@@ -362,7 +362,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_notification_compliance",
             llm_prompt=(
                 """Assess regulatory notification compliance: required disclosures, timely filing, regulatory relationship management,
@@ -371,7 +371,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="documentation_preservation_quality",
             llm_prompt=(
                 """Evaluate documentation preservation quality: audit trail maintenance, evidence collection,
@@ -380,7 +380,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="message_consistency_compliance",
             llm_prompt=(
                 """Assess message consistency across all communication channels: social media, press releases, internal communications.
@@ -389,7 +389,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="brand_voice_preservation",
             llm_prompt=(
                 """Evaluate preservation of brand voice and values throughout crisis communications.
@@ -399,13 +399,13 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="legal_documentation_presence_measure",
             evaluator_function=legal_documentation_presence,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="message_consistency_tracking_measure",
             evaluator_function=message_consistency_tracking,
             max_score=1.0,
@@ -417,7 +417,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
     # GOVERNANCE
     # ---------------------------
     governance_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="crisis_team_activation_effectiveness",
             llm_prompt=(
                 """Evaluate crisis team activation effectiveness: team assembly speed, role clarity, decision-making authority establishment,
@@ -426,7 +426,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cross_functional_coordination_quality",
             llm_prompt=(
                 """Assess cross-functional coordination quality: department integration, information flow,
@@ -435,7 +435,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="escalation_management_effectiveness",
             llm_prompt=(
                 """Evaluate escalation management effectiveness: clear escalation paths, timely decision-making,
@@ -444,7 +444,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="stakeholder_relationship_preservation",
             llm_prompt=(
                 """Assess stakeholder relationship preservation during crisis: customer retention efforts, employee morale management,
@@ -453,7 +453,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="decision_documentation_quality",
             llm_prompt=(
                 """Evaluate decision documentation quality and traceability: major decisions documented with rationale and approver,
@@ -462,7 +462,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="crisis_coordination_efficiency_measure",
             evaluator_function=crisis_coordination_efficiency,
             max_score=1.0,
@@ -475,7 +475,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
     # ---------------------------
     speed_rubrics = [
         # Crisis-specific timing measures
-        WorkflowRubric(
+        RubricCriteria(
             name="critical_timeline_adherence",
             llm_prompt=(
                 """Evaluate adherence to critical crisis response timelines: 2-hour acknowledgment, 24-hour comprehensive response,
@@ -484,7 +484,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="decision_making_speed",
             llm_prompt=(
                 """Assess decision-making speed under pressure: rapid assessment, quick approvals, 
@@ -494,13 +494,13 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Standard speed measures
-        WorkflowRubric(
+        RubricCriteria(
             name="speed_efficiency",
             evaluator_function=speed_rubric,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="crisis_response_timeliness_tracking",
             evaluator_function=crisis_response_timeliness,
             max_score=1.0,
@@ -512,13 +512,13 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
     # COST
     # ---------------------------
     cost_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_efficiency",
             evaluator_function=cost_rubric,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="crisis_budget_management",
             llm_prompt=(
                 """Evaluate crisis budget management: cost containment within ±15% of annual marketing budget,
@@ -528,7 +528,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="compensation_program_cost_effectiveness",
             llm_prompt=(
                 """Assess compensation program cost-effectiveness: program design efficiency, customer impact per dollar,
@@ -537,7 +537,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="resource_allocation_efficiency",
             llm_prompt=(
                 """Evaluate resource allocation efficiency during crisis: priority-based allocation, expertise matching,
@@ -546,7 +546,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="crisis_adversarial_scenarios",
             llm_prompt=(
                 """Evaluate handling of brand crisis adversarial scenarios and escalations:
@@ -560,7 +560,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_realism_validation",
             evaluator_function=_validate_cost_realism,
             max_score=1.0,
@@ -572,7 +572,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
     # REPUTATION RECOVERY
     # ---------------------------
     reputation_recovery_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="sentiment_monitoring_system_quality",
             llm_prompt=(
                 """Evaluate sentiment monitoring system quality: real-time tracking capability, platform coverage,
@@ -582,7 +582,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="trust_rebuilding_strategy_depth",
             llm_prompt=(
                 """Assess trust rebuilding strategy depth: community engagement initiatives, corporate responsibility programs,
@@ -592,7 +592,7 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="brand_recovery_measurement_framework",
             llm_prompt=(
                 """Evaluate brand recovery measurement framework: key metrics definition, tracking mechanisms,
@@ -601,13 +601,13 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="sentiment_recovery_progress_measure",
             evaluator_function=sentiment_recovery_progress,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="long_term_prevention_strategy",
             llm_prompt=(
                 """Assess long-term crisis prevention strategy: lessons learned documentation, protocol updates,
@@ -619,66 +619,66 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
         ),
     ]
 
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="quality",
                 weight=0.25,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="quality",
                     description="Measures the quality of the crisis response",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=quality_rubrics,
+                    criteria=quality_rubrics,
                 ),
             ),
             Preference(
                 name="compliance",
                 weight=0.20,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="compliance",
                     description="Measures the compliance of the crisis response",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=compliance_rubrics,
+                    criteria=compliance_rubrics,
                 ),
             ),
             Preference(
                 name="governance",
                 weight=0.20,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="governance",
                     description="Measures the governance of the crisis response",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=governance_rubrics,
+                    criteria=governance_rubrics,
                 ),
             ),
             Preference(
                 name="speed",
                 weight=0.15,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="speed",
                     description="Measures the speed of the crisis response",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=speed_rubrics,
+                    criteria=speed_rubrics,
                 ),
             ),
             Preference(
                 name="cost",
                 weight=0.10,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="cost",
                     description="Measures the cost of the crisis response",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=cost_rubrics,
+                    criteria=cost_rubrics,
                 ),
             ),
             Preference(
                 name="reputation_recovery",
                 weight=0.10,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="reputation_recovery",
                     description="Measures the reputation recovery of the crisis response",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=reputation_recovery_rubrics,
+                    criteria=reputation_recovery_rubrics,
                 ),
             ),
         ]
@@ -687,8 +687,8 @@ def create_brand_crisis_management_preferences() -> PreferenceWeights:
 
 def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     """Return weight update requests for crisis → recovery dynamics."""
-    timeline: dict[int, PreferenceWeights] = {
-        0: PreferenceWeights(
+    timeline: dict[int, PreferenceSnapshot] = {
+        0: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.30),
                 Preference(name="compliance", weight=0.25),
@@ -698,7 +698,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="reputation_recovery", weight=0.05),
             ]
         ),
-        5: PreferenceWeights(
+        5: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.25),
                 Preference(name="compliance", weight=0.20),
@@ -708,7 +708,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="reputation_recovery", weight=0.10),
             ]
         ),
-        15: PreferenceWeights(
+        15: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.20),
                 Preference(name="compliance", weight=0.15),
@@ -718,7 +718,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="reputation_recovery", weight=0.25),
             ]
         ),
-        25: PreferenceWeights(
+        25: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.15),
                 Preference(name="compliance", weight=0.10),
@@ -748,11 +748,11 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     return requests
 
 
-def create_evaluator_to_measure_goal_achievement() -> Evaluator:
+def create_evaluator_to_measure_goal_achievement() -> Rubric:
     """Create goal achievement evaluator for brand crisis management and reputation recovery."""
     goal_achievement_rubrics = [
         # Critical time-sensitive crisis response deliverables (must have for crisis containment)
-        WorkflowRubric(
+        RubricCriteria(
             name="crisis_assessment_completed",
             llm_prompt=(
                 "Does comprehensive crisis assessment exist with: situation evaluation completed, "
@@ -762,7 +762,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="public_communication_launched",
             llm_prompt=(
                 "Does launched public communication strategy exist with: coordinated messaging framework deployed, "
@@ -772,7 +772,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="customer_sentiment_recovery_achieved",
             llm_prompt=(
                 "Does customer sentiment recovery exist with: sentiment analysis showing >75% recovery to pre-crisis levels, "
@@ -782,7 +782,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=12.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="media_coverage_balance_restored",
             llm_prompt=(
                 "Does restored media coverage balance exist with: >60% neutral-to-positive articles achieved, "
@@ -793,7 +793,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Major reputation recovery deliverables (8-10 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="brand_trust_metrics_restored",
             llm_prompt=(
                 "Do restored brand trust metrics exist with: independent third-party measurement showing >80% of pre-crisis baseline, "
@@ -803,7 +803,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="customer_retention_maintained",
             llm_prompt=(
                 "Does maintained customer retention exist with: >90% customer retention rate achieved, "
@@ -813,7 +813,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="digital_reputation_recovery_campaign",
             llm_prompt=(
                 "Does digital reputation recovery campaign exist with: SEO optimization implemented, "
@@ -823,7 +823,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="internal_stakeholder_confidence_maintained",
             llm_prompt=(
                 "Does maintained internal stakeholder confidence exist with: <5% employee turnover during crisis, "
@@ -833,7 +833,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="customer_service_enhancement",
             llm_prompt=(
                 "Does customer service enhancement exist with: <24 hour resolution time for crisis-related inquiries, "
@@ -844,7 +844,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Important supporting deliverables (5-7 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="crisis_team_activation_successful",
             llm_prompt=(
                 "Does successful crisis team activation exist with: cross-functional team deployed, "
@@ -854,7 +854,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="legal_regulatory_compliance_maintained",
             llm_prompt=(
                 "Does maintained legal and regulatory compliance exist with: zero regulatory violations, "
@@ -864,7 +864,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="media_relations_strategy_executed",
             llm_prompt=(
                 "Does executed media relations strategy exist with: interview preparation completed, "
@@ -874,7 +874,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="compensation_program_implemented",
             llm_prompt=(
                 "Does implemented compensation program exist with: customer compensation framework developed, "
@@ -884,7 +884,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="community_engagement_initiatives",
             llm_prompt=(
                 "Do community engagement initiatives exist with: corporate responsibility initiatives launched, "
@@ -894,7 +894,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="investor_relations_maintained",
             llm_prompt=(
                 "Does maintained investor relations exist with: transparent communication provided, "
@@ -905,7 +905,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Supporting deliverables (3-4 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="crisis_response_protocols_updated",
             llm_prompt=(
                 "Do updated crisis response protocols exist with: lessons learned documented, "
@@ -915,7 +915,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="social_media_monitoring_operational",
             llm_prompt=(
                 "Does operational social media monitoring exist with: real-time monitoring tools active, "
@@ -925,7 +925,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="partner_stakeholder_coordination",
             llm_prompt=(
                 "Does partner stakeholder coordination exist with: key partners notified and aligned, "
@@ -937,9 +937,9 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
         ),
     ]
 
-    return Evaluator(
+    return Rubric(
         name="brand_crisis_goal_achievement_eval",
         description="Brand crisis management and reputation recovery deliverable achievement measurement",
         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-        rubrics=goal_achievement_rubrics,
+        criteria=goal_achievement_rubrics,
     )

@@ -11,7 +11,7 @@ from typing import Any, Callable, Awaitable
 from uuid import UUID
 from typing import cast
 
-from ...schemas.core.communication import (
+from manager_agent_gym.schemas.domain.communication import (
     Message,
     MessageType,
     CommunicationGraph,
@@ -21,7 +21,7 @@ from ...schemas.core.communication import (
     MessageGrouping,
 )
 
-from ...core.common.logging import logger
+from manager_agent_gym.core.common.logging import logger
 
 
 class CommunicationService:

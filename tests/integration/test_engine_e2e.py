@@ -1,25 +1,31 @@
 import pytest
 from uuid import uuid4
 
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.schemas.preferences.preference import PreferenceWeights
-from manager_agent_gym.schemas.config import OutputConfig
-from manager_agent_gym.core.execution.engine import WorkflowExecutionEngine
-from manager_agent_gym.core.workflow_agents.interface import AgentInterface
-from manager_agent_gym.core.workflow_agents.registry import AgentRegistry
-from manager_agent_gym.schemas.unified_results import create_task_result
-from manager_agent_gym.core.workflow_agents.stakeholder_agent import StakeholderAgent
-from manager_agent_gym.schemas.workflow_agents.stakeholder import StakeholderConfig
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.domain.task import Task
+from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
+from manager_agent_gym.core.workflow.schemas.config import OutputConfig
+from manager_agent_gym.core.workflow.engine import WorkflowExecutionEngine
+from manager_agent_gym.core.agents.workflow_agents.common.interface import (
+    AgentInterface,
+)
+from manager_agent_gym.core.agents.workflow_agents.tools.registry import AgentRegistry
+from manager_agent_gym.core.execution.schemas.results import create_task_result
+from manager_agent_gym.core.agents.stakeholder_agent.stakeholder_agent import (
+    StakeholderAgent,
+)
+from manager_agent_gym.schemas.agents.stakeholder import StakeholderConfig
 from typing import cast
 from tests.helpers.stubs import ManagerAssignFirstReady
+from manager_agent_gym.core.workflow.services import WorkflowQueries
+from manager_agent_gym.core.workflow.services import WorkflowMutations
 
 pytestmark = pytest.mark.integration
 
 
 class _StubAgent(AgentInterface):
     def __init__(self, agent_id: str):
-        from manager_agent_gym.schemas.workflow_agents import AgentConfig
+        from manager_agent_gym.schemas.agents import AgentConfig
 
         super().__init__(
             AgentConfig(
@@ -50,10 +56,10 @@ def _workflow_two_step():
     w = Workflow(name="w", workflow_goal="d", owner_id=uuid4())
     t1 = Task(name="A", description="d")
     t2 = Task(name="B", description="d", dependency_task_ids=[t1.id])
-    w.add_task(t1)
-    w.add_task(t2)
+    WorkflowMutations.add_task(w, t1)
+    WorkflowMutations.add_task(w, t2)
     agent = _StubAgent("worker-1")
-    w.add_agent(agent)
+    WorkflowMutations.add_agent(w, agent)
     # Minimal stakeholder with empty preferences to satisfy evaluation
     stakeholder_cfg = StakeholderConfig(
         agent_id="stakeholder",
@@ -62,11 +68,11 @@ def _workflow_two_step():
         model_name="o3",
         name="Stakeholder",
         role="Owner",
-        initial_preferences=PreferenceWeights(preferences=[]),
+        preference_data=PreferenceSnapshot(preferences=[]),
         agent_description="Stakeholder",
         agent_capabilities=["Stakeholder"],
     )
-    w.add_agent(StakeholderAgent(config=stakeholder_cfg))
+    WorkflowMutations.add_agent(w, StakeholderAgent(config=stakeholder_cfg))
     return w
 
 
@@ -97,7 +103,7 @@ async def test_full_execution_completes_workflow(tmp_path, monkeypatch):
     assert engine.execution_state.value in {"completed", "failed", "cancelled"}
     # Expect completion in this simple setup
     assert engine.execution_state.value == "completed"
-    assert engine.workflow.is_complete()
+    assert WorkflowQueries.is_complete(engine.workflow)
     assert len(results) >= 1
 
 

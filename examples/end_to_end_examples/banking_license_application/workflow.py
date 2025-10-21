@@ -13,10 +13,11 @@ Demonstrates:
 
 from uuid import uuid4
 
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.schemas.core.base import TaskStatus
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.domain.task import Task
+from manager_agent_gym.schemas.domain.base import TaskStatus
 from manager_agent_gym.schemas.preferences import Constraint
+from manager_agent_gym.core.workflow.services import WorkflowMutations
 
 
 def create_banking_license_application_workflow() -> Workflow:
@@ -618,7 +619,7 @@ def create_banking_license_application_workflow() -> Workflow:
         stakeholder_engagement,
         quality_assurance,
     ]:
-        workflow.add_task(task)
+        WorkflowMutations.add_task(workflow, task)
 
     # Constraints for regulatory approvals and compliance framework
     workflow.constraints.extend(

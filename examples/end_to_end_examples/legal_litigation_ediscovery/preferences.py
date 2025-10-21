@@ -3,21 +3,21 @@ from __future__ import annotations
 from math import exp
 from datetime import datetime
 
-from manager_agent_gym.schemas.core.workflow import Workflow
+from manager_agent_gym.schemas.domain.workflow import Workflow
 from manager_agent_gym.schemas.preferences.preference import (
     Preference,
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric, RunCondition
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria, RunCondition
 from examples.end_to_end_examples.standard_rules import speed_rubric, cost_rubric
 from manager_agent_gym.schemas.preferences import PreferenceWeightUpdateRequest
 
 
-def create_preferences() -> PreferenceWeights:
+def create_preferences() -> PreferenceSnapshot:
     # Deterministic helpers
     def artifact_density(workflow: Workflow) -> float:
         completed = [
@@ -192,7 +192,7 @@ def create_preferences() -> PreferenceWeights:
 
     # QUALITY: defensibility and review rigor
     quality_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="eca_rigor",
             llm_prompt=(
                 """
@@ -205,7 +205,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="tar_validation_completeness",
             llm_prompt=(
                 """
@@ -218,7 +218,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="review_qc_coverage",
             llm_prompt=(
                 """
@@ -231,7 +231,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="artifact_density",
             evaluator_function=artifact_density,
             max_score=1.0,
@@ -241,7 +241,7 @@ def create_preferences() -> PreferenceWeights:
 
     # COMPLIANCE: FRCP/protective order and production protocol
     compliance_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="frcp_protective_order_adherence",
             llm_prompt=(
                 """
@@ -254,7 +254,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="production_protocol_compliance",
             llm_prompt=(
                 """
@@ -267,7 +267,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="legal_hold_completeness",
             llm_prompt=(
                 """
@@ -284,13 +284,13 @@ def create_preferences() -> PreferenceWeights:
 
     # CONFIDENTIALITY & PRIVILEGE
     confidentiality_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="pii_leak_scan",
             evaluator_function=pii_leak_scan,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="privilege_log_completeness",
             llm_prompt=(
                 """
@@ -303,7 +303,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="chain_of_custody_signal",
             evaluator_function=chain_of_custody_signal,
             max_score=1.0,
@@ -313,31 +313,31 @@ def create_preferences() -> PreferenceWeights:
 
     # SPEED
     speed_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="deadline_adherence",
             evaluator_function=speed_deadline_adherence,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="time_to_first_output",
             evaluator_function=speed_time_to_first_output,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="blocked_deadtime_penalty",
             evaluator_function=speed_blocked_deadtime_ratio,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="throughput_progress",
             evaluator_function=speed_throughput_progress,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="speed_efficiency",
             evaluator_function=speed_rubric,
             max_score=1.0,
@@ -347,13 +347,13 @@ def create_preferences() -> PreferenceWeights:
 
     # COST
     cost_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_efficiency",
             evaluator_function=cost_rubric,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="litigation_adversarial_scenarios",
             llm_prompt=(
                 """Evaluate handling of litigation adversarial scenarios and discovery disputes:
@@ -367,7 +367,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_realism_validation",
             evaluator_function=_validate_cost_realism,
             max_score=1.0,
@@ -375,56 +375,56 @@ def create_preferences() -> PreferenceWeights:
         ),
     ]
 
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="quality",
                 weight=0.3,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="quality_eval",
                     description="defensibility and review rigor",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=quality_rubrics,
+                    criteria=quality_rubrics,
                 ),
             ),
             Preference(
                 name="compliance",
                 weight=0.25,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="compliance_eval",
                     description="FRCP/protective order and production protocol",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=compliance_rubrics,
+                    criteria=compliance_rubrics,
                 ),
             ),
             Preference(
                 name="confidentiality",
                 weight=0.15,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="confidentiality_eval",
                     description="PII, privilege, and chain-of-custody",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=confidentiality_rubrics,
+                    criteria=confidentiality_rubrics,
                 ),
             ),
             Preference(
                 name="speed",
                 weight=0.15,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="speed_eval",
                     description="timeliness",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=speed_rubrics,
+                    criteria=speed_rubrics,
                 ),
             ),
             Preference(
                 name="cost",
                 weight=0.15,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="cost_eval",
                     description="cost efficiency",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=cost_rubrics,
+                    criteria=cost_rubrics,
                 ),
             ),
         ],
@@ -434,8 +434,8 @@ def create_preferences() -> PreferenceWeights:
 
 def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     """Preference shifts across ECA → review → production lifecycle."""
-    timeline: dict[int, PreferenceWeights] = {
-        0: PreferenceWeights(
+    timeline: dict[int, PreferenceSnapshot] = {
+        0: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.30),
                 Preference(name="compliance", weight=0.25),
@@ -444,7 +444,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.15),
             ]
         ),
-        15: PreferenceWeights(
+        15: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.35),
                 Preference(name="compliance", weight=0.25),
@@ -453,7 +453,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.10),
             ]
         ),
-        30: PreferenceWeights(
+        30: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.25),
                 Preference(name="compliance", weight=0.30),
@@ -462,7 +462,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.15),
             ]
         ),
-        45: PreferenceWeights(
+        45: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.20),
                 Preference(name="compliance", weight=0.25),
@@ -492,11 +492,11 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     return requests
 
 
-def create_evaluator_to_measure_goal_achievement() -> Evaluator:
+def create_evaluator_to_measure_goal_achievement() -> Rubric:
     """Create goal achievement evaluator for litigation eDiscovery employment dispute process."""
     goal_achievement_rubrics = [
         # Critical eDiscovery process deliverables (must have for FRCP compliance and defensible process)
-        WorkflowRubric(
+        RubricCriteria(
             name="defensible_collection_chain_custody",
             llm_prompt=(
                 "Does defensible collection with chain of custody exist with: ESI collection documented, "
@@ -506,7 +506,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=18.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="privilege_review_qc_validated",
             llm_prompt=(
                 "Does validated privilege review with QC exist with: privilege review completed, "
@@ -516,7 +516,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="frcp_compliant_productions",
             llm_prompt=(
                 "Do FRCP-compliant productions exist with: production protocol specifications met, "
@@ -526,7 +526,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="tar_responsiveness_review_complete",
             llm_prompt=(
                 "Does complete TAR responsiveness review exist with: technology-assisted review implemented, "
@@ -536,7 +536,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=12.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="eca_data_sizing_completed",
             llm_prompt=(
                 "Does completed ECA data sizing exist with: early case assessment performed, "
@@ -546,7 +546,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="processing_culling_denist_performed",
             llm_prompt=(
                 "Does performed processing and culling exist with: data processing completed, "
@@ -556,7 +556,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="protective_order_compliance",
             llm_prompt=(
                 "Does protective order compliance exist with: No PII identifiable in any outputs which are going to be shared publicly, no signs of any violation of protective order requirements, confidentiality maintained, and court order adherence confirmed? "
@@ -565,7 +565,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="custodian_interviews_source_identification",
             llm_prompt=(
                 "Do custodian interviews and source identification exist with: key custodians interviewed, "
@@ -576,7 +576,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Important supporting deliverables (5-7 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="search_terms_validation",
             llm_prompt=(
                 "Does search terms validation exist with: search terms defined and tested, "
@@ -586,7 +586,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="work_product_segregation",
             llm_prompt=(
                 "Does work product segregation exist with: attorney work product identified and protected, "
@@ -596,7 +596,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="family_deduplication_handling",
             llm_prompt=(
                 "Does family deduplication handling exist with: document families identified, "
@@ -606,7 +606,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="ocr_text_extraction_quality",
             llm_prompt=(
                 "Is there any sign that documents recieved from other parties that had to be OCR'd show signs of detected duplicates, low quality, or other issues? "
@@ -615,7 +615,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="redaction_privilege_logging",
             llm_prompt=(
                 "Are the documents recieved from other parties that had to be redaacted not identifiable as original documents (but no other issues)? "
@@ -625,7 +625,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Supporting deliverables (3-4 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="production_load_files_metadata",
             llm_prompt=(
                 "Are the production load files and metadata properly generated and processed? "
@@ -634,7 +634,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="audit_trails_documentation",
             llm_prompt=(
                 "Do audit trails and documentation exist with: process documentation maintained, "
@@ -644,7 +644,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="court_deadlines_met",
             llm_prompt=(
                 "Are there signs of court deadlines being met, or of efforts being made to meet them? "
@@ -655,9 +655,9 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
         ),
     ]
 
-    return Evaluator(
+    return Rubric(
         name="legal_litigation_ediscovery_goal_achievement_eval",
         description="Litigation eDiscovery employment dispute process deliverable achievement measurement",
         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-        rubrics=goal_achievement_rubrics,
+        criteria=goal_achievement_rubrics,
     )

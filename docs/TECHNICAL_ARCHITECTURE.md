@@ -293,20 +293,20 @@ class ValidationEngine:
         workflow: Workflow,
         timestep: int,
         preferences: PreferenceWeights | None = None,
-        workflow_evaluators: list[Evaluator] | None = None,
+        workflow_rubrics: list[Rubric] | None = None,
     ) -> EvaluationResult:
         """Evaluate workflow state against all criteria"""
         
-        # 1. Collect all rubrics from preferences and workflow evaluators
-        scheduled_rubrics = self._collect_rubrics(preferences, workflow_evaluators)
+        # 1. Collect all criteria from preferences and workflow rubrics
+        scheduled_criteria = self._collect_criteria(preferences, workflow_rubrics)
         
-        # 2. Execute rubrics in parallel with concurrency control
-        rubric_results = await self._execute_rubrics_parallel(
-            scheduled_rubrics, workflow, timestep
+        # 2. Execute criteria in parallel with concurrency control
+        criteria_results = await self._execute_criteria_parallel(
+            scheduled_criteria, workflow, timestep
         )
         
         # 3. Aggregate results hierarchically
-        preference_scores = self._aggregate_preference_scores(rubric_results)
+        preference_scores = self._aggregate_preference_scores(criteria_results)
         
         # 4. Calculate reward signal
         reward_value = self._calculate_reward(preference_scores)
@@ -314,9 +314,9 @@ class ValidationEngine:
         return EvaluationResult(...)
 ```
 
-### Rubric Evaluation Strategies
+### Criteria Evaluation Strategies
 
-**Code-based Rubrics**: Direct Python function evaluation
+**Code-based Criteria**: Direct Python function evaluation
 ```python
 def quality_validator(context: ValidationContext) -> EvaluatedScore:
     """Custom validation logic"""
@@ -324,7 +324,7 @@ def quality_validator(context: ValidationContext) -> EvaluatedScore:
     return EvaluatedScore(score=score, reasoning="Quality assessment based on...")
 ```
 
-**LLM-based Rubrics**: Structured LLM evaluation
+**LLM-based Criteria**: Structured LLM evaluation
 ```python
 class WorkflowValidationRule:
     """LLM-based workflow evaluation"""
@@ -428,8 +428,8 @@ schemas/
 │   └── callbacks.py          # Event handling models
 ├── preferences/            # Preference and evaluation domain
 │   ├── preference.py         # Preference entities
-│   ├── evaluator.py          # Evaluation configuration
-│   └── rubric.py            # Rubric specifications
+│   ├── evaluator.py          # Rubric configuration (container)
+│   └── rubric.py            # Criteria specifications
 └── workflow_agents/        # Agent configuration domain
     ├── config.py             # Agent configuration models
     └── outputs.py           # Agent output specifications
@@ -562,7 +562,7 @@ def test_task_graph_validity(workflow):
 ### Scalability Patterns
 
 **Concurrency**: Parallel task execution and evaluation
-**Batching**: Rubric evaluation batching with progress tracking
+**Batching**: Criteria evaluation batching with progress tracking
 **Caching**: LLM response caching for repeated evaluations
 **Memory Management**: Circular buffers for action history
 
@@ -644,7 +644,7 @@ logger.info(
 
 **Custom Actions**: Extend `BaseManagerAction` hierarchy
 **Custom Agents**: Implement `AgentInterface` for specialized workers
-**Custom Evaluators**: Add domain-specific evaluation rubrics
+**Custom Criteria**: Add domain-specific evaluation criteria
 **Custom Communication**: Extend communication protocols
 
 ---

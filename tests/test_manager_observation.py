@@ -1,22 +1,23 @@
 import pytest
 from uuid import uuid4
 
-from manager_agent_gym.core.manager_agent.interface import ManagerAgent
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.schemas.core.base import TaskStatus
-from manager_agent_gym.schemas.preferences.preference import PreferenceWeights
+from manager_agent_gym.core.agents.manager_agent.common.interface import ManagerAgent
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.domain.task import Task
+from manager_agent_gym.schemas.domain.base import TaskStatus
+from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
 from manager_agent_gym.core.communication.service import CommunicationService
-from manager_agent_gym.schemas.execution.state import ExecutionState
-from manager_agent_gym.schemas.execution.manager import ManagerObservation
-from manager_agent_gym.schemas.workflow_agents.stakeholder import (
+from manager_agent_gym.core.execution.schemas.state import ExecutionState
+from manager_agent_gym.schemas.manager.observation import ManagerObservation
+from manager_agent_gym.schemas.agents.stakeholder import (
     StakeholderPublicProfile,
 )
+from manager_agent_gym.core.workflow.services import WorkflowMutations
 
 
 class _Mgr(ManagerAgent):
     def __init__(self):
-        super().__init__(agent_id="m", preferences=PreferenceWeights(preferences=[]))
+        super().__init__(agent_id="m", preferences=PreferenceSnapshot(preferences=[]))
 
     async def take_action(self, observation: ManagerObservation):
         raise NotImplementedError
@@ -25,16 +26,16 @@ class _Mgr(ManagerAgent):
         self,
         workflow: Workflow,
         execution_state: ExecutionState,
-        stakeholder_profile: StakeholderPublicProfile,
-        current_timestep: int,
-        running_tasks: dict,
-        completed_task_ids: set,
-        failed_task_ids: set,
+        stakeholder_profile: StakeholderPublicProfile | None = None,
+        current_timestep: int = 0,
+        running_tasks: dict | None = None,
+        completed_task_ids: set | None = None,
+        failed_task_ids: set | None = None,
         communication_service=None,
         previous_reward: float = 0.0,
         done: bool = False,
     ):
-        from manager_agent_gym.schemas.execution.manager_actions import NoOpAction
+        from manager_agent_gym.core.agents.manager_agent.actions import NoOpAction
 
         # Provide a trivial implementation to satisfy abstract base class
         return NoOpAction(reasoning="noop", success=True, result_summary="noop")
@@ -48,8 +49,8 @@ async def test_create_observation_counts_and_progress() -> None:
     w = Workflow(name="w", workflow_goal="d", owner_id=uuid4())
     t1 = Task(name="A", description="d")
     t2 = Task(name="B", description="d")
-    w.add_task(t1)
-    w.add_task(t2)
+    WorkflowMutations.add_task(w, t1)
+    WorkflowMutations.add_task(w, t2)
     # mark one completed
     t1.status = TaskStatus.COMPLETED
 
@@ -61,9 +62,6 @@ async def test_create_observation_counts_and_progress() -> None:
     obs = await mgr.create_observation(
         workflow=w,
         execution_state=ExecutionState.RUNNING,
-        stakeholder_profile=StakeholderPublicProfile(
-            display_name="Test Stakeholder", role="Owner", preference_summary=""
-        ),
         current_timestep=3,
         running_tasks={},
         completed_task_ids={t1.id},

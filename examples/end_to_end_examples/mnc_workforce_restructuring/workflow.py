@@ -1,12 +1,13 @@
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.schemas.core.base import TaskStatus
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.domain.task import Task
+from manager_agent_gym.schemas.domain.base import TaskStatus
 from manager_agent_gym.schemas.preferences import Constraint
 from uuid import uuid4
 
 # Optional stakeholder + preferences (tolerant import pattern)
 from examples.common_stakeholders import create_stakeholder_agent
 from .preferences import create_preferences  # to be provided later
+from manager_agent_gym.core.workflow.services import WorkflowMutations
 
 
 def create_workflow() -> Workflow:
@@ -399,7 +400,7 @@ def create_workflow() -> Workflow:
         regulator_filings,
         post_action_audit,
     ]:
-        wf.add_task(t)
+        WorkflowMutations.add_task(wf, t)
 
     # ---------------------------
     # CONSTRAINTS (Legal, Fairness, Documentation, Confidentiality)
@@ -505,6 +506,6 @@ def create_workflow() -> Workflow:
     # Stakeholder agent
     prefs = create_preferences()
     stakeholder = create_stakeholder_agent(persona="balanced", preferences=prefs)
-    wf.add_agent(stakeholder)
+    WorkflowMutations.add_agent(wf, stakeholder)
 
     return wf

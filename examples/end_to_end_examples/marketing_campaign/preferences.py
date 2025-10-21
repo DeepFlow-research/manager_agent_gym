@@ -9,24 +9,24 @@ Preferences modeled for an integrated campaign:
 
 Mirrors example schema usage:
   * PreferenceWeights / Preference
-  * Evaluator(aggregation=AggregationStrategy.WEIGHTED_AVERAGE, rubrics=[WorkflowRubric...])
-  * WorkflowRubric with llm_prompt or evaluator_function
+  * Rubric(aggregation=AggregationStrategy.WEIGHTED_AVERAGE, criteria=[RubricCriteria...])
+  * RubricCriteria with llm_prompt or evaluator_function
   * create_*_preference_update_requests(): absolute, normalized timeline updates
 """
 
 from typing import List
 from manager_agent_gym.schemas.preferences.preference import (
     Preference,
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric, RunCondition
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria, RunCondition
 from manager_agent_gym.schemas.preferences import PreferenceWeightUpdateRequest
-from manager_agent_gym.schemas.core import Workflow
-from manager_agent_gym.schemas.core.base import TaskStatus
+from manager_agent_gym.schemas.domain import Workflow
+from manager_agent_gym.schemas.domain.base import TaskStatus
 
 
 # ---------------------------
@@ -209,8 +209,8 @@ def rule_wcag_passes(workflow: Workflow) -> float:
 # ---------------------------
 # LLM Rubrics
 # ---------------------------
-performance_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+performance_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="pipeline_quality_and_flow",
         llm_prompt=(
             "Evaluate whether the campaign is set up to generate qualified pipeline efficiently: "
@@ -223,13 +223,13 @@ performance_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_foundations_ready",
         evaluator_function=rule_foundations_ready,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_experimentation_live",
         evaluator_function=rule_experimentation_live,
         max_score=1.0,
@@ -237,8 +237,8 @@ performance_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-brand_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+brand_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="creative_system_coherence",
         llm_prompt=(
             "Assess whether creative assets reflect a coherent brand system: "
@@ -248,7 +248,7 @@ brand_rubrics: List[WorkflowRubric] = [
         max_score=8.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="brand_lift_readiness",
         llm_prompt=(
             "Assess readiness to measure brand lift: sampling plan, survey constructs (ad recall, awareness, consideration), "
@@ -257,13 +257,13 @@ brand_rubrics: List[WorkflowRubric] = [
         max_score=6.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_brand_lift_instrumented",
         evaluator_function=rule_brand_lift_instrumented,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_creative_toolkit_complete",
         evaluator_function=rule_creative_toolkit_complete,
         max_score=1.0,
@@ -271,8 +271,8 @@ brand_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-compliance_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+compliance_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="environmental_claims_substantiation",
         llm_prompt=(
             "Evaluate environmental claims for compliance and substantiation: "
@@ -282,7 +282,7 @@ compliance_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="privacy_and_email_compliance",
         llm_prompt=(
             "Assess consent and email compliance posture: explicit consent for non-essential cookies and direct marketing; "
@@ -292,19 +292,19 @@ compliance_rubrics: List[WorkflowRubric] = [
         max_score=8.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_green_claims_playbook_in_place",
         evaluator_function=rule_green_claims_playbook_in_place,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_privacy_controls_live",
         evaluator_function=rule_privacy_controls_live,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="marketing_crisis_scenarios",
         llm_prompt=(
             """Evaluate handling of marketing crisis and adversarial scenarios:
@@ -318,7 +318,7 @@ compliance_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="cost_realism_validation",
         evaluator_function=_validate_cost_realism,
         max_score=1.0,
@@ -326,8 +326,8 @@ compliance_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-accessibility_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+accessibility_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="wcag_aa_conformance",
         llm_prompt=(
             "Evaluate whether key campaign web pages and assets conform to WCAG 2.1 AA: text alternatives, captions, "
@@ -337,7 +337,7 @@ accessibility_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_wcag_passes",
         evaluator_function=rule_wcag_passes,
         max_score=1.0,
@@ -349,48 +349,48 @@ accessibility_rubrics: List[WorkflowRubric] = [
 # ---------------------------
 # Preferences + Evaluators
 # ---------------------------
-def create_marketing_preferences() -> PreferenceWeights:
+def create_marketing_preferences() -> PreferenceSnapshot:
     """Initial stakeholder weights for Renewables Marketing (t=0 snapshot)."""
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="performance",
                 weight=0.45,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="performance_eval",
                     description="Evaluates pipeline readiness and experimentation rigor.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=performance_rubrics,
+                    criteria=performance_rubrics,
                 ),
             ),
             Preference(
                 name="brand",
                 weight=0.25,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="brand_eval",
                     description="Evaluates creative coherence and brand lift readiness.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=brand_rubrics,
+                    criteria=brand_rubrics,
                 ),
             ),
             Preference(
                 name="compliance",
                 weight=0.2,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="compliance_eval",
                     description="Evaluates environmental claims substantiation and privacy/email controls.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=compliance_rubrics,
+                    criteria=compliance_rubrics,
                 ),
             ),
             Preference(
                 name="accessibility",
                 weight=0.1,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="accessibility_eval",
                     description="Evaluates WCAG 2.1 AA readiness across web and key assets.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=accessibility_rubrics,
+                    criteria=accessibility_rubrics,
                 ),
             ),
         ]
@@ -402,9 +402,9 @@ def create_marketing_preferences() -> PreferenceWeights:
 # ---------------------------
 def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     """Stakeholder's weight changes over time (absolute, normalized)."""
-    timeline: dict[int, PreferenceWeights] = {
+    timeline: dict[int, PreferenceSnapshot] = {
         # Early: speed/performance bias to stand up the campaign
-        0: PreferenceWeights(
+        0: PreferenceSnapshot(
             preferences=[
                 Preference(name="performance", weight=0.45),
                 Preference(name="brand", weight=0.25),
@@ -413,7 +413,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
             ]
         ),
         # Mid-flight: brand quality weighs more as creative stabilizes and reach scales
-        20: PreferenceWeights(
+        20: PreferenceSnapshot(
             preferences=[
                 Preference(name="performance", weight=0.35),
                 Preference(name="brand", weight=0.35),
@@ -422,7 +422,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
             ]
         ),
         # Late: compliance & accessibility take priority as scale and scrutiny increase
-        45: PreferenceWeights(
+        45: PreferenceSnapshot(
             preferences=[
                 Preference(name="performance", weight=0.2),
                 Preference(name="brand", weight=0.2),
@@ -451,11 +451,11 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     return requests
 
 
-def create_evaluator_to_measure_goal_achievement() -> Evaluator:
+def create_evaluator_to_measure_goal_achievement() -> Rubric:
     """Create goal achievement evaluator for renewable energy integrated marketing campaign."""
     goal_achievement_rubrics = [
         # Critical campaign performance deliverables (must have for campaign success)
-        WorkflowRubric(
+        RubricCriteria(
             name="brand_tracking_framework_operational",
             llm_prompt=(
                 "Does operational brand tracking framework exist with: measurement approach documented, "
@@ -465,7 +465,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=18.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="lead_generation_system_designed",
             llm_prompt=(
                 "Does designed lead generation system exist with: lead scoring strategy documented, "
@@ -475,7 +475,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="seo_optimization_strategy_implemented",
             llm_prompt=(
                 "Does implemented SEO optimization strategy exist with: keyword research and strategy documented, "
@@ -485,7 +485,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=12.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="b2b_sales_pipeline_framework_ready",
             llm_prompt=(
                 "Does ready B2B sales pipeline framework exist with: opportunity qualification approach documented, "
@@ -496,7 +496,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Major campaign infrastructure and compliance deliverables (8-10 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="messaging_claims_substantiation",
             llm_prompt=(
                 "Does messaging claims substantiation exist with: substantiation log maintained, "
@@ -506,7 +506,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="wcag_accessibility_compliance",
             llm_prompt=(
                 "Does WCAG accessibility compliance exist with: WCAG 2.1 AA compliance achieved for key web assets, "
@@ -516,7 +516,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="consent_opt_in_rates_achieved",
             llm_prompt=(
                 "Do achieved consent opt-in rates exist with: ≥85% consent opt-in rates maintained, "
@@ -526,7 +526,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="integrated_campaign_execution",
             llm_prompt=(
                 "Does integrated campaign execution exist with: multi-channel strategy deployed (paid/owned/earned), "
@@ -536,7 +536,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="measurement_framework_operational",
             llm_prompt=(
                 "Does operational measurement framework exist with: MMM/MTA-compatible tracking implemented, "
@@ -547,7 +547,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Important supporting deliverables (5-7 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="creative_toolkit_deployed",
             llm_prompt=(
                 "Does deployed creative toolkit exist with: brand guidelines implemented, "
@@ -557,7 +557,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="pr_analyst_program_active",
             llm_prompt=(
                 "Does active PR and analyst program exist with: media relations strategy executed, "
@@ -567,7 +567,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="events_field_marketing_executed",
             llm_prompt=(
                 "Does executed events and field marketing exist with: events program launched, "
@@ -577,7 +577,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="partner_co_marketing_assets",
             llm_prompt=(
                 "Do partner co-marketing assets exist with: partner marketing materials developed, "
@@ -587,7 +587,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="experimentation_cadence_established",
             llm_prompt=(
                 "Does established experimentation cadence exist with: A/B testing framework operational, "
@@ -598,7 +598,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Supporting deliverables (3-4 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="executive_dashboard_operational",
             llm_prompt=(
                 "Does operational executive dashboard exist with: weekly performance reporting active, "
@@ -608,7 +608,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="crm_lead_routing_system",
             llm_prompt=(
                 "Does CRM lead routing system exist with: automated lead scoring implemented, "
@@ -618,7 +618,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="web_conversion_flows_optimized",
             llm_prompt=(
                 "Do optimized web conversion flows exist with: conversion funnel analysis completed, "
@@ -628,7 +628,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=3.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="audience_persona_validation",
             llm_prompt=(
                 "Does audience persona validation exist with: target personas researched and validated, "
@@ -640,9 +640,9 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
         ),
     ]
 
-    return Evaluator(
+    return Rubric(
         name="marketing_campaign_goal_achievement_eval",
         description="Renewable energy integrated marketing campaign performance and compliance achievement measurement",
         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-        rubrics=goal_achievement_rubrics,
+        criteria=goal_achievement_rubrics,
     )

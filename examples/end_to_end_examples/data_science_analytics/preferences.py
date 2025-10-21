@@ -3,21 +3,21 @@ from __future__ import annotations
 from math import exp
 from datetime import datetime
 
-from manager_agent_gym.schemas.core.workflow import Workflow
+from manager_agent_gym.schemas.domain.workflow import Workflow
 from manager_agent_gym.schemas.preferences.preference import (
     Preference,
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric, RunCondition
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria, RunCondition
 from manager_agent_gym.schemas.preferences import PreferenceWeightUpdateRequest
 from examples.end_to_end_examples.standard_rules import speed_rubric, cost_rubric
 
 
-def create_preferences() -> PreferenceWeights:
+def create_preferences() -> PreferenceSnapshot:
     # ---------------------------
     # Deterministic helper rules
     # ---------------------------
@@ -260,7 +260,7 @@ def create_preferences() -> PreferenceWeights:
     # QUALITY
     # ---------------------------
     quality_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="evaluation_rigor",
             llm_prompt=(
                 """Rigorously evaluate evaluation methodology with specific requirements:
@@ -275,7 +275,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="error_analysis_depth",
             llm_prompt=(
                 """
@@ -288,7 +288,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="feature_quality_review",
             llm_prompt=(
                 """
@@ -301,13 +301,13 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="artifact_density_quality",
             evaluator_function=artifact_density_quality,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="data_science_adversarial_scenarios",
             llm_prompt=(
                 """Evaluate handling of data science adversarial scenarios and challenges:
@@ -327,7 +327,7 @@ def create_preferences() -> PreferenceWeights:
     # RESPONSIBLE AI
     # ---------------------------
     rai_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="fairness_assessment_completeness",
             llm_prompt=(
                 """
@@ -340,7 +340,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="explainability_quality",
             llm_prompt=(
                 """
@@ -353,7 +353,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="pii_leak_scan",
             evaluator_function=pii_leak_scan,
             max_score=1.0,
@@ -365,19 +365,19 @@ def create_preferences() -> PreferenceWeights:
     # MLOPS
     # ---------------------------
     mlops_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="reproducibility_signal",
             evaluator_function=reproducibility_signal,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="experiment_tracking_signal",
             evaluator_function=experiment_tracking_signal,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cicd_readiness",
             llm_prompt=(
                 """
@@ -390,7 +390,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="monitoring_readiness",
             llm_prompt=(
                 """
@@ -409,7 +409,7 @@ def create_preferences() -> PreferenceWeights:
     # DATA GOVERNANCE
     # ---------------------------
     data_gov_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="data_lineage_completeness",
             llm_prompt=(
                 """
@@ -422,7 +422,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="data_quality_checks_coverage",
             llm_prompt=(
                 """
@@ -435,7 +435,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="dq_test_density",
             evaluator_function=dq_test_density,
             max_score=1.0,
@@ -447,7 +447,7 @@ def create_preferences() -> PreferenceWeights:
     # BUSINESS VALUE
     # ---------------------------
     biz_value_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="kpi_linkage_clarity",
             llm_prompt=(
                 """
@@ -460,7 +460,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="roi_estimate_credibility",
             llm_prompt=(
                 """
@@ -479,37 +479,37 @@ def create_preferences() -> PreferenceWeights:
     # SPEED
     # ---------------------------
     speed_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="deadline_adherence",
             evaluator_function=speed_deadline_adherence,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="time_to_first_output",
             evaluator_function=speed_time_to_first_output,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="blocked_deadtime_penalty",
             evaluator_function=speed_blocked_deadtime_ratio,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="throughput_progress",
             evaluator_function=speed_throughput_progress,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="speed_efficiency",
             evaluator_function=speed_rubric,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="milestone_plan_quality",
             llm_prompt=(
                 """
@@ -522,7 +522,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="risk_register_quality",
             llm_prompt=(
                 """
@@ -541,13 +541,13 @@ def create_preferences() -> PreferenceWeights:
     # COST
     # ---------------------------
     cost_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_efficiency",
             evaluator_function=cost_rubric,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_overrun_efficiency",
             evaluator_function=lambda w: (
                 lambda budget, actual: (
@@ -559,7 +559,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_per_task_stability",
             evaluator_function=lambda w: (
                 lambda planned_avg, actual_avg: (
@@ -589,7 +589,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_realism_vs_scope",
             llm_prompt=(
                 """
@@ -602,7 +602,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_justification_quality",
             llm_prompt=(
                 """
@@ -617,76 +617,76 @@ def create_preferences() -> PreferenceWeights:
         ),
     ]
 
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="quality",
                 weight=0.25,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="quality_eval",
                     description="quality evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=quality_rubrics,
+                    criteria=quality_rubrics,
                 ),
             ),
             Preference(
                 name="responsible_ai",
                 weight=0.20,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="responsible_ai_eval",
                     description="responsible ai evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=rai_rubrics,
+                    criteria=rai_rubrics,
                 ),
             ),
             Preference(
                 name="mlops",
                 weight=0.15,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="mlops_eval",
                     description="mlops evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=mlops_rubrics,
+                    criteria=mlops_rubrics,
                 ),
             ),
             Preference(
                 name="data_governance",
                 weight=0.10,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="data_governance_eval",
                     description="data governance evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=data_gov_rubrics,
+                    criteria=data_gov_rubrics,
                 ),
             ),
             Preference(
                 name="business_value",
                 weight=0.10,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="business_value_eval",
                     description="business value evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=biz_value_rubrics,
+                    criteria=biz_value_rubrics,
                 ),
             ),
             Preference(
                 name="speed",
                 weight=0.10,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="speed_eval",
                     description="speed evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=speed_rubrics,
+                    criteria=speed_rubrics,
                 ),
             ),
             Preference(
                 name="cost",
                 weight=0.10,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="cost_eval",
                     description="cost evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=cost_rubrics,
+                    criteria=cost_rubrics,
                 ),
             ),
         ],
@@ -696,8 +696,8 @@ def create_preferences() -> PreferenceWeights:
 
 def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     """Stakeholder weight update requests for DS analytics scenario."""
-    timeline: dict[int, PreferenceWeights] = {
-        0: PreferenceWeights(
+    timeline: dict[int, PreferenceSnapshot] = {
+        0: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.20),
                 Preference(name="responsible_ai", weight=0.15),
@@ -708,7 +708,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.15),
             ]
         ),
-        10: PreferenceWeights(
+        10: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.25),
                 Preference(name="responsible_ai", weight=0.15),
@@ -719,7 +719,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.15),
             ]
         ),
-        60: PreferenceWeights(
+        60: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.20),
                 Preference(name="responsible_ai", weight=0.25),
@@ -750,11 +750,11 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     return requests
 
 
-def create_evaluator_to_measure_goal_achievement() -> Evaluator:
+def create_evaluator_to_measure_goal_achievement() -> Rubric:
     """Create goal achievement evaluator for data science analytics project delivery."""
     goal_achievement_rubrics = [
         # Critical technical deliverables (must have for production deployment)
-        WorkflowRubric(
+        RubricCriteria(
             name="production_ready_model_deployed",
             llm_prompt=(
                 "Does deployed production-ready model exist with: CI/CD pipeline operational, "
@@ -764,7 +764,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=18.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="data_privacy_compliance_verified",
             llm_prompt=(
                 "Does verified data privacy compliance exist with: PII policy compliance confirmed, "
@@ -774,7 +774,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="reproducible_training_pipeline",
             llm_prompt=(
                 "Does reproducible training pipeline exist with: fixed seeds implemented, "
@@ -784,7 +784,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="bias_fairness_analysis_completed",
             llm_prompt=(
                 "Does completed bias/fairness analysis exist with: bias metrics within policy thresholds, "
@@ -795,7 +795,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Major technical and business deliverables (8-10 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="model_performance_thresholds_met",
             llm_prompt=(
                 "Do met model performance thresholds exist with: evaluation metrics (AUC/accuracy) above minimum thresholds, "
@@ -805,7 +805,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="curated_dataset_with_lineage",
             llm_prompt=(
                 "Does curated dataset with lineage exist with: data quality checks implemented, "
@@ -815,7 +815,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="model_card_and_explainability",
             llm_prompt=(
                 "Do model card and explainability exist with: model card completed with performance metrics, "
@@ -826,7 +826,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Important supporting deliverables (5-7 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="deployment_readiness_gate_passed",
             llm_prompt=(
                 "Does passed deployment readiness gate exist with: security review completed, "
@@ -836,7 +836,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="experiment_tracking_system",
             llm_prompt=(
                 "Does experiment tracking system exist with: all experiments logged, "
@@ -846,7 +846,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="model_monitoring_alerts",
             llm_prompt=(
                 "Do model monitoring alerts exist with: drift detection implemented, "
@@ -857,7 +857,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Supporting deliverables (3-4 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="business_requirements_documented",
             llm_prompt=(
                 "Do documented business requirements exist with: success metrics defined, "
@@ -867,7 +867,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="model_validation_framework",
             llm_prompt=(
                 "Does model validation framework exist with: validation strategies implemented, "
@@ -877,7 +877,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="data_access_governance",
             llm_prompt=(
                 "Does data access governance exist with: access controls implemented, "
@@ -887,7 +887,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=3.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="project_documentation_complete",
             llm_prompt=(
                 "Does complete project documentation exist with: methodology documented, "
@@ -899,9 +899,9 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
         ),
     ]
 
-    return Evaluator(
+    return Rubric(
         name="data_science_analytics_goal_achievement_eval",
         description="Data science analytics project delivery and governance achievement measurement",
         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-        rubrics=goal_achievement_rubrics,
+        criteria=goal_achievement_rubrics,
     )

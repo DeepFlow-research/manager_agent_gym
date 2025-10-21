@@ -18,18 +18,18 @@ from examples.end_to_end_examples.standard_rules import (
 from math import exp
 from manager_agent_gym.schemas.preferences.preference import (
     Preference,
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
-from manager_agent_gym.schemas.core import Workflow
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric, RunCondition
+from manager_agent_gym.schemas.domain import Workflow
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria, RunCondition
 from manager_agent_gym.schemas.preferences import PreferenceWeightUpdateRequest
 
 
-def create_preferences() -> PreferenceWeights:
+def create_preferences() -> PreferenceSnapshot:
     # ---------------------------
     # Deterministic helper rules
     # ---------------------------
@@ -265,7 +265,7 @@ def create_preferences() -> PreferenceWeights:
     # ACADEMIC QUALITY & STANDARDS
     # ---------------------------
     academic_quality_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="b_conditions_compliance_evidence",
             llm_prompt=(
                 """Evaluate compliance evidence against OfS B-conditions (B1-B6). Award partial credit for:
@@ -278,7 +278,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="external_examiner_synthesis_quality",
             llm_prompt=(
                 """Assess quality of external examiner report synthesis and trend analysis.
@@ -288,7 +288,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="student_outcome_analysis_depth",
             llm_prompt=(
                 """Evaluate depth of student outcome analysis: (1) KPI benchmarking against sector,
@@ -298,7 +298,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="academic_standards_validation",
             llm_prompt=(
                 """Assess academic standards validation against sector benchmarks and regulatory expectations.
@@ -308,7 +308,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="quality_artifact_density",
             evaluator_function=academic_quality_artifacts,
             max_score=1.0,
@@ -320,7 +320,7 @@ def create_preferences() -> PreferenceWeights:
     # REGULATORY COMPLIANCE
     # ---------------------------
     regulatory_compliance_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="ofs_conditions_mapping_completeness",
             llm_prompt=(
                 """Evaluate mapping of institutional activities to OfS conditions A-E. Award partial credit for: coverage,
@@ -330,7 +330,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="consumer_law_compliance_thoroughness",
             llm_prompt=(
                 """Assess CMA consumer law compliance review: prospectus accuracy, contract fairness, cost transparency,
@@ -339,7 +339,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="ukvi_sponsorship_compliance_validation",
             llm_prompt=(
                 """Evaluate UKVI sponsor licence compliance validation: attendance monitoring systems,
@@ -349,7 +349,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="prevent_duty_compliance_evidence",
             llm_prompt=(
                 """Assess Prevent duty compliance documentation: risk assessment currency, training coverage analysis,
@@ -359,7 +359,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="data_protection_and_quality_controls",
             llm_prompt=(
                 """Evaluate data protection and quality controls: GDPR compliance evidence, HESA data validation,
@@ -369,13 +369,13 @@ def create_preferences() -> PreferenceWeights:
             max_score=9.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_evidence_density",
             evaluator_function=regulatory_evidence_density,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="student_protection_coverage",
             evaluator_function=student_protection_coverage,
             max_score=1.0,
@@ -387,7 +387,7 @@ def create_preferences() -> PreferenceWeights:
     # GOVERNANCE & OVERSIGHT
     # ---------------------------
     governance_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="governance_structure_effectiveness",
             llm_prompt=(
                 """Evaluate governance structure effectiveness: steering committee formation, role clarity,
@@ -397,7 +397,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=9.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="access_participation_governance_oversight",
             llm_prompt=(
                 """Assess governance oversight of Access & Participation Plan: monitoring data analysis,
@@ -407,7 +407,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="financial_sustainability_governance",
             llm_prompt=(
                 """Evaluate governance of financial sustainability assessment: scenario planning oversight,
@@ -417,7 +417,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="evidence_consolidation_oversight",
             llm_prompt=(
                 """Assess oversight of evidence consolidation and submission process: quality assurance,
@@ -427,13 +427,13 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="governance_approval_tracking",
             evaluator_function=governance_approval_tracking,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="stakeholder_coordination_efficiency",
             evaluator_function=stakeholder_coordination_efficiency,
             max_score=1.0,
@@ -445,7 +445,7 @@ def create_preferences() -> PreferenceWeights:
     # DATA QUALITY & INTEGRITY
     # ---------------------------
     data_quality_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="hesa_data_validation_thoroughness",
             llm_prompt=(
                 """Evaluate HESA Data Futures validation thoroughness: accuracy checks, completeness validation,
@@ -455,7 +455,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="internal_audit_quality_controls",
             llm_prompt=(
                 """Assess internal audit quality controls: data collection validation, processing integrity checks,
@@ -465,7 +465,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="data_integrity_assurance_strength",
             llm_prompt=(
                 """Evaluate data integrity assurance measures: senior officer attestations, validation procedures,
@@ -474,7 +474,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="data_quality_validation_presence",
             evaluator_function=data_quality_validation_presence,
             max_score=1.0,
@@ -487,13 +487,13 @@ def create_preferences() -> PreferenceWeights:
     # ---------------------------
     speed_rubrics = [
         # Deterministic
-        WorkflowRubric(
+        RubricCriteria(
             name="accreditation_deadline_adherence",
             evaluator_function=accreditation_deadline_adherence,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="evidence_compilation_efficiency",
             llm_prompt=(
                 """Evaluate efficiency of evidence compilation process: parallel track execution,
@@ -503,7 +503,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_submission_timeliness",
             llm_prompt=(
                 """Assess timeliness of regulatory submission preparation and quality assurance processes.
@@ -513,7 +513,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="speed_efficiency",
             evaluator_function=speed_rubric,
             max_score=1.0,
@@ -525,13 +525,13 @@ def create_preferences() -> PreferenceWeights:
     # COST
     # ---------------------------
     cost_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_efficiency",
             evaluator_function=cost_rubric,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="compliance_cost_optimization",
             llm_prompt=(
                 """Assess compliance cost optimization: efficient use of internal resources vs external consultants,
@@ -541,7 +541,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="resource_allocation_effectiveness",
             llm_prompt=(
                 """Evaluate resource allocation effectiveness across compliance workstreams:
@@ -551,7 +551,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="university_crisis_scenarios",
             llm_prompt=(
                 """Evaluate handling of university accreditation crisis scenarios:
@@ -565,7 +565,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_realism_validation",
             evaluator_function=_validate_cost_realism,
             max_score=1.0,
@@ -573,66 +573,66 @@ def create_preferences() -> PreferenceWeights:
         ),
     ]
 
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="academic_quality",
                 weight=0.25,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="academic_quality_eval",
                     description="academic quality and standards evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=academic_quality_rubrics,
+                    criteria=academic_quality_rubrics,
                 ),
             ),
             Preference(
                 name="regulatory_compliance",
                 weight=0.3,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="regulatory_compliance_eval",
                     description="regulatory compliance evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=regulatory_compliance_rubrics,
+                    criteria=regulatory_compliance_rubrics,
                 ),
             ),
             Preference(
                 name="governance",
                 weight=0.2,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="governance_eval",
                     description="governance and oversight evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=governance_rubrics,
+                    criteria=governance_rubrics,
                 ),
             ),
             Preference(
                 name="data_quality",
                 weight=0.15,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="data_quality_eval",
                     description="data quality and integrity evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=data_quality_rubrics,
+                    criteria=data_quality_rubrics,
                 ),
             ),
             Preference(
                 name="speed",
                 weight=0.06,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="speed_eval",
                     description="speed and timeliness evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=speed_rubrics,
+                    criteria=speed_rubrics,
                 ),
             ),
             Preference(
                 name="cost",
                 weight=0.04,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="cost_eval",
                     description="cost efficiency evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=cost_rubrics,
+                    criteria=cost_rubrics,
                 ),
             ),
         ]
@@ -645,27 +645,27 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     Timeline shifts from initial setup and evidence gathering to regulatory compliance
     focus as submission deadline approaches.
     """
-    timeline: dict[int, PreferenceWeights] = {
-        0: PreferenceWeights(
+    timeline: dict[int, PreferenceSnapshot] = {
+        0: PreferenceSnapshot(
             preferences=[
                 Preference(
                     name="academic_quality",
                     weight=0.3,
-                    evaluator=Evaluator(
+                    evaluator=Rubric(
                         name="academic_quality_eval",
                         description="placeholder",
                         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                        rubrics=[],
+                        criteria=[],
                     ),
                 ),
                 Preference(
                     name="regulatory_compliance",
                     weight=0.2,
-                    evaluator=Evaluator(
+                    evaluator=Rubric(
                         name="regulatory_compliance_eval",
                         description="placeholder",
                         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                        rubrics=[],
+                        criteria=[],
                     ),
                 ),
                 Preference(name="governance", weight=0.2),
@@ -674,7 +674,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.05),
             ]
         ),
-        10: PreferenceWeights(
+        10: PreferenceSnapshot(
             preferences=[
                 Preference(name="academic_quality", weight=0.25),
                 Preference(name="regulatory_compliance", weight=0.3),
@@ -684,7 +684,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.04),
             ]
         ),
-        20: PreferenceWeights(
+        20: PreferenceSnapshot(
             preferences=[
                 Preference(name="academic_quality", weight=0.2),
                 Preference(name="regulatory_compliance", weight=0.4),
@@ -694,7 +694,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.04),
             ]
         ),
-        30: PreferenceWeights(
+        30: PreferenceSnapshot(
             preferences=[
                 Preference(name="academic_quality", weight=0.15),
                 Preference(name="regulatory_compliance", weight=0.5),
@@ -724,11 +724,11 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     return requests
 
 
-def create_evaluator_to_measure_goal_achievement() -> Evaluator:
+def create_evaluator_to_measure_goal_achievement() -> Rubric:
     """Create goal achievement evaluator for UK University OfS accreditation renewal process."""
     goal_achievement_rubrics = [
         # Critical OfS compliance deliverables (must have for registration renewal)
-        WorkflowRubric(
+        RubricCriteria(
             name="ofs_evidence_pack_submitted_compliant",
             llm_prompt=(
                 "Does submitted compliant OfS evidence pack exist with: evidence pack submitted on time, "
@@ -738,7 +738,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=20.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="quality_standards_compliance_b_conditions",
             llm_prompt=(
                 "Does quality standards compliance with B-conditions exist with: course clusters mapped to B1-B6 conditions, "
@@ -748,7 +748,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=18.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cma_consumer_law_compliance_audit",
             llm_prompt=(
                 "Does CMA consumer law compliance audit exist with: CMA-compliant prospectus and contracts confirmed, "
@@ -758,7 +758,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="app_accepted_ofs_valid_credible",
             llm_prompt=(
                 "Does OfS-accepted APP exist with: Access and Participation Plan updated, "
@@ -769,7 +769,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Major regulatory and governance deliverables (8-10 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="ukvi_sponsorship_compliance_maintained",
             llm_prompt=(
                 "Does maintained UKVI sponsorship compliance exist with: attendance monitoring records current, "
@@ -779,7 +779,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="prevent_duty_documentation_compliant",
             llm_prompt=(
                 "Does compliant Prevent duty documentation exist with: risk assessment completed, "
@@ -789,7 +789,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="governance_package_decisions_documented",
             llm_prompt=(
                 "Does documented governance package with decisions exist with: Council/Senate/Quality Committee minutes complete, "
@@ -799,7 +799,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="data_quality_assurance_hesa_validated",
             llm_prompt=(
                 "Does HESA-validated data quality assurance exist with: HESA Data Futures submissions validated, "
@@ -809,7 +809,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="student_outcomes_tef_aligned",
             llm_prompt=(
                 "Does TEF-aligned student outcomes narrative exist with: Teaching Excellence Framework indicators addressed, "
@@ -820,7 +820,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Important supporting deliverables (5-7 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="financial_sustainability_evidence",
             llm_prompt=(
                 "Does financial sustainability evidence exist with: financial sustainability demonstrated, "
@@ -830,7 +830,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="student_protection_measures_documented",
             llm_prompt=(
                 "Do documented student protection measures exist with: student protection plan current, "
@@ -840,7 +840,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="external_examiner_summaries_validated",
             llm_prompt=(
                 "Do validated external examiner summaries exist with: external examiner reports comprehensive, "
@@ -850,7 +850,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="equality_opportunity_governance_oversight",
             llm_prompt=(
                 "Does equality opportunity governance oversight exist with: equality of opportunity monitored, "
@@ -860,7 +860,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="academic_standards_baseline_compliance",
             llm_prompt=(
                 "Does academic standards baseline compliance exist with: academic standards maintained, "
@@ -871,7 +871,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Supporting deliverables (3-4 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="course_information_transparency",
             llm_prompt=(
                 "Does course information transparency exist with: course information clear and accurate, "
@@ -881,7 +881,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_correspondence_tracking",
             llm_prompt=(
                 "Does regulatory correspondence tracking exist with: OfS communications logged, "
@@ -891,7 +891,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="continuous_improvement_initiatives",
             llm_prompt=(
                 "Do continuous improvement initiatives exist with: improvement initiatives identified and implemented, "
@@ -901,7 +901,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=3.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="sector_benchmarking_alignment",
             llm_prompt=(
                 "Does sector benchmarking alignment exist with: sector benchmarks analyzed, "
@@ -913,9 +913,9 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
         ),
     ]
 
-    return Evaluator(
+    return Rubric(
         name="uk_university_accreditation_goal_achievement_eval",
         description="UK University OfS accreditation renewal process deliverable achievement measurement",
         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-        rubrics=goal_achievement_rubrics,
+        criteria=goal_achievement_rubrics,
     )

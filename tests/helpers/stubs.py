@@ -5,31 +5,31 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from manager_agent_gym.core.communication.service import CommunicationService
-from manager_agent_gym.core.manager_agent.interface import ManagerAgent
-from manager_agent_gym.core.workflow_agents.interface import (
+from manager_agent_gym.core.agents.manager_agent.common.interface import ManagerAgent
+from manager_agent_gym.core.agents.workflow_agents.common.interface import (
     AgentInterface,
-    StakeholderBase,
 )
-from manager_agent_gym.schemas.core.communication import MessageType
-from manager_agent_gym.schemas.core.resources import Resource
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.execution.manager_actions import (
+from manager_agent_gym.core.agents.stakeholder_agent.interface import StakeholderBase
+from manager_agent_gym.schemas.domain.communication import MessageType
+from manager_agent_gym.schemas.domain.resource import Resource
+from manager_agent_gym.schemas.domain.task import Task
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.core.agents.manager_agent.actions import (
     RequestEndWorkflowAction,
     SendMessageAction,
 )
-from manager_agent_gym.schemas.execution.state import ExecutionState
+from manager_agent_gym.core.execution.schemas.state import ExecutionState
 from manager_agent_gym.schemas.preferences.preference import (
-    PreferenceChange,
-    PreferenceWeights,
+    PreferenceChangeEvent,
+    PreferenceSnapshot,
 )
-from manager_agent_gym.schemas.unified_results import create_task_result
-from manager_agent_gym.schemas.workflow_agents.stakeholder import (
+from manager_agent_gym.core.execution.schemas.results import create_task_result
+from manager_agent_gym.schemas.agents.stakeholder import (
     StakeholderConfig,
     StakeholderPublicProfile,
 )
-from manager_agent_gym.schemas.workflow_agents import AgentConfig
-from manager_agent_gym.schemas.execution.manager_actions import (
+from manager_agent_gym.schemas.agents import AgentConfig
+from manager_agent_gym.core.agents.manager_agent.actions import (
     AssignTaskAction,
     NoOpAction,
 )
@@ -57,7 +57,7 @@ class StakeholderStub(StakeholderBase):
             name="Stakeholder",
             role="Owner",
             model_name="o3",
-            initial_preferences=PreferenceWeights(preferences=[]),
+            preference_data=PreferenceSnapshot(preferences=[]),
             agent_description="Stakeholder",
             agent_capabilities=["Stakeholder"],
         )
@@ -92,36 +92,46 @@ class StakeholderStub(StakeholderBase):
         )
         self._replied_timesteps.add(current_timestep)
 
-    def get_preferences_for_timestep(self, timestep: int) -> PreferenceWeights:
-        return PreferenceWeights(preferences=[])
+    def _build_public_profile(self):
+        from manager_agent_gym.schemas.agents.stakeholder import StakeholderPublicProfile
+        return StakeholderPublicProfile(
+            display_name="Stakeholder",
+            role="Owner",
+            preference_summary="Test preferences"
+        )
 
-    def apply_preference_change(
-        self,
-        timestep: int,
-        new_weights: PreferenceWeights,
-        change_event: PreferenceChange | None,
-    ) -> None:
-        return None
+    async def evaluate_for_timestep(self, timestep, validation_engine, workflow, communications, manager_actions):
+        """No-op evaluation for test stub."""
+        pass
 
-    def apply_weight_update(self, request: Any) -> PreferenceChange:
-        return PreferenceChange(
+    def get_serializable_state(self, timestep: int) -> dict:
+        """Return empty state for test stub."""
+        return {"type": "test_stub", "timestep": timestep}
+
+    def restore_from_state(self, state_dict: dict) -> None:
+        """No-op restore for test stub."""
+        pass
+
+    def apply_weight_update(self, request: Any) -> PreferenceChangeEvent:
+        """Stub weight update (returns no-op change event)."""
+        return PreferenceChangeEvent(
             timestep=0,
-            preferences=PreferenceWeights(preferences=[]),
+            preferences=PreferenceSnapshot(preferences=[]),
             previous_weights={},
             new_weights={},
             change_type="none",
             magnitude=0.0,
-            trigger_reason="test",
+            trigger_reason="test_stub",
         )
 
-    def apply_weight_updates(self, requests: list[Any]) -> list[PreferenceChange]:
+    def apply_weight_updates(self, requests: list[Any]) -> list[PreferenceChangeEvent]:
         return [self.apply_weight_update(r) for r in requests]
 
 
 class ManagerSendsThenEnd(ManagerAgent):
     """Manager that sends a direct message to stakeholder on first step, then requests end."""
 
-    def __init__(self, preferences: PreferenceWeights, receiver_id: str) -> None:
+    def __init__(self, preferences: PreferenceSnapshot, receiver_id: str) -> None:
         super().__init__(agent_id="manager_agent", preferences=preferences)
         self._receiver_id = receiver_id
         self._sent_initial: bool = False
@@ -130,11 +140,11 @@ class ManagerSendsThenEnd(ManagerAgent):
         self,
         workflow: Workflow,
         execution_state: ExecutionState,
-        stakeholder_profile: StakeholderPublicProfile,
-        current_timestep: int,
-        running_tasks: dict[UUID, asyncio.Task[Any]] | dict,
-        completed_task_ids: set[UUID],
-        failed_task_ids: set[UUID],
+        stakeholder_profile: StakeholderPublicProfile | None = None,
+        current_timestep: int = 0,
+        running_tasks: dict[UUID, asyncio.Task[Any]] | dict | None = None,
+        completed_task_ids: set[UUID] | None = None,
+        failed_task_ids: set[UUID] | None = None,
         communication_service: CommunicationService | None = None,
         previous_reward: float = 0.0,
         done: bool = False,
@@ -164,18 +174,18 @@ class ManagerAssignFirstReady(ManagerAgent):
 
     def __init__(self) -> None:
         super().__init__(
-            agent_id="stub_manager", preferences=PreferenceWeights(preferences=[])
+            agent_id="stub_manager", preferences=PreferenceSnapshot(preferences=[])
         )
 
     async def step(
         self,
         workflow: Workflow,
         execution_state: ExecutionState,
-        stakeholder_profile: StakeholderPublicProfile,
-        current_timestep: int,
-        running_tasks: dict[UUID, asyncio.Task[Any]] | dict,
-        completed_task_ids: set[UUID],
-        failed_task_ids: set[UUID],
+        stakeholder_profile: StakeholderPublicProfile | None = None,
+        current_timestep: int = 0,
+        running_tasks: dict[UUID, asyncio.Task[Any]] | dict | None = None,
+        completed_task_ids: set[UUID] | None = None,
+        failed_task_ids: set[UUID] | None = None,
         communication_service: CommunicationService | None = None,
         previous_reward: float = 0.0,
         done: bool = False,
@@ -183,7 +193,6 @@ class ManagerAssignFirstReady(ManagerAgent):
         obs = await self.create_observation(
             workflow=workflow,
             execution_state=execution_state,
-            stakeholder_profile=stakeholder_profile,
             current_timestep=current_timestep,
             running_tasks=running_tasks,
             completed_task_ids=completed_task_ids,
@@ -209,18 +218,18 @@ class ManagerNoOp(ManagerAgent):
 
     def __init__(self) -> None:
         super().__init__(
-            agent_id="stub_manager", preferences=PreferenceWeights(preferences=[])
+            agent_id="stub_manager", preferences=PreferenceSnapshot(preferences=[])
         )
 
     async def step(
         self,
         workflow: Workflow,
         execution_state: ExecutionState,
-        stakeholder_profile: StakeholderPublicProfile,
-        current_timestep: int,
-        running_tasks: dict[UUID, asyncio.Task[Any]] | dict,
-        completed_task_ids: set[UUID],
-        failed_task_ids: set[UUID],
+        stakeholder_profile: StakeholderPublicProfile | None = None,
+        current_timestep: int = 0,
+        running_tasks: dict[UUID, asyncio.Task[Any]] | dict | None = None,
+        completed_task_ids: set[UUID] | None = None,
+        failed_task_ids: set[UUID] | None = None,
         communication_service: CommunicationService | None = None,
         previous_reward: float = 0.0,
         done: bool = False,

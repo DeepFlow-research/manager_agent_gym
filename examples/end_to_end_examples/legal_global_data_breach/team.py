@@ -7,13 +7,13 @@ Exports:
   - create_breach_team_timeline()
 """
 
-from manager_agent_gym.schemas.workflow_agents import (
+from manager_agent_gym.schemas.agents import (
     AIAgentConfig,
     HumanAgentConfig,
     StakeholderConfig,
 )
 from manager_agent_gym.schemas.preferences.preference import (
-    PreferenceWeights,
+    PreferenceSnapshot,
     Preference,
 )
 
@@ -252,7 +252,7 @@ def create_team_configs():
         clarification_reply_rate=0.9,
         strictness=0.7,
         verbosity=2,
-        initial_preferences=PreferenceWeights(
+        preference_data=PreferenceSnapshot(
             preferences=[
                 Preference(name="speed", weight=0.5),
                 Preference(name="compliance", weight=0.3),

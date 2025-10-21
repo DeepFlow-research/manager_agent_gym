@@ -4,7 +4,7 @@ Evaluation components score workflow performance against stakeholder objectives.
 
 ### Validation Engine
 
-Runs rubrics, aggregates preference scores, and computes multi-objective regret.
+Runs criteria, aggregates preference scores, and computes multi-objective regret.
 
 ::: manager_agent_gym.core.evaluation.validation_engine.ValidationEngine
 

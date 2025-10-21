@@ -12,10 +12,11 @@ Demonstrates:
 
 from uuid import uuid4, UUID
 
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.schemas.core.base import TaskStatus
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.domain.task import Task
+from manager_agent_gym.schemas.domain.base import TaskStatus
 from manager_agent_gym.schemas.preferences import Constraint
+from manager_agent_gym.core.workflow.services import WorkflowMutations
 
 
 def create_workflow() -> Workflow:
@@ -454,7 +455,7 @@ def create_workflow() -> Workflow:
         model_inventory,
         pii_controls,
     ]:
-        workflow.add_task(task)
+        WorkflowMutations.add_task(workflow, task)
 
     # Governance and compliance constraints for ICAAP
     workflow.constraints.extend(

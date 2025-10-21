@@ -5,13 +5,13 @@ import pytest
 from uuid import uuid4
 
 from manager_agent_gym.core.communication.service import CommunicationService
-from manager_agent_gym.core.manager_agent.structured_manager import (
+from manager_agent_gym.core.agents.manager_agent.implementations.chain_of_thought import (
     ChainOfThoughtManagerAgent,
 )
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.preferences.preference import PreferenceWeights
-from manager_agent_gym.schemas.execution.state import ExecutionState
-from manager_agent_gym.schemas.workflow_agents.stakeholder import (
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
+from manager_agent_gym.core.execution.schemas.state import ExecutionState
+from manager_agent_gym.schemas.agents.stakeholder import (
     StakeholderPublicProfile,
 )
 
@@ -31,7 +31,7 @@ async def test_structured_manager_prompt_includes_stakeholder_messages() -> None
     comms = CommunicationService()
 
     # Manager under test
-    manager = ChainOfThoughtManagerAgent(preferences=PreferenceWeights(preferences=[]))
+    manager = ChainOfThoughtManagerAgent(preferences=PreferenceSnapshot(preferences=[]))
 
     # Simulate stakeholder sending a direct message to this manager's agent_id
     stake_id = "stakeholder_1"

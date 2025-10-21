@@ -5,7 +5,7 @@ Team timeline with specialized AI agents following project phases,
 and late-phase human stakeholders for sign-offs.
 """
 
-from manager_agent_gym.schemas.workflow_agents import (
+from manager_agent_gym.schemas.agents import (
     AIAgentConfig,
     HumanAgentConfig,
 )

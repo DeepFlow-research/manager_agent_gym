@@ -1,7 +1,7 @@
 import pytest
 from uuid import uuid4
 from manager_agent_gym.core.communication.service import CommunicationService
-from manager_agent_gym.schemas.core.communication import MessageType
+from manager_agent_gym.schemas.domain.communication import MessageType
 
 
 @pytest.mark.asyncio
@@ -120,4 +120,4 @@ async def test_mark_message_read_and_grouped_views():
     assert comm.mark_message_read(m.message_id, "a2")
     assert "a2" in comm.graph.messages[m.message_id].read_by
     grouped = comm.get_all_messages_grouped()
-    assert grouped and grouped[0].sender_id in {"a1"} #type: ignore # todo: fix
+    assert grouped and grouped[0].sender_id in {"a1"}  # type: ignore # todo: fix

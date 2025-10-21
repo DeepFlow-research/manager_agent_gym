@@ -1,21 +1,23 @@
 import pytest
 
-from manager_agent_gym.core.manager_agent.factory import (
+from manager_agent_gym.core.agents.manager_agent.common.factory import (
     create_manager_agent,
     manager_mode_label,
 )
-from manager_agent_gym.core.manager_agent.structured_manager import (
+from manager_agent_gym.core.agents.manager_agent.implementations.chain_of_thought import (
     ChainOfThoughtManagerAgent,
 )
-from manager_agent_gym.core.manager_agent.random_manager import (
+from manager_agent_gym.core.agents.manager_agent.implementations.random_manager import (
     RandomManagerAgentV2,
+)
+from manager_agent_gym.core.agents.manager_agent.implementations.one_shot_delegation import (
     OneShotDelegateManagerAgent,
 )
-from manager_agent_gym.schemas.preferences.preference import PreferenceWeights
+from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
 
 
 def _prefs():
-    return PreferenceWeights(preferences=[])
+    return PreferenceSnapshot(preferences=[])
 
 
 def _clear_env(monkeypatch) -> None:

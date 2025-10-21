@@ -5,16 +5,16 @@ from typing import Any, cast
 import pytest
 
 from manager_agent_gym.core.communication.service import CommunicationService
-from manager_agent_gym.core.execution.engine import WorkflowExecutionEngine
-from manager_agent_gym.core.workflow_agents.registry import AgentRegistry
-from manager_agent_gym.schemas.config import OutputConfig
-from manager_agent_gym.schemas.core.communication import (
+from manager_agent_gym.core.workflow.engine import WorkflowExecutionEngine
+from manager_agent_gym.core.agents.workflow_agents.tools.registry import AgentRegistry
+from manager_agent_gym.core.workflow.schemas.config import OutputConfig
+from manager_agent_gym.schemas.domain.communication import (
     MessageGrouping,
     MessageType,
 )
-from manager_agent_gym.schemas.core.communication import ThreadMessagesView
-from manager_agent_gym.schemas.execution.state import ExecutionState
-from manager_agent_gym.schemas.preferences.preference import PreferenceWeights
+from manager_agent_gym.schemas.domain.communication import ThreadMessagesView
+from manager_agent_gym.core.execution.schemas.state import ExecutionState
+from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
 from tests.helpers.stubs import (
     make_empty_workflow,
     ManagerSendsThenEnd,
@@ -46,7 +46,7 @@ async def test_manager_to_stakeholder_direct_and_stakeholder_reply_and_broadcast
     comms = CommunicationService()
     stakeholder = _StakeholderStub(agent_id="stakeholder_1")
     manager = _ManagerSendsThenEnd(
-        preferences=PreferenceWeights(preferences=[]), receiver_id="stakeholder_1"
+        preferences=PreferenceSnapshot(preferences=[]), receiver_id="stakeholder_1"
     )
 
     engine = WorkflowExecutionEngine(

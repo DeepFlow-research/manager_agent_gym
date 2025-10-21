@@ -5,6 +5,7 @@ import sys
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+import traceback
 from typing import List, Optional
 
 import typer
@@ -46,7 +47,7 @@ DEFAULT_SCENARIOS: list[str] = [
     "airline_launch_program",
 ]
 
-MANAGER_MODE_CHOICES: list[str] = ["cot", "random", "assign_all"]
+MANAGER_MODE_CHOICES: list[str] = ["cot", "random", "assign_all", "rubric_decomp"]
 MODEL_NAME_SUGGESTIONS: list[str] = [
     "gpt-5",
     "gpt-5-mini",
@@ -290,7 +291,9 @@ def main(
     try:
         from examples.scenarios import SCENARIOS  # type: ignore
     except Exception as exc:  # pragma: no cover
-        typer.echo(f"Failed to import scenarios: {exc}")
+        typer.echo(
+            f"Failed to import scenarios: {exc} traceback: {traceback.format_exc()}"
+        )
         raise typer.Exit(code=1)
 
     # Available keys kept for potential validation in future; interactive prompt pulls directly

@@ -2,14 +2,15 @@
 import pytest  # type: ignore[import-not-found]
 from uuid import uuid4
 
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.schemas.execution.manager_actions import (
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.domain.task import Task
+from manager_agent_gym.core.agents.manager_agent.actions import (
     GetWorkflowStatusAction,
     GetAvailableAgentsAction,
     GetPendingTasksAction,
     SendMessageAction,
 )
+from manager_agent_gym.core.workflow.services import WorkflowMutations
 from manager_agent_gym.core.communication.service import CommunicationService
 
 
@@ -19,8 +20,8 @@ async def test_info_actions_return_expected_payloads() -> None:
     w = Workflow(name="w", workflow_goal="d", owner_id=uuid4())
     a = Task(name="A", description="d")
     b = Task(name="B", description="d", dependency_task_ids=[a.id])
-    w.add_task(a)
-    w.add_task(b)
+    WorkflowMutations.add_task(w, a)
+    WorkflowMutations.add_task(w, b)
 
     # Initially: A is READY, B is PENDING
     status_res = await GetWorkflowStatusAction(

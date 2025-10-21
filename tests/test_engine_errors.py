@@ -1,24 +1,25 @@
 import pytest
 from uuid import uuid4
 
-from manager_agent_gym.core.execution.engine import WorkflowExecutionEngine
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.core.workflow_agents.registry import AgentRegistry
-from manager_agent_gym.schemas.core.tasks import Task
+from manager_agent_gym.core.workflow.engine import WorkflowExecutionEngine
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.core.agents.workflow_agents.tools.registry import AgentRegistry
+from manager_agent_gym.schemas.domain.task import Task
 from typing import cast
-from manager_agent_gym.core.manager_agent.interface import ManagerAgent
+from manager_agent_gym.core.agents.manager_agent.common.interface import ManagerAgent
+from manager_agent_gym.core.workflow.services import WorkflowMutations
 
 
 @pytest.mark.asyncio
 async def test_execute_timestep_requires_manager() -> None:
     w = Workflow(name="w", workflow_goal="d", owner_id=uuid4())
-    w.add_task(Task(name="t", description="d"))
+    WorkflowMutations.add_task(w, Task(name="t", description="d"))
     # Minimal stakeholder to satisfy engine signature
-    from manager_agent_gym.core.workflow_agents.stakeholder_agent import (
+    from manager_agent_gym.core.agents.stakeholder_agent.stakeholder_agent import (
         StakeholderAgent,
     )
-    from manager_agent_gym.schemas.workflow_agents.stakeholder import StakeholderConfig
-    from manager_agent_gym.schemas.preferences.preference import PreferenceWeights
+    from manager_agent_gym.schemas.agents.stakeholder import StakeholderConfig
+    from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
 
     stakeholder = StakeholderAgent(
         config=StakeholderConfig(
@@ -28,13 +29,13 @@ async def test_execute_timestep_requires_manager() -> None:
             model_name="o3",
             name="Stakeholder",
             role="Owner",
-            initial_preferences=PreferenceWeights(preferences=[]),
+            preference_data=PreferenceSnapshot(preferences=[]),
             agent_description="Stakeholder",
             agent_capabilities=["Stakeholder"],
         )
     )
 
-    w.add_agent(stakeholder)
+    WorkflowMutations.add_agent(w, stakeholder)
     with pytest.raises(ValueError):
         _ = WorkflowExecutionEngine(
             workflow=w,

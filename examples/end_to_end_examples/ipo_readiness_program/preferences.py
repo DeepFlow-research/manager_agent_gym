@@ -19,18 +19,18 @@ from examples.end_to_end_examples.standard_rules import (
 from math import exp
 from manager_agent_gym.schemas.preferences.preference import (
     Preference,
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
-from manager_agent_gym.schemas.core import Workflow
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric, RunCondition
+from manager_agent_gym.schemas.domain import Workflow
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria, RunCondition
 from manager_agent_gym.schemas.preferences import PreferenceWeightUpdateRequest
 
 
-def create_preferences() -> PreferenceWeights:
+def create_preferences() -> PreferenceSnapshot:
     # ---------------------------
     # Deterministic helper rules
     # ---------------------------
@@ -220,7 +220,7 @@ def create_preferences() -> PreferenceWeights:
     # SEC COMPLIANCE
     # ---------------------------
     sec_compliance_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="s1_completeness_quality",
             llm_prompt=(
                 """Evaluate S-1 registration statement completeness and quality. Award partial credit for:
@@ -233,7 +233,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="financial_statement_audit_quality",
             llm_prompt=(
                 """Assess PCAOB-audited financial statement quality and compliance:
@@ -246,7 +246,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_disclosure_accuracy",
             llm_prompt=(
                 """Evaluate regulatory disclosure accuracy and completeness:
@@ -257,13 +257,13 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="sec_filing_readiness_indicators",
             evaluator_function=sec_filing_readiness,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="edgar_submission_validation",
             llm_prompt=(
                 """
@@ -275,7 +275,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="material_weakness_handling",
             llm_prompt=(
                 "Score 0–8 for material weakness identification and remediation planning:"
@@ -285,7 +285,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="quiet_period_compliance",
             llm_prompt=(
                 "Evaluate quiet period compliance strategy: gun-jumping avoidance,"
@@ -301,7 +301,7 @@ def create_preferences() -> PreferenceWeights:
     # GOVERNANCE & CONTROLS
     # ---------------------------
     governance_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="board_independence_compliance",
             llm_prompt=(
                 """Evaluate board independence and governance structure compliance. Award partial credit for:
@@ -314,7 +314,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="sox_control_implementation",
             llm_prompt=(
                 """Assess SOX compliance implementation quality:
@@ -325,7 +325,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="committee_structure_effectiveness",
             llm_prompt=(
                 """Evaluate board committee structure and effectiveness:
@@ -336,19 +336,19 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="governance_artifact_completeness",
             evaluator_function=governance_artifact_density,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="internal_control_maturity",
             evaluator_function=sox_control_maturity,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="board_governance_discipline",
             evaluator_function=board_governance_compliance,
             max_score=1.0,
@@ -360,7 +360,7 @@ def create_preferences() -> PreferenceWeights:
     # FINANCIAL READINESS
     # ---------------------------
     financial_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="audit_opinion_quality",
             llm_prompt=(
                 """Evaluate audit opinion quality and financial statement readiness:
@@ -371,7 +371,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="financial_controls_testing",
             llm_prompt=(
                 """Assess financial controls testing and documentation:
@@ -382,7 +382,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="comfort_letter_readiness",
             llm_prompt=(
                 """Evaluate comfort letter readiness for underwriters:
@@ -393,7 +393,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="non_gaap_reconciliation_quality",
             llm_prompt=(
                 "Assess non-GAAP measure reconciliation quality: calculation accuracy,"
@@ -409,7 +409,7 @@ def create_preferences() -> PreferenceWeights:
     # LEGAL & REGULATORY
     # ---------------------------
     legal_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="legal_opinion_completeness",
             llm_prompt=(
                 """Evaluate legal opinion completeness and regulatory compliance:
@@ -420,7 +420,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="securities_law_compliance",
             llm_prompt=(
                 """Assess securities law compliance across all activities:
@@ -431,7 +431,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="exchange_listing_readiness",
             llm_prompt=(
                 """Evaluate exchange listing standard compliance and readiness:
@@ -448,25 +448,25 @@ def create_preferences() -> PreferenceWeights:
     # SPEED
     # ---------------------------
     speed_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="speed_efficiency",
             evaluator_function=speed_rubric,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_deadline_compliance",
             evaluator_function=regulatory_deadline_adherence,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="compliance_progress_efficiency",
             evaluator_function=compliance_progress_tracking,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="ipo_timeline_adherence",
             llm_prompt=(
                 "Assess IPO timeline adherence and milestone achievement:"
@@ -476,7 +476,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="sec_response_efficiency",
             llm_prompt=(
                 "Evaluate SEC comment letter response efficiency and quality:"
@@ -486,7 +486,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="ipo_crisis_scenarios",
             llm_prompt=(
                 """Evaluate handling of IPO crisis and market pressure scenarios:
@@ -500,7 +500,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_realism_validation",
             evaluator_function=_validate_cost_realism,
             max_score=1.0,
@@ -512,19 +512,19 @@ def create_preferences() -> PreferenceWeights:
     # COST
     # ---------------------------
     cost_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_efficiency",
             evaluator_function=cost_rubric,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="audit_cost_management",
             evaluator_function=audit_cost_efficiency,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="legal_cost_justification",
             llm_prompt=(
                 "Assess legal and professional service cost justification:"
@@ -534,7 +534,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="underwriter_cost_optimization",
             llm_prompt=(
                 "Evaluate underwriter and advisory cost optimization:"
@@ -546,66 +546,66 @@ def create_preferences() -> PreferenceWeights:
         ),
     ]
 
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="sec_compliance",
                 weight=0.3,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="sec_compliance_eval",
                     description="SEC compliance evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=sec_compliance_rubrics,
+                    criteria=sec_compliance_rubrics,
                 ),
             ),
             Preference(
                 name="governance",
                 weight=0.25,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="governance_eval",
                     description="governance evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=governance_rubrics,
+                    criteria=governance_rubrics,
                 ),
             ),
             Preference(
                 name="financial_readiness",
                 weight=0.2,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="financial_readiness_eval",
                     description="financial readiness evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=financial_rubrics,
+                    criteria=financial_rubrics,
                 ),
             ),
             Preference(
                 name="legal_regulatory",
                 weight=0.15,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="legal_regulatory_eval",
                     description="legal and regulatory evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=legal_rubrics,
+                    criteria=legal_rubrics,
                 ),
             ),
             Preference(
                 name="speed",
                 weight=0.05,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="speed_eval",
                     description="speed evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=speed_rubrics,
+                    criteria=speed_rubrics,
                 ),
             ),
             Preference(
                 name="cost",
                 weight=0.05,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="cost_eval",
                     description="cost evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=cost_rubrics,
+                    criteria=cost_rubrics,
                 ),
             ),
         ]
@@ -620,7 +620,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     - Late: Speed and final compliance (execution pressure)
     """
     timeline = {
-        5: PreferenceWeights(
+        5: PreferenceSnapshot(
             preferences=[
                 Preference(name="sec_compliance", weight=0.2),
                 Preference(name="governance", weight=0.3),
@@ -630,7 +630,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.05),
             ]
         ),
-        15: PreferenceWeights(
+        15: PreferenceSnapshot(
             preferences=[
                 Preference(name="sec_compliance", weight=0.35),
                 Preference(name="governance", weight=0.2),
@@ -640,7 +640,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.05),
             ]
         ),
-        25: PreferenceWeights(
+        25: PreferenceSnapshot(
             preferences=[
                 Preference(name="sec_compliance", weight=0.4),
                 Preference(name="governance", weight=0.15),
@@ -670,11 +670,11 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     return requests
 
 
-def create_evaluator_to_measure_goal_achievement() -> Evaluator:
+def create_evaluator_to_measure_goal_achievement() -> Rubric:
     """Create goal achievement evaluator for IPO readiness program with SEC compliance focus."""
     goal_achievement_rubrics = [
         # Critical SEC compliance deliverables (absolutely must have for public listing)
-        WorkflowRubric(
+        RubricCriteria(
             name="s1_registration_statement_accepted",
             llm_prompt=(
                 "Does accepted S-1 registration statement exist with: complete narrative sections (Business, Risk Factors, MD&A), "
@@ -684,7 +684,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=20.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="pcaob_audited_financials_completed",
             llm_prompt=(
                 "Do completed PCAOB-audited financial statements exist with: audit sign-offs secured, "
@@ -694,7 +694,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=18.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="independent_board_committees_certified",
             llm_prompt=(
                 "Do certified independent board committees exist with: independent directors appointed, "
@@ -704,7 +704,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="sox_controls_documentation_ready",
             llm_prompt=(
                 "Does ready SOX controls documentation exist with: disclosure controls & procedures (SOX 302) documented, "
@@ -715,7 +715,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Major compliance and operational deliverables (8-10 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="edgar_submission_workflows_tested",
             llm_prompt=(
                 "Do tested EDGAR submission workflows exist with: EDGAR test submissions validated, "
@@ -725,7 +725,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="legal_tax_opinions_filed",
             llm_prompt=(
                 "Do filed legal and tax opinions exist with: Staff Legal Bulletin No. 19 compliance confirmed, "
@@ -735,7 +735,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="listing_requirements_checklist_complete",
             llm_prompt=(
                 "Does complete listing requirements checklist exist with: market value tests met, "
@@ -745,7 +745,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="risk_disclosure_register_comprehensive",
             llm_prompt=(
                 "Does comprehensive risk disclosure register exist with: operational/financial/legal/cyber risks inventoried, "
@@ -755,7 +755,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="quiet_period_communications_plan",
             llm_prompt=(
                 "Does quiet period communications plan exist with: counsel-approved strategy documented, "
@@ -766,7 +766,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Important supporting deliverables (5-7 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="corporate_governance_package_complete",
             llm_prompt=(
                 "Does complete corporate governance package exist with: governance policies documented, "
@@ -776,7 +776,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="internal_controls_framework_validated",
             llm_prompt=(
                 "Does validated internal controls framework exist with: control procedures documented, "
@@ -786,7 +786,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="investor_relations_playbook_ready",
             llm_prompt=(
                 "Does ready investor relations playbook exist with: IR strategy documented, "
@@ -796,7 +796,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="executive_compensation_disclosure",
             llm_prompt=(
                 "Does executive compensation disclosure exist with: compensation analysis completed, "
@@ -806,7 +806,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="comfort_letter_request_lists",
             llm_prompt=(
                 "Do comfort letter request lists exist with: underwriter requirements documented, "
@@ -817,7 +817,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Supporting deliverables (3-4 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="non_gaap_disclosure_controls",
             llm_prompt=(
                 "Do non-GAAP disclosure controls exist with: non-GAAP measures defined, "
@@ -827,7 +827,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="legal_proceedings_documentation",
             llm_prompt=(
                 "Does legal proceedings documentation exist with: material litigation identified, "
@@ -837,7 +837,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="board_meeting_minutes_documented",
             llm_prompt=(
                 "Do documented board meeting minutes exist with: IPO authorization resolutions passed, "
@@ -847,7 +847,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=3.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_correspondence_archive",
             llm_prompt=(
                 "Does regulatory correspondence archive exist with: SEC communications logged, "
@@ -859,9 +859,9 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
         ),
     ]
 
-    return Evaluator(
+    return Rubric(
         name="ipo_readiness_goal_achievement_eval",
         description="IPO readiness program SEC compliance and public listing deliverable achievement measurement",
         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-        rubrics=goal_achievement_rubrics,
+        criteria=goal_achievement_rubrics,
     )

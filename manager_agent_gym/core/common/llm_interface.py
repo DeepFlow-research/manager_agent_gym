@@ -5,7 +5,9 @@ Centralized LLM interface using Instructor for structured outputs.
 from typing import TypeVar, Type, Any
 import os
 from pydantic import BaseModel
-from .logging import logger
+import traceback
+
+from manager_agent_gym.core.common.logging import logger
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -74,6 +76,7 @@ def _get_openai_client():
 
     try:
         import instructor  # type: ignore
+
         instructor.patch(client)  # type: ignore[attr-defined]
     except Exception:
         pass
@@ -182,5 +185,7 @@ async def generate_structured_response(
                 "error_type": type(e).__name__,
             },
         )
-        logger.error(f"LLM request failed for {response_type.__name__}: {error}")
+        logger.error(
+            f"LLM request failed for {response_type.__name__}: {error} traceback: {traceback.format_exc()} error: {e}"
+        )
         raise error

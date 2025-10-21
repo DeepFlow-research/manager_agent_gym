@@ -3,12 +3,12 @@ from __future__ import annotations
 from typing import Callable
 from pydantic import BaseModel, ConfigDict
 
-from manager_agent_gym.schemas.core.workflow import Workflow
+from manager_agent_gym.schemas.domain.workflow import Workflow
 from manager_agent_gym.schemas.preferences import (
-    PreferenceWeights,
+    PreferenceSnapshot,
     PreferenceWeightUpdateRequest,
 )
-from manager_agent_gym.schemas.preferences.evaluator import Evaluator
+from manager_agent_gym.schemas.preferences.evaluator import Rubric
 
 # Import scenario modules and adapt to a common interface
 from examples.end_to_end_examples.icap import (
@@ -157,12 +157,12 @@ class ScenarioSpec(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     create_workflow: Callable[[], Workflow]
-    create_preferences: Callable[[], PreferenceWeights]
+    create_preferences: Callable[[], PreferenceSnapshot]
     create_team_timeline: Callable[[], dict[int, list]]
     create_preference_update_requests: (
         Callable[[], list[PreferenceWeightUpdateRequest]] | None
     ) = None
-    create_evaluator_to_measure_goal_achievement: Callable[[], Evaluator] | None = None
+    create_evaluator_to_measure_goal_achievement: Callable[[], Rubric] | None = None
 
 
 SCENARIOS: dict[str, ScenarioSpec] = {

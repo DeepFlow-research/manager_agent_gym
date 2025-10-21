@@ -12,7 +12,7 @@ Demonstrates:
 - Escalation management for regulatory findings and compliance gaps
 """
 
-from manager_agent_gym.schemas.workflow_agents import (
+from manager_agent_gym.schemas.agents import (
     AIAgentConfig,
     HumanAgentConfig,
 )

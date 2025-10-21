@@ -6,14 +6,14 @@ from pydantic import BaseModel, Field
 
 
 class RubricResult(BaseModel):
-    """Result of a single rubric evaluation."""
+    """Result of a single criteria evaluation."""
 
-    name: str = Field(..., description="Name of the rubric")
+    name: str = Field(..., description="Name of the criteria")
     score: float = Field(
-        ..., ge=0.0, description="Score achieved by the rubric (raw units)"
+        ..., ge=0.0, description="Score achieved by the criteria (raw units)"
     )
     max_score: float = Field(
-        ..., gt=0.0, description="Maximum possible score for the rubric"
+        ..., gt=0.0, description="Maximum possible score for the criteria"
     )
     normalized_score: float = Field(
         ..., ge=0.0, le=1.0, description="Score normalized to [0,1]"
@@ -22,13 +22,15 @@ class RubricResult(BaseModel):
     error: str | None = Field(None, description="Error message if evaluation failed")
     raw_output: Any | None = Field(
         None,
-        description="Optional raw output returned by the rubric evaluator for transparency",
+        description="Optional raw output returned by the criteria evaluator for transparency",
     )
 
 
 class RubricGroupResult(BaseModel):
-    evaluator_name: str = Field(..., description="Name of the evaluator")
-    rubric_scores: list[RubricResult] = Field(..., description="Scores for each rubric")
+    evaluator_name: str = Field(..., description="Name of the rubric")
+    rubric_scores: list[RubricResult] = Field(
+        ..., description="Scores for each criterion"
+    )
     aggregated_score: float | None = Field(
         default=None,
         ge=0.0,
@@ -51,10 +53,10 @@ class PreferenceScore(BaseModel):
         ..., ge=0.0, le=1.0, description="Normalized weight of this preference"
     )
     ruberic_group_results: RubricGroupResult = Field(
-        ..., description="Results of all the rubric runs"
+        ..., description="Results of all the criteria runs"
     )
     aggregation_strategy: str = Field(
-        ..., description="Strategy used to aggregate rubric scores"
+        ..., description="Strategy used to aggregate criteria scores"
     )
 
 
@@ -90,9 +92,9 @@ class EvaluationResult(BaseModel):
                 lines.append(
                     f"  • {name}: score={ps.score:.3f}, weight={ps.weight:.3f}"
                 )
-        # Workflow-level evaluators
+        # Workflow-level rubrics
         if self.evaluation_results:
-            lines.append("- Workflow Evaluators:")
+            lines.append("- Workflow Rubrics:")
             for group in self.evaluation_results:
                 agg = (
                     f" (agg={group.aggregated_score:.3f}"
@@ -107,7 +109,7 @@ class EvaluationResult(BaseModel):
                     )
                 if len(group.rubric_scores) > 5:
                     lines.append(
-                        f"     … and {len(group.rubric_scores) - 5} more rubrics"
+                        f"     … and {len(group.rubric_scores) - 5} more criteria"
                     )
         # Utility
         lines.append(f"- Total utility: {self.weighted_preference_total:.3f}")

@@ -10,7 +10,7 @@ Demonstrates:
 - Operational readiness assessment and capital structure planning
 """
 
-from manager_agent_gym.schemas.workflow_agents import AIAgentConfig, HumanAgentConfig
+from manager_agent_gym.schemas.agents import AIAgentConfig, HumanAgentConfig
 
 
 def create_banking_license_team_configs():

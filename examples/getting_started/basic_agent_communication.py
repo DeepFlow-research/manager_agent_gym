@@ -18,53 +18,53 @@ from manager_agent_gym import (
     ChainOfThoughtManagerAgent,
     AgentRegistry,
     CommunicationService,
-    PreferenceWeights,
+    PreferenceSnapshot,
     Preference,
 )
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
-from manager_agent_gym.schemas.workflow_agents import AIAgentConfig, HumanAgentConfig
-from manager_agent_gym.schemas.core.communication import MessageType
+from manager_agent_gym.schemas.agents import AIAgentConfig, HumanAgentConfig
+from manager_agent_gym.schemas.domain.communication import MessageType
 from examples.end_to_end_examples.icap.workflow import create_workflow
 
 
-def create_communication_focused_preferences() -> PreferenceWeights:
+def create_communication_focused_preferences() -> PreferenceSnapshot:
     """Create preferences that encourage agent communication and coordination."""
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="collaboration",
                 weight=0.4,
                 description="Prioritize tasks that involve agent collaboration",
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="collaboration_eval",
                     description="placeholder",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=[],
+                    criteria=[],
                 ),
             ),
             Preference(
                 name="quality",
                 weight=0.3,
                 description="Ensure high-quality outputs through coordination",
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="quality_eval",
                     description="placeholder",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=[],
+                    criteria=[],
                 ),
             ),
             Preference(
                 name="efficiency",
                 weight=0.3,
                 description="Complete tasks efficiently through good communication",
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="efficiency_eval",
                     description="placeholder",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=[],
+                    criteria=[],
                 ),
             ),
         ],

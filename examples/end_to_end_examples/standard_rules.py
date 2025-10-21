@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import math
 
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.evaluation.success_criteria import ValidationContext
-from manager_agent_gym.schemas.core.base import TaskStatus
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.core.evaluation.schemas.success_criteria import ValidationContext
+from manager_agent_gym.schemas.domain.base import TaskStatus
 
 
 # Additional preferences using function-based rubrics for speed and cost

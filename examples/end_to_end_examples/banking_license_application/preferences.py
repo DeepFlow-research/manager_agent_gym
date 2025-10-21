@@ -16,19 +16,19 @@ from examples.end_to_end_examples.standard_rules import (
 )
 from math import exp
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
 from manager_agent_gym.schemas.preferences.preference import (
     Preference,
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
-from manager_agent_gym.schemas.core import Workflow
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric, RunCondition
+from manager_agent_gym.schemas.domain import Workflow
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria, RunCondition
 from manager_agent_gym.schemas.preferences import PreferenceWeightUpdateRequest
 
 
-def create_banking_license_preferences() -> PreferenceWeights:
+def create_banking_license_preferences() -> PreferenceSnapshot:
     # ---------------------------
     # Deterministic helper rules
     # ---------------------------
@@ -261,7 +261,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
     # REGULATORY COMPLIANCE
     # ---------------------------
     regulatory_compliance_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="occ_application_completeness",
             llm_prompt=(
                 "Does the workflow show evidence of an OCC application package being prepared with details including: "
@@ -278,7 +278,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="multi_jurisdiction_coordination",
             llm_prompt=(
                 """
@@ -294,7 +294,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="aml_bsa_program_robustness",
             llm_prompt=(
                 """
@@ -310,7 +310,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="federal_reserve_regulation_k_compliance",
             llm_prompt=(
                 """
@@ -323,7 +323,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="due_diligence_thoroughness",
             llm_prompt=(
                 """
@@ -336,13 +336,13 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_documentation_signal",
             evaluator_function=regulatory_documentation_completeness,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="compliance_framework_coverage_signal",
             evaluator_function=compliance_framework_coverage,
             max_score=1.0,
@@ -354,7 +354,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
     # OPERATIONAL READINESS
     # ---------------------------
     operational_readiness_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="it_infrastructure_completeness",
             llm_prompt=(
                 """
@@ -367,7 +367,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="correspondent_banking_relationships",
             llm_prompt=(
                 """Assess correspondent banking relationship establishment:
@@ -380,7 +380,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="physical_office_and_facilities",
             llm_prompt=(
                 """Evaluate physical office setup and operational facilities:
@@ -393,7 +393,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="staffing_and_human_resources",
             llm_prompt=(
                 """Assess staffing plan execution: senior management recruitment,
@@ -406,7 +406,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="operational_procedures_quality",
             llm_prompt=(
                 """Evaluate operational procedures and workflows quality:
@@ -416,14 +416,14 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="operational_readiness_density_signal",
             evaluator_function=operational_readiness_density,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Evidence gate: require concrete operational artifacts before awarding strong credit
-        WorkflowRubric(
+        RubricCriteria(
             name="operational_artifacts_evidence",
             llm_prompt=(
                 "Check for concrete operational readiness deliverables and artifacts.\n"
@@ -440,7 +440,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
     # RISK MANAGEMENT
     # ---------------------------
     risk_management_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="comprehensive_risk_framework",
             llm_prompt=(
                 """Evaluate comprehensive risk management framework covering:
@@ -450,7 +450,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_reporting_systems",
             llm_prompt=(
                 """Assess regulatory reporting systems establishment:
@@ -460,7 +460,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="credit_underwriting_standards",
             llm_prompt=(
                 """Evaluate credit risk policies and underwriting standards:
@@ -470,7 +470,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="liquidity_and_funding_management",
             llm_prompt=(
                 """Assess liquidity management and funding strategy:
@@ -480,7 +480,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="operational_risk_controls",
             llm_prompt=(
                 """Evaluate operational risk management framework:
@@ -491,7 +491,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Evidence gate: require finalized risk framework artifacts
-        WorkflowRubric(
+        RubricCriteria(
             name="risk_framework_artifacts_evidence",
             llm_prompt=(
                 "Verify presence of finalized risk framework artifacts: approved Credit Risk Policy, Market & Liquidity controls,\n"
@@ -507,7 +507,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
     # CAPITAL STRUCTURE
     # ---------------------------
     capital_structure_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="minimum_capital_compliance",
             llm_prompt=(
                 """Evaluate $50M minimum capital requirement compliance:
@@ -517,7 +517,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="ced_arrangements_quality",
             llm_prompt=(
                 """Assess Capital Equivalent Deposit (CED) arrangements:
@@ -527,7 +527,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="funding_strategy_sustainability",
             llm_prompt=(
                 """Evaluate ongoing funding strategy sustainability:
@@ -537,7 +537,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="capital_adequacy_tracking_signal",
             evaluator_function=capital_adequacy_tracking,
             max_score=1.0,
@@ -549,7 +549,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
     # STAKEHOLDER COORDINATION
     # ---------------------------
     stakeholder_coordination_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="regulator_relationship_management",
             llm_prompt=(
                 """Evaluate regulator relationship management quality:
@@ -560,7 +560,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="project_governance_effectiveness",
             llm_prompt=(
                 """Assess project governance effectiveness: clear roles and responsibilities,
@@ -570,7 +570,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="legal_counsel_coordination",
             llm_prompt=(
                 """Evaluate legal counsel coordination and management:
@@ -580,7 +580,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="internal_stakeholder_alignment",
             llm_prompt=(
                 """Assess internal stakeholder alignment: executive team coordination,
@@ -590,14 +590,14 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="stakeholder_coordination_signal",
             evaluator_function=stakeholder_coordination_effectiveness,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Evidence gate: governance/liaison documentation and sign-offs
-        WorkflowRubric(
+        RubricCriteria(
             name="governance_and_liaison_artifacts_evidence",
             llm_prompt=(
                 "Require evidence of regulator liaison protocols, project governance artifacts (RACI, escalation),\n"
@@ -612,7 +612,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
     # MARKET ENTRY STRATEGY
     # ---------------------------
     market_entry_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="market_analysis_depth",
             llm_prompt=(
                 """Evaluate US market analysis depth and quality:
@@ -623,7 +623,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="business_plan_realism",
             llm_prompt=(
                 """Assess business plan realism and feasibility:
@@ -634,7 +634,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="product_strategy_alignment",
             llm_prompt=(
                 """Evaluate product strategy alignment with market needs:
@@ -645,7 +645,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="competitive_positioning",
             llm_prompt=(
                 """Assess competitive positioning strategy:
@@ -663,33 +663,33 @@ def create_banking_license_preferences() -> PreferenceWeights:
     # ---------------------------
     speed_rubrics = [
         # Deterministic
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_milestone_adherence",
             evaluator_function=regulatory_milestone_adherence,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="deadline_adherence",
             evaluator_function=lambda w: speed_deadline_adherence(w),
             max_score=5.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="throughput_progress",
             evaluator_function=lambda w: speed_throughput_progress(w),
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
         # Existing combined speed rule
-        WorkflowRubric(
+        RubricCriteria(
             name="speed_efficiency",
             evaluator_function=speed_rubric,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # LLM timeline management checks
-        WorkflowRubric(
+        RubricCriteria(
             name="critical_path_management",
             llm_prompt=(
                 """Evaluate critical path management for 18-24 month timeline:
@@ -699,7 +699,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_timeline_optimization",
             llm_prompt=(
                 """Assess regulatory timeline optimization:
@@ -709,7 +709,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="milestone_tracking_quality",
             llm_prompt=(
                 """Evaluate milestone tracking and reporting quality:
@@ -720,7 +720,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Evidence gate: baseline schedule and timestamps
-        WorkflowRubric(
+        RubricCriteria(
             name="schedule_and_timestamp_evidence",
             llm_prompt=(
                 "Award credit only if a baseline schedule (milestones/Gantt) and timestamped task histories exist to support speed claims.\n"
@@ -760,13 +760,13 @@ def create_banking_license_preferences() -> PreferenceWeights:
     # COST (Budget Management)
     # ---------------------------
     cost_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_efficiency",
             evaluator_function=cost_rubric,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="budget_adherence_5m_limit",
             llm_prompt=(
                 """Evaluate adherence to $5M total project budget:
@@ -776,7 +776,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_category_optimization",
             llm_prompt=(
                 """Assess cost optimization across categories:
@@ -786,7 +786,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="value_for_money_assessment",
             llm_prompt=(
                 """Evaluate value for money in vendor selection and resource allocation:
@@ -796,7 +796,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_transparency_reporting",
             llm_prompt=(
                 """Assess cost transparency and reporting quality:
@@ -807,7 +807,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Evidence gate: budget control and variance reporting artifacts
-        WorkflowRubric(
+        RubricCriteria(
             name="budget_control_artifacts_evidence",
             llm_prompt=(
                 "Verify presence of cost tracking plan, variance reports, procurement/contract artifacts, and approval logs.\n"
@@ -816,7 +816,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="banking_adversarial_scenarios",
             llm_prompt=(
                 """Evaluate handling of banking license adversarial scenarios:
@@ -830,7 +830,7 @@ def create_banking_license_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_realism_validation",
             evaluator_function=_validate_cost_realism,
             max_score=1.0,
@@ -838,86 +838,86 @@ def create_banking_license_preferences() -> PreferenceWeights:
         ),
     ]
 
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="regulatory_compliance",
                 weight=0.35,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="regulatory_compliance",
                     description="placeholder",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=regulatory_compliance_rubrics,
+                    criteria=regulatory_compliance_rubrics,
                 ),
             ),
             Preference(
                 name="operational_readiness",
                 weight=0.25,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="operational_readiness",
                     description="placeholder",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=operational_readiness_rubrics,
+                    criteria=operational_readiness_rubrics,
                 ),
             ),
             Preference(
                 name="risk_management",
                 weight=0.15,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="risk_management",
                     description="placeholder",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=risk_management_rubrics,
+                    criteria=risk_management_rubrics,
                 ),
             ),
             Preference(
                 name="capital_structure",
                 weight=0.10,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="capital_structure",
                     description="placeholder",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=capital_structure_rubrics,
+                    criteria=capital_structure_rubrics,
                 ),
             ),
             Preference(
                 name="stakeholder_coordination",
                 weight=0.08,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="stakeholder_coordination",
                     description="placeholder",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=stakeholder_coordination_rubrics,
+                    criteria=stakeholder_coordination_rubrics,
                 ),
             ),
             Preference(
                 name="market_entry_strategy",
                 weight=0.04,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="market_entry_strategy",
                     description="placeholder",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=market_entry_rubrics,
+                    criteria=market_entry_rubrics,
                 ),
             ),
             Preference(
                 name="speed",
                 weight=0.02,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="speed",
                     description="placeholder",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=speed_rubrics,
+                    criteria=speed_rubrics,
                 ),
             ),
             Preference(
                 name="cost",
                 weight=0.01,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="cost",
                     description="placeholder",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=cost_rubrics,
+                    criteria=cost_rubrics,
                 ),
             ),
         ]
@@ -926,8 +926,8 @@ def create_banking_license_preferences() -> PreferenceWeights:
 
 def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     """Return weight update requests for compliance → operational readiness dynamics."""
-    timeline: dict[int, PreferenceWeights] = {
-        0: PreferenceWeights(
+    timeline: dict[int, PreferenceSnapshot] = {
+        0: PreferenceSnapshot(
             preferences=[
                 Preference(name="regulatory_compliance", weight=0.4),
                 Preference(name="operational_readiness", weight=0.2),
@@ -939,7 +939,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.01),
             ]
         ),
-        15: PreferenceWeights(
+        15: PreferenceSnapshot(
             preferences=[
                 Preference(name="regulatory_compliance", weight=0.35),
                 Preference(name="operational_readiness", weight=0.25),
@@ -951,7 +951,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.01),
             ]
         ),
-        30: PreferenceWeights(
+        30: PreferenceSnapshot(
             preferences=[
                 Preference(name="regulatory_compliance", weight=0.3),
                 Preference(name="operational_readiness", weight=0.3),
@@ -963,7 +963,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.01),
             ]
         ),
-        45: PreferenceWeights(
+        45: PreferenceSnapshot(
             preferences=[
                 Preference(name="regulatory_compliance", weight=0.25),
                 Preference(name="operational_readiness", weight=0.35),
@@ -995,11 +995,11 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     return requests
 
 
-def create_evaluator_to_measure_goal_achievement() -> Evaluator:
+def create_evaluator_to_measure_goal_achievement() -> Rubric:
     """Create goal achievement evaluator for US banking license application process."""
     goal_achievement_rubrics = [
         # Critical regulatory approvals (absolutely must have for legal banking operations)
-        WorkflowRubric(
+        RubricCriteria(
             name="occ_license_approval_granted",
             llm_prompt=(
                 "Does OCC (Office of the Comptroller of the Currency) license approval exist with: "
@@ -1010,7 +1010,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=20.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="federal_reserve_non_objection",
             llm_prompt=(
                 "Does Federal Reserve non-objection exist with: formal non-objection letter, "
@@ -1020,7 +1020,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="home_country_regulator_approval",
             llm_prompt=(
                 "Does home country regulator (ECB/national authority) approval exist with: "
@@ -1032,7 +1032,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Major compliance and operational deliverables (10-12 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="aml_bsa_program_implemented",
             llm_prompt=(
                 "Does implemented AML/BSA compliance program exist with: written compliance policies, "
@@ -1043,7 +1043,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=12.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="capital_structure_established",
             llm_prompt=(
                 "Does established capital structure exist with: $50M minimum capital deposited, "
@@ -1054,7 +1054,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=12.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="risk_management_framework_operational",
             llm_prompt=(
                 "Does operational risk management framework exist with: credit risk policies, "
@@ -1065,7 +1065,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="operational_infrastructure_deployed",
             llm_prompt=(
                 "Does deployed operational infrastructure exist with: IT systems operational, "
@@ -1076,7 +1076,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="senior_management_appointed",
             llm_prompt=(
                 "Does appointed senior management team exist with: all key positions filled, "
@@ -1087,7 +1087,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Important supporting deliverables (6-8 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="business_plan_approved",
             llm_prompt=(
                 "Does approved business plan exist with: comprehensive market analysis, "
@@ -1098,7 +1098,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="corporate_governance_established",
             llm_prompt=(
                 "Does established corporate governance exist with: board structure implemented, "
@@ -1108,7 +1108,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_reporting_systems",
             llm_prompt=(
                 "Do regulatory reporting systems exist with: automated reporting capabilities, "
@@ -1118,7 +1118,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="due_diligence_completed",
             llm_prompt=(
                 "Does completed due diligence exist with: beneficial ownership verification, "
@@ -1128,7 +1128,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="legal_structure_finalized",
             llm_prompt=(
                 "Does finalized legal structure exist with: US entity incorporation complete, "
@@ -1139,7 +1139,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Supporting deliverables (3-5 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="market_entry_strategy_documented",
             llm_prompt=(
                 "Does documented market entry strategy exist with: competitive analysis completed, "
@@ -1149,7 +1149,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_conditions_satisfied",
             llm_prompt=(
                 "Is there evidence that any regulatory conditions relevent to banking operations have been broken? "
@@ -1158,7 +1158,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="fdic_insurance_secured",
             llm_prompt=(
                 "Does FDIC insurance exist with: application submitted, coverage approved, "
@@ -1170,9 +1170,9 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
         ),
     ]
 
-    return Evaluator(
+    return Rubric(
         name="banking_license_goal_achievement_eval",
         description="US banking license application deliverable achievement measurement",
         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-        rubrics=goal_achievement_rubrics,
+        criteria=goal_achievement_rubrics,
     )

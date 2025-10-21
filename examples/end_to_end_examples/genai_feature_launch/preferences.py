@@ -21,18 +21,18 @@ from math import exp
 from datetime import datetime
 from manager_agent_gym.schemas.preferences.preference import (
     Preference,
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
-from manager_agent_gym.schemas.core import Workflow
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric, RunCondition
+from manager_agent_gym.schemas.domain import Workflow
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria, RunCondition
 from manager_agent_gym.schemas.preferences import PreferenceWeightUpdateRequest
 
 
-def create_preferences() -> PreferenceWeights:
+def create_preferences() -> PreferenceSnapshot:
     # ---------------------------
     # Deterministic helper rules
     # ---------------------------
@@ -283,7 +283,7 @@ def create_preferences() -> PreferenceWeights:
     # QUALITY
     # ---------------------------
     quality_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="ai_safety_testing_soundness",
             llm_prompt=(
                 """Rigorously evaluate AI safety testing soundness with specific requirements:
@@ -297,7 +297,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="threat_model_completeness_justification",
             llm_prompt=(
                 """Assess if AI threat modeling assumptions are justified with evidence/benchmarks, with attack scenarios and risks explained.
@@ -306,7 +306,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="safety_control_architecture_depth",
             llm_prompt=(
                 """Evaluate safety control architecture depth: (1) input/output filtering design, (2) runtime monitoring systems,
@@ -315,13 +315,13 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="safety_reproducibility_procedural_integrity",
             evaluator_function=ai_safety_seed_rule,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="red_team_scenario_coverage",
             llm_prompt=(
                 """Evaluate red team scenario coverage with specific evidence requirements:
@@ -335,7 +335,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="ai_risk_type_coverage",
             llm_prompt=(
                 "Score 0–10 for AI risk type coverage: safety violations, bias/fairness, hallucination, privacy leakage, adversarial attacks;"
@@ -344,7 +344,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="monitoring_systems_linkage",
             llm_prompt=(
                 "Evaluate linkage of monitoring systems to safety results: alert thresholds, automated responses, escalation procedures."
@@ -353,7 +353,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="safety_testing_completeness",
             llm_prompt=(
                 "Assess safety testing completeness (including human adversarial testing). Partial credit across scenarios, automation, and remediation tracking."
@@ -362,13 +362,13 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="safety_artifact_density_quality",
             evaluator_function=safety_artifact_density,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="ai_crisis_scenario_handling",
             llm_prompt=(
                 """Evaluate AI crisis scenario handling and preparedness:
@@ -388,7 +388,7 @@ def create_preferences() -> PreferenceWeights:
     # COMPLIANCE (AI-focused)
     # ---------------------------
     compliance_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="ai_regulatory_mapping_completeness",
             llm_prompt=(
                 "Evaluate mapping of AI feature to privacy regulations (GDPR/CCPA/AI Act). Award partial credit for: coverage,"
@@ -397,7 +397,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="stakeholder_signoffs_present",
             llm_prompt=(
                 "Assess formal sign‑offs: named approvers (Product/Security/Privacy/Legal/Executive) with dates and scope; reference specific AI safety sections."
@@ -406,7 +406,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="dpia_data_lineage_audit_trail",
             llm_prompt=(
                 "Evaluate DPIA and data lineage auditability: data flow registries, consent mechanisms, DSR handling, reproducibility steps."
@@ -415,7 +415,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="ai_model_risk_controls",
             llm_prompt=(
                 "Assess AI model risk controls: bias monitoring, performance validation, safety threshold enforcement, model version control."
@@ -424,7 +424,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="pii_sensitive_info_handling",
             llm_prompt=(
                 "Evaluate PII and sensitive information handling: detection systems, data minimization, anonymization procedures, access controls."
@@ -433,7 +433,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="ai_transparency_disclosure_requirements",
             llm_prompt=(
                 "Assess AI transparency disclosure compliance: user notifications, capability limitations, model cards, content labeling implementation."
@@ -442,7 +442,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="external_compliance_validation",
             llm_prompt=(
                 """Evaluate external compliance validation and adversarial pressure handling:
@@ -462,7 +462,7 @@ def create_preferences() -> PreferenceWeights:
     # GOVERNANCE
     # ---------------------------
     governance_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="ai_governance_framework_maturity",
             llm_prompt=(
                 "Evaluate AI governance framework maturity: decision rights clarity, approval workflows, risk escalation procedures, accountability assignment."
@@ -471,7 +471,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="launch_gate_governance_effectiveness",
             llm_prompt=(
                 "Assess launch gate governance: safety thresholds, approval criteria, gate progression logic, rollback triggers."
@@ -480,7 +480,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cross_functional_coordination_quality",
             llm_prompt=(
                 "Evaluate cross-functional coordination: stakeholder engagement, dependency management, communication effectiveness, conflict resolution."
@@ -489,7 +489,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="incident_response_governance",
             llm_prompt=(
                 "Assess incident response governance: escalation procedures, decision authority, communication protocols, kill switch governance."
@@ -498,13 +498,13 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="ai_decision_log_presence",
             evaluator_function=governance_safety_decision_log_presence,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="audit_readiness_documentation",
             llm_prompt=(
                 "Evaluate audit readiness: evidence linkage, decision traceability, compliance documentation completeness, regulatory scrutiny preparation."
@@ -519,31 +519,31 @@ def create_preferences() -> PreferenceWeights:
     # SPEED
     # ---------------------------
     speed_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="safety_first_timeline_efficiency",
             evaluator_function=safety_deadline_adherence,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="red_team_velocity",
             evaluator_function=safety_time_to_first_output,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="safety_testing_coordination_efficiency",
             evaluator_function=safety_blocked_deadtime_ratio,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="launch_gate_progression_speed",
             evaluator_function=safety_throughput_progress,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="speed_efficiency",
             evaluator_function=speed_rubric,
             max_score=1.0,
@@ -555,92 +555,92 @@ def create_preferences() -> PreferenceWeights:
     # COST
     # ---------------------------
     cost_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="ai_safety_cost_overrun_control",
             evaluator_function=cost_overrun_efficiency,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="safety_investment_efficiency",
             evaluator_function=safety_cost_per_completed_task_stability,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_efficiency",
             evaluator_function=cost_rubric,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_realism_validation",
             evaluator_function=_validate_cost_realism,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
     ]
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="quality",
                 weight=0.4,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="ai_safety_quality_eval",
                     description="AI safety and testing quality evaluation",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=quality_rubrics,
+                    criteria=quality_rubrics,
                 ),
             ),
             Preference(
                 name="compliance",
                 weight=0.25,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="ai_compliance_eval",
                     description="AI regulatory compliance and privacy evaluation",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=compliance_rubrics,
+                    criteria=compliance_rubrics,
                 ),
             ),
             Preference(
                 name="governance",
                 weight=0.15,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="ai_governance_eval",
                     description="AI governance and stakeholder coordination evaluation",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=governance_rubrics,
+                    criteria=governance_rubrics,
                 ),
             ),
             Preference(
                 name="speed",
                 weight=0.1,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="ai_safety_speed_eval",
                     description="AI safety-first timeline and efficiency evaluation",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=speed_rubrics,
+                    criteria=speed_rubrics,
                 ),
             ),
             Preference(
                 name="cost",
                 weight=0.1,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="ai_safety_cost_eval",
                     description="AI safety investment and cost efficiency evaluation",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=cost_rubrics,
+                    criteria=cost_rubrics,
                 ),
             ),
         ]
     )
 
 
-def create_evaluator_to_measure_goal_achievement() -> Evaluator:
+def create_evaluator_to_measure_goal_achievement() -> Rubric:
     """Create a separate goal achievement evaluator for GenAI Feature Launch."""
     goal_achievement_rubrics = [
         # Critical deliverables (10 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="security_assessment_completed",
             llm_prompt=(
                 "Does a complete security assessment exist with: threat analysis, vulnerability assessment, "
@@ -650,7 +650,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="legal_compliance_verified",
             llm_prompt=(
                 "Does verified legal compliance documentation exist with: regulatory review, "
@@ -660,7 +660,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="production_deployment_ready",
             llm_prompt=(
                 "Does production deployment readiness exist with: deployment procedures, "
@@ -671,7 +671,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Major deliverables (7 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="product_specification_exists",
             llm_prompt=(
                 "Does a product specification document exist with: feature requirements, "
@@ -681,7 +681,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="technical_architecture_documented",
             llm_prompt=(
                 "Does technical architecture documentation exist with: system design, "
@@ -692,7 +692,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Important deliverables (5 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="performance_benchmarks_established",
             llm_prompt=(
                 "Do performance benchmarks exist with: baseline metrics, target thresholds, "
@@ -702,7 +702,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="user_acceptance_criteria_defined",
             llm_prompt=(
                 "Do user acceptance criteria exist with: success metrics, user scenarios, "
@@ -712,7 +712,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="launch_timeline_with_milestones",
             llm_prompt=(
                 "Does a launch timeline exist with: key milestones, dependencies, "
@@ -722,7 +722,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="success_metrics_established",
             llm_prompt=(
                 "Do success metrics exist with: KPI definitions, measurement methods, "
@@ -733,7 +733,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Supporting deliverables (3 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="development_environment_setup",
             llm_prompt=(
                 "Does development environment setup exist with: development tools, "
@@ -743,7 +743,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=3.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="user_documentation_complete",
             llm_prompt=(
                 "Does user documentation exist with: user guides, API documentation, "
@@ -755,11 +755,11 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
         ),
     ]
 
-    return Evaluator(
+    return Rubric(
         name="genai_goal_achievement_eval",
         description="Concrete deliverable and milestone achievement measurement",
         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-        rubrics=goal_achievement_rubrics,
+        criteria=goal_achievement_rubrics,
     )
 
 
@@ -769,27 +769,27 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     Converts the timeline of absolute weights into requests consumable by
     StakeholderAgent.apply_weight_updates.
     """
-    timeline: dict[int, PreferenceWeights] = {
-        0: PreferenceWeights(
+    timeline: dict[int, PreferenceSnapshot] = {
+        0: PreferenceSnapshot(
             preferences=[
                 Preference(
                     name="quality",
                     weight=0.5,
-                    evaluator=Evaluator(
+                    evaluator=Rubric(
                         name="ai_safety_quality_eval",
                         description="placeholder",
                         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                        rubrics=[],
+                        criteria=[],
                     ),
                 ),
                 Preference(
                     name="compliance",
                     weight=0.3,
-                    evaluator=Evaluator(
+                    evaluator=Rubric(
                         name="ai_compliance_eval",
                         description="placeholder",
                         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                        rubrics=[],
+                        criteria=[],
                     ),
                 ),
                 Preference(name="governance", weight=0.1),
@@ -797,7 +797,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.05),
             ]
         ),
-        8: PreferenceWeights(
+        8: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.4),
                 Preference(name="compliance", weight=0.3),
@@ -806,7 +806,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.05),
             ]
         ),
-        15: PreferenceWeights(
+        15: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.35),
                 Preference(name="compliance", weight=0.25),
@@ -815,7 +815,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.1),
             ]
         ),
-        25: PreferenceWeights(
+        25: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.3),
                 Preference(name="compliance", weight=0.2),

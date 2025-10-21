@@ -18,23 +18,27 @@ from . import schemas
 from . import core
 
 # Import key classes and functions for easy access
-from .core.manager_agent import ChainOfThoughtManagerAgent, ManagerAgent
-from .core.workflow_agents import AgentRegistry
-from .core.execution.engine import WorkflowExecutionEngine
+from .core.agents.manager_agent.implementations.chain_of_thought import (
+    ChainOfThoughtManagerAgent,
+)
+from .core.agents.manager_agent.common.interface import ManagerAgent
+
+from .core.agents.workflow_agents import AgentRegistry
+from .core.workflow.engine import WorkflowExecutionEngine
 from .core.communication import CommunicationService
 
 # Import key schemas for workflow creation
-from .schemas.core import (
+from .schemas.domain import (
     Workflow,
     Task,
     Resource,
     TaskStatus,
     Message,
 )
-from .schemas.preferences.preference import Preference, PreferenceWeights
+from .schemas.preferences.preference import Preference, PreferenceSnapshot
 
 # Import execution schemas
-from .schemas.execution import (
+from .core.execution.schemas import (
     ExecutionState,
 )
 
@@ -56,7 +60,7 @@ __all__ = [
     "Resource",
     "TaskStatus",
     "Preference",
-    "PreferenceWeights",
+    "PreferenceSnapshot",
     "Message",
     # Execution schemas
     "ExecutionState",

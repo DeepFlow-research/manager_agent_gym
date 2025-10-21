@@ -3,8 +3,8 @@ Legal M&A – Preferences, Evaluators, and Weight Update Requests
 
 - Uses the same schema patterns as existing examples:
   * PreferenceWeights / Preference
-  * Evaluator(aggregation=AggregationStrategy.WEIGHTED_AVERAGE, rubrics=[WorkflowRubric...])
-  * WorkflowRubric with either llm_prompt or evaluator_function (rule-based)
+  * Rubric(aggregation=AggregationStrategy.WEIGHTED_AVERAGE, criteria=[RubricCriteria...])
+  * RubricCriteria with either llm_prompt or evaluator_function (rule-based)
   * PreferenceWeightUpdateRequest timeline with absolute weights
 
 Exports:
@@ -15,16 +15,16 @@ Exports:
 from typing import List
 from manager_agent_gym.schemas.preferences.preference import (
     Preference,
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric, RunCondition
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria, RunCondition
 from manager_agent_gym.schemas.preferences import PreferenceWeightUpdateRequest
-from manager_agent_gym.schemas.core import Workflow
-from manager_agent_gym.schemas.core.base import TaskStatus
+from manager_agent_gym.schemas.domain import Workflow
+from manager_agent_gym.schemas.domain.base import TaskStatus
 
 
 # ---------------------------
@@ -154,8 +154,8 @@ def rule_approvals_and_consents(workflow: Workflow) -> float:
 # ---------------------------
 # LLM Rubrics
 # ---------------------------
-quality_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+quality_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="spa_drafting_completeness_and_consistency",
         llm_prompt=(
             "Assess the Share Purchase Agreement (SPA) draft and redline history for: "
@@ -167,7 +167,7 @@ quality_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="disclosure_schedules_precision_and_provenance",
         llm_prompt=(
             "Evaluate the precision of disclosure schedules and consent lists: "
@@ -178,7 +178,7 @@ quality_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="funds_flow_and_closing_set_readiness",
         llm_prompt=(
             "Assess funds-flow statements and closing set readiness: sources/uses tie out, wire instructions validated, "
@@ -188,19 +188,19 @@ quality_rubrics: List[WorkflowRubric] = [
         run_condition=RunCondition.ON_COMPLETION,
     ),
     # Rule-based seeds for reproducibility and objective checks
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_spa_core_sections_present",
         evaluator_function=rule_spa_core_sections_present,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_disclosure_schedules_evidence_linked",
         evaluator_function=rule_disclosure_schedules_evidence_linked,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_funds_flow_and_checklist_ready",
         evaluator_function=rule_funds_flow_and_checklist_ready,
         max_score=1.0,
@@ -208,8 +208,8 @@ quality_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-compliance_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+compliance_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="hsr_submission_quality",
         llm_prompt=(
             "Evaluate HSR submission quality and readiness: inclusion of Item 4(c)/(d) documents, "
@@ -220,7 +220,7 @@ compliance_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="cfius_screening_and_strategy",
         llm_prompt=(
             "Evaluate CFIUS screening and strategy: identification of foreign ownership/control, "
@@ -230,7 +230,7 @@ compliance_rubrics: List[WorkflowRubric] = [
         max_score=8.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="consents_and_change_of_control_management",
         llm_prompt=(
             "Assess management of third‑party consents and change‑of‑control/anti‑assignment provisions: "
@@ -241,19 +241,19 @@ compliance_rubrics: List[WorkflowRubric] = [
         run_condition=RunCondition.ON_COMPLETION,
     ),
     # Rule-based checks
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_hsr_submitted",
         evaluator_function=rule_hsr_submitted,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_approvals_and_consents",
         evaluator_function=rule_approvals_and_consents,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="ma_adversarial_scenarios",
         llm_prompt=(
             """Evaluate handling of M&A adversarial scenarios and deal challenges:
@@ -267,7 +267,7 @@ compliance_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="cost_realism_validation",
         evaluator_function=_validate_cost_realism,
         max_score=1.0,
@@ -279,28 +279,28 @@ compliance_rubrics: List[WorkflowRubric] = [
 # ---------------------------
 # Preferences + Evaluators
 # ---------------------------
-def create_preferences() -> PreferenceWeights:
+def create_preferences() -> PreferenceSnapshot:
     """Initial stakeholder weights for Legal M&A (t=0 snapshot)."""
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="quality",
                 weight=0.3,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="quality_eval",
                     description="Evaluates drafting completeness, schedules precision, and closing readiness.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=quality_rubrics,
+                    criteria=quality_rubrics,
                 ),
             ),
             Preference(
                 name="compliance",
                 weight=0.2,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="compliance_eval",
                     description="Evaluates HSR/CFIUS posture and third‑party consents management.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=compliance_rubrics,
+                    criteria=compliance_rubrics,
                 ),
             ),
         ]
@@ -312,22 +312,22 @@ def create_preferences() -> PreferenceWeights:
 # ---------------------------
 def create_mna_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     """Stakeholder's explicit weight changes over time (absolute, normalized)."""
-    timeline: dict[int, PreferenceWeights] = {
-        0: PreferenceWeights(
+    timeline: dict[int, PreferenceSnapshot] = {
+        0: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.3),
                 Preference(name="compliance", weight=0.2),
                 Preference(name="speed", weight=0.5),
             ]
         ),
-        35: PreferenceWeights(
+        35: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.6),
                 Preference(name="compliance", weight=0.2),
                 Preference(name="speed", weight=0.2),
             ]
         ),
-        70: PreferenceWeights(
+        70: PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.3),
                 Preference(name="compliance", weight=0.6),
@@ -355,11 +355,11 @@ def create_mna_preference_update_requests() -> list[PreferenceWeightUpdateReques
     return requests
 
 
-def create_evaluator_to_measure_goal_achievement() -> Evaluator:
+def create_evaluator_to_measure_goal_achievement() -> Rubric:
     """Create goal achievement evaluator for mid-market tech acquisition legal M&A process."""
     goal_achievement_rubrics = [
         # Critical transaction deliverables (absolutely must have for signing/closing)
-        WorkflowRubric(
+        RubricCriteria(
             name="spa_execution_ready_draft",
             llm_prompt=(
                 "Does execution-ready SPA draft exist with: complete core sections (purchase price, representations, covenants), "
@@ -369,7 +369,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=18.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="disclosure_schedules_evidence_linked",
             llm_prompt=(
                 "Do evidence-linked disclosure schedules exist with: precise and current disclosure information, "
@@ -379,7 +379,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="hsr_cfius_filings_submitted",
             llm_prompt=(
                 "Do submitted HSR/CFIUS filings exist with: HSR submission prepared and filed, "
@@ -389,7 +389,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="funds_flow_closing_set_ready",
             llm_prompt=(
                 "Does ready funds flow and closing set exist with: sources/uses documented, "
@@ -400,7 +400,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Major transaction coordination deliverables (8-10 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="third_party_consents_managed",
             llm_prompt=(
                 "Do managed third-party consents exist with: consent requirements identified, "
@@ -410,7 +410,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="due_diligence_artifacts_organized",
             llm_prompt=(
                 "Do organized due diligence artifacts exist with: data room structure maintained, "
@@ -420,7 +420,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="governance_approvals_secured",
             llm_prompt=(
                 "Do secured governance approvals exist with: board/committee approvals obtained, "
@@ -430,7 +430,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="risk_register_raid_log_maintained",
             llm_prompt=(
                 "Do maintained risk register and RAID log exist with: transaction risks identified, "
@@ -440,7 +440,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="redline_negotiation_history",
             llm_prompt=(
                 "Does redline negotiation history exist with: negotiation progression documented, "
@@ -451,7 +451,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Important supporting deliverables (5-7 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="deal_memo_objectives_documented",
             llm_prompt=(
                 "Do documented deal memo and objectives exist with: enterprise value defined, "
@@ -461,7 +461,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="tax_structuring_analysis",
             llm_prompt=(
                 "Does tax structuring analysis exist with: tax-efficient structure designed, "
@@ -471,7 +471,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="reps_warranties_insurance",
             llm_prompt=(
                 "Does reps and warranties insurance exist with: RWI policy negotiated, "
@@ -481,7 +481,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="employment_matters_review",
             llm_prompt=(
                 "Does employment matters review exist with: key employee retention addressed, "
@@ -491,7 +491,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="ip_portfolio_analysis",
             llm_prompt=(
                 "Do the resources published in the workflow suggest no signs of application deficiencies or regulatory concerns raised? "
@@ -501,7 +501,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Supporting deliverables (3-4 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="antitrust_clearance_strategy",
             llm_prompt=(
                 "Does antitrust clearance strategy exist with: antitrust risk assessment completed, "
@@ -511,7 +511,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="escrow_holdback_arrangements",
             llm_prompt=(
                 "Do escrow and holdback arrangements exist with: escrow terms negotiated, "
@@ -521,7 +521,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="data_room_security_compliance",
             llm_prompt=(
                 "Does data room security compliance exist with: secure data room operational, "
@@ -531,7 +531,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=3.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="closing_conditions_checklist",
             llm_prompt=(
                 "Does closing conditions checklist exist with: all closing conditions identified, "
@@ -543,9 +543,9 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
         ),
     ]
 
-    return Evaluator(
+    return Rubric(
         name="legal_mna_goal_achievement_eval",
         description="Legal M&A mid-market tech acquisition transaction deliverable achievement measurement",
         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-        rubrics=goal_achievement_rubrics,
+        criteria=goal_achievement_rubrics,
     )

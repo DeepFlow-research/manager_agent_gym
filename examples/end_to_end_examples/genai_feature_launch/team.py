@@ -13,13 +13,13 @@ Demonstrates:
 - Timeline-critical delivery under 6-week constraint with safety-first scope management and controlled rollout strategies
 """
 
-from manager_agent_gym.schemas.workflow_agents import (
+from manager_agent_gym.schemas.agents import (
     AIAgentConfig,
     HumanAgentConfig,
     StakeholderConfig,
 )
 from manager_agent_gym.schemas.preferences.preference import (
-    PreferenceWeights,
+    PreferenceSnapshot,
     Preference,
 )
 
@@ -344,7 +344,7 @@ def create_team_configs():
         clarification_reply_rate=0.8,
         strictness=0.7,
         verbosity=2,
-        initial_preferences=PreferenceWeights(
+        preference_data=PreferenceSnapshot(
             preferences=[
                 Preference(name="quality", weight=0.4),
                 Preference(name="compliance", weight=0.3),

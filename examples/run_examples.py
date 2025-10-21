@@ -9,17 +9,14 @@ import os
 import logging
 from manager_agent_gym.core.common.logging import configure_library_logging
 from manager_agent_gym.core.common.callbacks import default_timestep_callbacks
-
+from manager_agent_gym.core.agents.stakeholder_agent.stakeholder_agent import (
+    StakeholderAgent,
+)
 import litellm  # type: ignore  # noqa: F401
 
 # Silence LiteLLM before it is imported elsewhere and set global flags
 os.environ.setdefault("LITELLM_LOG", "ERROR")
 os.environ.setdefault("LITELLM_LOGGING", "OFF")
-
-
-# Quiet underlying HTTP clients too
-# for name in ("litellm", "httpx", "httpcore", "urllib3"):
-#    logging.getLogger(name).setLevel(logging.CRITICAL)
 
 # Configure console logging for this application and route library logs
 logging.basicConfig(
@@ -32,19 +29,21 @@ configure_library_logging(logging.INFO)
 import asyncio
 from datetime import datetime
 import argparse
-from manager_agent_gym.core.execution.engine import WorkflowExecutionEngine
-from manager_agent_gym.core.manager_agent.factory import create_manager
-from manager_agent_gym.core.workflow_agents.registry import AgentRegistry
+from manager_agent_gym.core.workflow.engine import WorkflowExecutionEngine
+from manager_agent_gym.core.agents.manager_agent.common.factory import create_manager
+from manager_agent_gym.core.agents.workflow_agents.tools.registry import AgentRegistry
 from manager_agent_gym.core.communication.service import CommunicationService
-from manager_agent_gym.schemas.preferences.evaluator import Evaluator
-from manager_agent_gym.schemas.core.workflow import Workflow
+from manager_agent_gym.schemas.preferences.evaluator import Rubric
+from manager_agent_gym.schemas.domain.workflow import Workflow
 from manager_agent_gym.schemas.preferences.preference import (
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
 from manager_agent_gym.config import settings
 from examples.common_stakeholders import create_stakeholder_agent
-from manager_agent_gym.core.evaluation.common_evaluators import build_default_evaluators
-from manager_agent_gym.schemas.workflow_agents import AgentConfig
+from manager_agent_gym.core.evaluation.rules.common_evaluators import (
+    build_default_evaluators,
+)
+from manager_agent_gym.schemas.agents import AgentConfig
 from manager_agent_gym.schemas.preferences.rubric import RunCondition
 
 from examples.scenarios import SCENARIOS
@@ -56,7 +55,7 @@ def create_workflow(name: str) -> Workflow:
     return SCENARIOS[name].create_workflow()
 
 
-def create_preferences(name: str) -> PreferenceWeights:
+def create_preferences(name: str) -> PreferenceSnapshot:
     if name not in SCENARIOS:
         raise ValueError(f"Unknown preferences: {name}")
     return SCENARIOS[name].create_preferences()
@@ -68,13 +67,13 @@ def create_team_timeline(name: str) -> dict[int, list]:
     return SCENARIOS[name].create_team_timeline()
 
 
-def create_evaluator_to_measure_goal_achievement(name: str) -> Evaluator:
+def create_evaluator_to_measure_goal_achievement(name: str) -> Rubric:
     if name not in SCENARIOS:
         raise ValueError(f"Unknown evaluator: {name}")
     if not SCENARIOS[name].create_evaluator_to_measure_goal_achievement:
         raise ValueError(f"No evaluator to measure goal achievement for {name}")
 
-    return SCENARIOS[name].create_evaluator_to_measure_goal_achievement() #type: ignore
+    return SCENARIOS[name].create_evaluator_to_measure_goal_achievement()  # type: ignore
 
 
 async def run_demo(
@@ -88,6 +87,7 @@ async def run_demo(
     restore_from_snapshot: str | None = None,
     restore_timestep: int | None = None,
     rerun_suffix: str = "_rerun",
+    use_rubric_decomposition: bool = False,
 ):
     """Run a workflow end-to-end with shared config."""
 
@@ -108,25 +108,65 @@ async def run_demo(
 
     # 5. Agent scheduling via registry
     print("\n🤝 Creating team timeline...")
-    team_timeline = create_team_timeline(workflow_name)
-    # Register timeline directly on the registry
-    for t, changes in team_timeline.items():
-        for action, payload, reason in changes:
-            if action == "add":
-                agent_registry.schedule_agent_add(t, payload, reason)
-            elif action == "remove":
-                # Accept either a config object or a string agent_id for removals
-                agent_id = (
-                    payload.agent_id if isinstance(payload, AgentConfig) else payload
-                )
-                agent_registry.schedule_agent_remove(t, agent_id, reason)
 
-    print(f"   ✅ Registered team timeline with {len(team_timeline)} timesteps")
+    # If using rubric decomposition mode, create a single generic AI worker for all tasks
+    if use_rubric_decomposition:
+        from manager_agent_gym.schemas.agents import AIAgentConfig
+        from manager_agent_gym.core.agents.workflow_agents import AIAgent
+
+        print("   🎯 Rubric decomposition mode: Creating generic AI worker...")
+        generic_worker_config = AIAgentConfig(
+            agent_id="generic_ai_worker",
+            agent_type="ai",
+            system_prompt="You are a skilled AI worker executing tasks in a managed workflow. Follow task requirements carefully and deliver high-quality work.",
+            model_name=model_name,
+            agent_description="Generic AI worker for rubric decomposition workflow",
+            agent_capabilities=[
+                "general_task_execution",
+                "tool_usage",
+                "communication",
+            ],
+        )
+        generic_worker = AIAgent(config=generic_worker_config, tools=[])
+        agent_registry.register_agent(generic_worker)
+
+        # Assign all workflow tasks to this generic worker
+        for task in workflow.tasks.values():
+            if task.is_atomic_task():  # Only assign atomic tasks
+                task.assigned_agent_id = "generic_ai_worker"
+
+        print(
+            f"   ✅ Generic worker created and assigned to {sum(1 for t in workflow.tasks.values() if t.is_atomic_task())} atomic tasks"
+        )
+    else:
+        # Standard mode: use scenario-specific team timeline
+        team_timeline = create_team_timeline(workflow_name)
+        # Register timeline directly on the registry
+        for t, changes in team_timeline.items():
+            for action, payload, reason in changes:
+                if action == "add":
+                    agent_registry.schedule_agent_add(t, payload, reason)
+                elif action == "remove":
+                    # Accept either a config object or a string agent_id for removals
+                    agent_id = (
+                        payload.agent_id
+                        if isinstance(payload, AgentConfig)
+                        else payload
+                    )
+                    agent_registry.schedule_agent_remove(t, agent_id, reason)
+
+        print(f"   ✅ Registered team timeline with {len(team_timeline)} timesteps")
 
     # 6. Manager agent (selectable baseline or CoT)
     print("\n🧠 Initializing manager agent...")
+    # For rubric_decomp mode, use assign_all since tasks are pre-assigned
+    effective_manager_mode = (
+        "assign_all" if use_rubric_decomposition else manager_agent_mode
+    )
     manager = create_manager(
-        preferences=preferences, model_name=model_name, manager_mode=manager_agent_mode
+        preferences=preferences,
+        model_name=model_name,
+        manager_mode=effective_manager_mode,
     )
     print("   ✅ Manager ready")
 
@@ -158,24 +198,66 @@ async def run_demo(
     )
 
     # 9. Make a stakeholder agent
-    stakeholder = create_stakeholder_agent(persona="balanced", preferences=preferences)
+    # For rubric decomposition, use specialized clarification stakeholder with TRUE preferences
+    if use_rubric_decomposition:
+        from manager_agent_gym.core.agents.stakeholder_agent.rubric_stakeholder import (
+            ClarificationStakeholderAgent,
+        )
+        from manager_agent_gym.schemas.agents.stakeholder import (
+            StakeholderConfig,
+        )
+        from manager_agent_gym.schemas.preferences.evaluator import PreferenceExemplar
+
+        stakeholder = ClarificationStakeholderAgent(
+            config=StakeholderConfig(
+                agent_id="stakeholder",
+                model_name=model_name,
+                name="Stakeholder",
+                role="Project Stakeholder",
+                persona_description="Balanced stakeholder focused on preference elicitation",
+                preference_data=PreferenceExemplar(
+                    exemplar_output="High-quality output that maximizes stakeholder utility across all preferences.",
+                ),
+                system_prompt="You are a project stakeholder answering clarification questions about preferences.",
+                agent_description="Project stakeholder with expertise in preference elicitation",
+                agent_capabilities=[
+                    "answer_clarifications",
+                    "provide_feedback",
+                    "evaluate_quality",
+                ],
+            ),
+            seed=seed,
+        )
+        print(
+            f"   🎯 Created ClarificationStakeholderAgent with {len(preferences.preferences)} TRUE preferences"
+        )
+
+        # Add stakeholder to workflow so it can be found by AskClarificationQuestionsAction
+        workflow.agents[stakeholder.config.agent_id] = stakeholder
+        print("   ✅ Added stakeholder to workflow.agents")
+    else:
+        stakeholder = create_stakeholder_agent(
+            persona="balanced", preferences=preferences
+        )
 
     # Apply scenario-defined preference dynamics (if provided)
     spec = SCENARIOS.get(workflow_name)
-    if spec and spec.create_preference_update_requests:
-        stakeholder.apply_weight_updates(spec.create_preference_update_requests())
+    if (
+        spec
+        and spec.create_preference_update_requests
+        and isinstance(stakeholder, StakeholderAgent)
+    ):
+        stakeholder.apply_weight_updates(spec.create_preference_update_requests())  # type: ignore
 
     max_steps = int(max_timesteps or settings.resolve_max_timesteps(fallback=50))
     print(f"\n⚙️ Building execution engine (max_timesteps={max_steps})...")
-    default_evaluators: list[Evaluator] = build_default_evaluators(
-        communication_service
-    )
+    default_evaluators: list[Rubric] = build_default_evaluators(communication_service)
     default_evaluators.append(
         create_evaluator_to_measure_goal_achievement(workflow_name)
     )
 
     # Inject scenario-specific constraints and milestone rubrics
-    from manager_agent_gym.core.evaluation.scenario_constraints import (
+    from manager_agent_gym.core.evaluation.rules.scenario_constraints import (
         build_constraints_for_scenario,
     )
 
@@ -183,6 +265,34 @@ async def run_demo(
     scenario_constraints = build_constraints_for_scenario(workflow_name)
     if scenario_constraints is not None:
         default_evaluators.append(scenario_constraints)
+
+    # Create pre-execution phase if using rubric decomposition
+    pre_execution_phase = None
+    if use_rubric_decomposition:
+        from manager_agent_gym.core.execution.pre_execution_phase import (
+            InitialRubricGenerationPhase,
+        )
+        from manager_agent_gym.core.agents.manager_agent.implementations.rubric_generation_manager.rubric_decomposition_manager import (
+            RubricDecompositionManagerAgent,
+        )
+
+        print("   🎯 Creating rubric decomposition pre-execution phase...")
+
+        # Create decomposition manager
+        decomp_manager = RubricDecompositionManagerAgent(
+            model_name=model_name,
+            max_clarification_budget=2,
+            seed=seed,
+        )
+
+        # Create runner with manager, stakeholder, and communication service
+        pre_execution_phase = InitialRubricGenerationPhase(
+            manager=decomp_manager,
+            stakeholder=stakeholder,  # type: ignore
+            communication_service=communication_service,
+            max_turns=10,
+        )
+        print("   ✅ Pre-execution phase configured")
 
     engine = WorkflowExecutionEngine(
         workflow=workflow,
@@ -197,6 +307,7 @@ async def run_demo(
         timestep_end_callbacks=default_timestep_callbacks(),
         evaluations=default_evaluators,
         seed=seed,
+        pre_execution_phases=[pre_execution_phase] if pre_execution_phase else None,
     )
     print("   ✅ Engine configured")
 
@@ -240,9 +351,7 @@ async def run_demo(
                     sort_within_group="time", include_broadcasts=True
                 ),
                 manager_actions=engine.manager_agent.get_action_buffer(),
-                preferences=engine._get_preferences_from_stakeholder_agent(
-                    engine.current_timestep
-                ),
+                preferences=None,  # Preferences now handled by stakeholder.evaluate_for_timestep()
                 workflow_evaluators=engine.evaluations,
             )
 
@@ -251,7 +360,7 @@ async def run_demo(
 
             end_time = datetime.now()
             # Create a dummy ExecutionResult for consistency with normal simulation
-            from manager_agent_gym.schemas.unified_results import create_timestep_result
+            from manager_agent_gym.core.execution.schemas.results import create_timestep_result
 
             execution_result = create_timestep_result(
                 timestep=target_timestep,
@@ -360,6 +469,13 @@ if __name__ == "__main__":
             # <output_dir>/<workflow_name>/run_seed_<n>/...
             os.environ["MAG_RUN_SUFFIX"] = f"seed_{current_seed}"
             print(f"\n==== Running seed {current_seed} ====")
+            # Check if rubric decomposition mode is enabled
+            use_rubric_decomp = (
+                args.manager_agent_mode == "rubric_decomp"
+                if args.manager_agent_mode
+                else False
+            )
+
             await run_demo(
                 offline_run_dir=args.offline_run_dir,
                 workflow_name=args.workflow_name,
@@ -371,6 +487,7 @@ if __name__ == "__main__":
                 restore_from_snapshot=args.restore_from_snapshot,
                 restore_timestep=args.restore_timestep,
                 rerun_suffix=args.rerun_suffix,
+                use_rubric_decomposition=use_rubric_decomp,
             )
 
     asyncio.run(_run_multi_seed())

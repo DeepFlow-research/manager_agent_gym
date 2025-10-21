@@ -1,8 +1,10 @@
-from manager_agent_gym.core.workflow_agents.registry import AgentRegistry
-from manager_agent_gym.core.workflow_agents.interface import AgentInterface
-from manager_agent_gym.schemas.workflow_agents import AgentConfig
-from manager_agent_gym.schemas.core import Task, Resource
-from manager_agent_gym.schemas.unified_results import (
+from manager_agent_gym.core.agents.workflow_agents.tools.registry import AgentRegistry
+from manager_agent_gym.core.agents.workflow_agents.common.interface import (
+    AgentInterface,
+)
+from manager_agent_gym.schemas.agents import AgentConfig
+from manager_agent_gym.schemas.domain import Task, Resource
+from manager_agent_gym.core.execution.schemas.results import (
     ExecutionResult,
     create_task_result,
 )
@@ -12,7 +14,7 @@ def test_register_and_list_agents() -> None:
     class MockConfig(AgentConfig):
         agent_id: str
         agent_type: str
-        system_prompt: str = "dummy system prompt"
+        system_prompt: str | None = "dummy system prompt"
         model_name: str = "o3"
 
     class _A(AgentInterface[MockConfig]):

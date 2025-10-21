@@ -17,9 +17,10 @@ Demonstrates:
 
 from uuid import uuid4
 
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.schemas.core.base import TaskStatus
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.domain.task import Task
+from manager_agent_gym.schemas.domain.base import TaskStatus
+from manager_agent_gym.core.workflow.services import WorkflowMutations
 
 
 def create_tech_acquisition_integration_workflow() -> Workflow:
@@ -477,6 +478,6 @@ def create_tech_acquisition_integration_workflow() -> Workflow:
         regulatory_approval_coordination,
         stakeholder_communication_management,
     ]:
-        workflow.add_task(task)
+        WorkflowMutations.add_task(workflow, task)
 
     return workflow

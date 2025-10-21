@@ -2,14 +2,17 @@ import pytest
 from uuid import uuid4
 
 # Minimal stakeholder with empty preferences
-from manager_agent_gym.core.workflow_agents.stakeholder_agent import StakeholderAgent
-from manager_agent_gym.schemas.workflow_agents.stakeholder import StakeholderConfig
-from manager_agent_gym.schemas.preferences.preference import PreferenceWeights
+from manager_agent_gym.core.agents.stakeholder_agent.stakeholder_agent import (
+    StakeholderAgent,
+)
+from manager_agent_gym.schemas.agents.stakeholder import StakeholderConfig
+from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
 
-from manager_agent_gym.core.execution.engine import WorkflowExecutionEngine
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.core.workflow_agents.registry import AgentRegistry
+from manager_agent_gym.core.workflow.engine import WorkflowExecutionEngine
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.core.agents.workflow_agents.tools.registry import AgentRegistry
 from tests.helpers.stubs import ManagerNoOp
+from manager_agent_gym.core.workflow.services import WorkflowMutations
 
 
 # Use shared Manager stub from tests.helpers.stubs
@@ -26,12 +29,12 @@ async def test_registry_scheduling_adds_agent_and_syncs_workflow() -> None:
             model_name="o3",
             name="Stakeholder",
             role="Owner",
-            initial_preferences=PreferenceWeights(preferences=[]),
+            preference_data=PreferenceSnapshot(preferences=[]),
             agent_description="Stakeholder",
             agent_capabilities=["Stakeholder"],
         )
     )
-    w.add_agent(stakeholder)
+    WorkflowMutations.add_agent(w, stakeholder)
     engine = WorkflowExecutionEngine(
         workflow=w,
         agent_registry=AgentRegistry(),
@@ -46,7 +49,7 @@ async def test_registry_scheduling_adds_agent_and_syncs_workflow() -> None:
 
     # Schedule add via registry API (timestep 0)
     # Build a minimal AIAgentConfig compatible with registry API
-    from manager_agent_gym.schemas.workflow_agents import AIAgentConfig
+    from manager_agent_gym.schemas.agents import AIAgentConfig
 
     ai_cfg = AIAgentConfig(
         agent_id="ai_dummy",
@@ -77,12 +80,12 @@ async def test_registry_scheduling_remove_syncs_workflow() -> None:
             model_name="o3",
             name="Stakeholder",
             role="Owner",
-            initial_preferences=PreferenceWeights(preferences=[]),
+            preference_data=PreferenceSnapshot(preferences=[]),
             agent_description="Stakeholder",
             agent_capabilities=["Stakeholder"],
         )
     )
-    w.add_agent(stakeholder)
+    WorkflowMutations.add_agent(w, stakeholder)
     engine = WorkflowExecutionEngine(
         workflow=w,
         agent_registry=AgentRegistry(),
@@ -96,7 +99,7 @@ async def test_registry_scheduling_remove_syncs_workflow() -> None:
     )
 
     # First, add then remove the same agent across timesteps 0 and 1
-    from manager_agent_gym.schemas.workflow_agents import AIAgentConfig
+    from manager_agent_gym.schemas.agents import AIAgentConfig
 
     ai_cfg = AIAgentConfig(
         agent_id="ai_tmp",

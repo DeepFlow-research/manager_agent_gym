@@ -2,21 +2,24 @@ import pytest
 from pathlib import Path
 from uuid import uuid4
 
-from manager_agent_gym.core.execution.engine import WorkflowExecutionEngine
-from manager_agent_gym.schemas.config import OutputConfig
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.core.workflow_agents.registry import AgentRegistry
-from manager_agent_gym.core.manager_agent.interface import ManagerAgent
-from manager_agent_gym.schemas.preferences.preference import PreferenceWeights
-from manager_agent_gym.schemas.execution.manager import ManagerObservation
-from manager_agent_gym.schemas.core.resources import Resource
-from manager_agent_gym.core.workflow_agents.stakeholder_agent import StakeholderAgent
-from manager_agent_gym.schemas.workflow_agents.stakeholder import StakeholderConfig
-from manager_agent_gym.schemas.execution.state import ExecutionState
-from manager_agent_gym.schemas.workflow_agents.stakeholder import (
+from manager_agent_gym.core.workflow.engine import WorkflowExecutionEngine
+from manager_agent_gym.core.workflow.schemas.config import OutputConfig
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.domain.task import Task
+from manager_agent_gym.core.agents.workflow_agents.tools.registry import AgentRegistry
+from manager_agent_gym.core.agents.manager_agent.common.interface import ManagerAgent
+from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
+from manager_agent_gym.schemas.manager.observation import ManagerObservation
+from manager_agent_gym.schemas.domain.resource import Resource
+from manager_agent_gym.core.agents.stakeholder_agent.stakeholder_agent import (
+    StakeholderAgent,
+)
+from manager_agent_gym.schemas.agents.stakeholder import StakeholderConfig
+from manager_agent_gym.core.execution.schemas.state import ExecutionState
+from manager_agent_gym.schemas.agents.stakeholder import (
     StakeholderPublicProfile,
 )
+from manager_agent_gym.core.workflow.services import WorkflowMutations
 from tests.helpers.stubs import ManagerNoOp
 
 
@@ -28,7 +31,7 @@ from tests.helpers.stubs import ManagerNoOp
 async def test_output_files_written_when_enabled(tmp_path: Path, enable_logs: bool):
     out = OutputConfig(base_output_dir=tmp_path, create_run_subdirectory=False)
     w = Workflow(name="w", workflow_goal="d", owner_id=uuid4())
-    w.add_task(Task(name="t", description="d"))
+    WorkflowMutations.add_task(w, Task(name="t", description="d"))
     # Minimal stakeholder with empty preferences to satisfy evaluation
     stakeholder_cfg = StakeholderConfig(
         agent_id="stakeholder",
@@ -37,12 +40,12 @@ async def test_output_files_written_when_enabled(tmp_path: Path, enable_logs: bo
         model_name="o3",
         name="Stakeholder",
         role="Owner",
-        initial_preferences=PreferenceWeights(preferences=[]),
+        preference_data=PreferenceSnapshot(preferences=[]),
         agent_description="Stakeholder",
         agent_capabilities=["Stakeholder"],
     )
     stakeholder = StakeholderAgent(config=stakeholder_cfg)
-    w.add_agent(stakeholder)
+    WorkflowMutations.add_agent(w, stakeholder)
 
     engine = WorkflowExecutionEngine(
         workflow=w,
@@ -75,15 +78,17 @@ async def test_cost_bucket_and_cost_efficiency_when_agents_incur_cost(tmp_path: 
     t2 = Task(
         name="B", description="d", estimated_cost=200.0, dependency_task_ids=[t1.id]
     )
-    w.add_task(t1)
-    w.add_task(t2)
+    WorkflowMutations.add_task(w, t1)
+    WorkflowMutations.add_task(w, t2)
 
     # Define costed stub agents
-    from manager_agent_gym.core.workflow_agents.interface import AgentInterface
+    from manager_agent_gym.core.agents.workflow_agents.common.interface import (
+        AgentInterface,
+    )
 
     class _CostAgent(AgentInterface):
         def __init__(self, agent_id: str, agent_type: str, cost: float):
-            from manager_agent_gym.schemas.workflow_agents import AgentConfig
+            from manager_agent_gym.schemas.agents import AgentConfig
 
             super().__init__(
                 AgentConfig(
@@ -98,7 +103,7 @@ async def test_cost_bucket_and_cost_efficiency_when_agents_incur_cost(tmp_path: 
             self._cost = float(cost)
 
         async def execute_task(self, task: Task, resources: list[Resource]):
-            from manager_agent_gym.schemas.unified_results import create_task_result
+            from manager_agent_gym.core.execution.schemas.results import create_task_result
 
             return create_task_result(
                 task_id=task.id,
@@ -112,8 +117,8 @@ async def test_cost_bucket_and_cost_efficiency_when_agents_incur_cost(tmp_path: 
     # Add two agents with distinct costs
     ai = _CostAgent("ai-1", "ai", cost=60.0)
     human = _CostAgent("human-1", "human", cost=80.0)
-    w.add_agent(ai)
-    w.add_agent(human)
+    WorkflowMutations.add_agent(w, ai)
+    WorkflowMutations.add_agent(w, human)
     # Minimal stakeholder with empty preferences to satisfy evaluation
     stakeholder_cfg = StakeholderConfig(
         agent_id="stakeholder",
@@ -122,23 +127,23 @@ async def test_cost_bucket_and_cost_efficiency_when_agents_incur_cost(tmp_path: 
         model_name="o3",
         name="Stakeholder",
         role="Owner",
-        initial_preferences=PreferenceWeights(preferences=[]),
+        preference_data=PreferenceSnapshot(preferences=[]),
         agent_description="Stakeholder",
         agent_capabilities=["Stakeholder"],
     )
     stakeholder = StakeholderAgent(config=stakeholder_cfg)
-    w.add_agent(stakeholder)
+    WorkflowMutations.add_agent(w, stakeholder)
 
     # Manager that alternates assignments so A->ai, B->human
     class _AlternatingAssignManager(ManagerAgent):
         def __init__(self):
             super().__init__(
-                agent_id="stub_manager", preferences=PreferenceWeights(preferences=[])
+                agent_id="stub_manager", preferences=PreferenceSnapshot(preferences=[])
             )
             self._last_idx = -1
 
         async def take_action(self, observation: ManagerObservation):
-            from manager_agent_gym.schemas.execution.manager_actions import (
+            from manager_agent_gym.core.agents.manager_agent.actions import (
                 AssignTaskAction,
                 NoOpAction,
             )
@@ -162,11 +167,11 @@ async def test_cost_bucket_and_cost_efficiency_when_agents_incur_cost(tmp_path: 
             self,
             workflow: Workflow,
             execution_state: ExecutionState,
-            stakeholder_profile: StakeholderPublicProfile,
-            current_timestep: int,
-            running_tasks: dict,
-            completed_task_ids: set,
-            failed_task_ids: set,
+            stakeholder_profile: StakeholderPublicProfile | None = None,
+            current_timestep: int = 0,
+            running_tasks: dict | None = None,
+            completed_task_ids: set | None = None,
+            failed_task_ids: set | None = None,
             communication_service=None,
             previous_reward: float = 0.0,
             done: bool = False,
@@ -175,7 +180,6 @@ async def test_cost_bucket_and_cost_efficiency_when_agents_incur_cost(tmp_path: 
             obs = await self.create_observation(
                 workflow=workflow,
                 execution_state=execution_state,
-                stakeholder_profile=stakeholder_profile,
                 current_timestep=current_timestep,
                 running_tasks=running_tasks,
                 completed_task_ids=completed_task_ids,

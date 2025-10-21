@@ -1,7 +1,7 @@
 from uuid import uuid4
 
-from manager_agent_gym.schemas.execution.manager import ManagerObservation
-from manager_agent_gym.schemas.workflow_agents.stakeholder import (
+from manager_agent_gym.schemas.manager.observation import ManagerObservation
+from manager_agent_gym.schemas.agents.stakeholder import (
     StakeholderPublicProfile,
 )
 

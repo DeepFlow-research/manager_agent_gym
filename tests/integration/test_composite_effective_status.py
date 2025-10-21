@@ -1,16 +1,20 @@
 import pytest
 from uuid import uuid4
 
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.schemas.core.base import TaskStatus
-from manager_agent_gym.core.execution.engine import WorkflowExecutionEngine
-from manager_agent_gym.core.workflow_agents.registry import AgentRegistry
-from manager_agent_gym.schemas.config import OutputConfig
-from manager_agent_gym.schemas.preferences.preference import PreferenceWeights
-from manager_agent_gym.core.workflow_agents.stakeholder_agent import StakeholderAgent
-from manager_agent_gym.schemas.workflow_agents.stakeholder import StakeholderConfig
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.domain.task import Task
+from manager_agent_gym.schemas.domain.base import TaskStatus
+from manager_agent_gym.core.workflow.engine import WorkflowExecutionEngine
+from manager_agent_gym.core.agents.workflow_agents.tools.registry import AgentRegistry
+from manager_agent_gym.core.workflow.schemas.config import OutputConfig
+from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
+from manager_agent_gym.core.agents.stakeholder_agent.stakeholder_agent import (
+    StakeholderAgent,
+)
+from manager_agent_gym.schemas.agents.stakeholder import StakeholderConfig
 from tests.helpers.stubs import StubAgent, ManagerAssignFirstReady
+from manager_agent_gym.core.workflow.services import WorkflowQueries
+from manager_agent_gym.core.workflow.services import WorkflowMutations
 
 
 pytestmark = pytest.mark.integration
@@ -25,7 +29,7 @@ def _make_composite() -> Workflow:
     container.add_subtask(a)
     container.add_subtask(b)
     parent.add_subtask(container)
-    w.add_task(parent)
+    WorkflowMutations.add_task(w, parent)
     for t in (a, b):
         t.assigned_agent_id = "worker"
     return w
@@ -35,7 +39,7 @@ def _make_composite() -> Workflow:
 async def test_composite_effective_status_and_never_schedulable(tmp_path):
     w = _make_composite()
     agent = StubAgent(agent_id="worker", agent_type="ai", seconds=0.0)
-    w.add_agent(agent)
+    WorkflowMutations.add_agent(w, agent)
 
     stakeholder = StakeholderAgent(
         config=StakeholderConfig(
@@ -45,12 +49,12 @@ async def test_composite_effective_status_and_never_schedulable(tmp_path):
             model_name="o3",
             name="Stakeholder",
             role="Owner",
-            initial_preferences=PreferenceWeights(preferences=[]),
+            preference_data=PreferenceSnapshot(preferences=[]),
             agent_description="Stakeholder",
             agent_capabilities=["Stakeholder"],
         )
     )
-    w.add_agent(stakeholder)
+    WorkflowMutations.add_agent(w, stakeholder)
 
     engine = WorkflowExecutionEngine(
         workflow=w,
@@ -67,7 +71,7 @@ async def test_composite_effective_status_and_never_schedulable(tmp_path):
     )
 
     # T0: A should be READY, B PENDING; composites not READY/RUNNING
-    ready0 = {t.name for t in w.get_ready_tasks()}
+    ready0 = {t.name for t in WorkflowQueries.get_ready_tasks(w)}
     assert "A" in ready0 and "B" not in ready0
     parent = next(t for t in w.tasks.values() if t.name == "Parent")
     container = next((st for st in parent.subtasks if st.name == "Container"), None)
@@ -84,8 +88,8 @@ async def test_composite_effective_status_and_never_schedulable(tmp_path):
     assert parent.effective_status == TaskStatus.RUNNING.value
     assert container.effective_status == TaskStatus.RUNNING.value
     # Composites must not be in READY list
-    assert "Parent" not in {t.name for t in w.get_ready_tasks()}
-    assert "Container" not in {t.name for t in w.get_ready_tasks()}
+    assert "Parent" not in {t.name for t in WorkflowQueries.get_ready_tasks(w)}
+    assert "Container" not in {t.name for t in WorkflowQueries.get_ready_tasks(w)}
 
     # Step until A completes and B becomes READY/RUNNING
     for _ in range(5):
@@ -112,12 +116,12 @@ async def test_composite_effective_status_and_never_schedulable(tmp_path):
 
     # Finish the workflow
     for _ in range(10):
-        if w.is_complete():
+        if WorkflowQueries.is_complete(w):
             break
         await engine.execute_timestep()
 
     # Parents must be COMPLETED only after all leaves COMPLETED
-    assert w.is_complete()
+    assert WorkflowQueries.is_complete(w)
     assert parent.status == TaskStatus.COMPLETED
     assert container.status == TaskStatus.COMPLETED
     assert parent.effective_status == TaskStatus.COMPLETED.value

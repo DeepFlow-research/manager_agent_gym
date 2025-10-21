@@ -9,24 +9,24 @@ Preferences selected (4):
 
 Mirrors schema patterns from examples:
   * PreferenceWeights / Preference
-  * Evaluator(aggregation=AggregationStrategy.WEIGHTED_AVERAGE, rubrics=[WorkflowRubric...])
-  * WorkflowRubric with llm_prompt or evaluator_function
+  * Rubric(aggregation=AggregationStrategy.WEIGHTED_AVERAGE, criteria=[RubricCriteria...])
+  * RubricCriteria with llm_prompt or evaluator_function
   * create_*_preference_update_requests(): absolute, normalized timeline updates
 """
 
 from typing import List
 from manager_agent_gym.schemas.preferences.preference import (
     Preference,
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric, RunCondition
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria, RunCondition
 from manager_agent_gym.schemas.preferences import PreferenceWeightUpdateRequest
-from manager_agent_gym.schemas.core import Workflow
-from manager_agent_gym.schemas.core.base import TaskStatus
+from manager_agent_gym.schemas.domain import Workflow
+from manager_agent_gym.schemas.domain.base import TaskStatus
 
 
 # ---------------------------
@@ -183,8 +183,8 @@ def rule_ops_exception_loop_running(workflow: Workflow) -> float:
 # ---------------------------
 # LLM Rubrics
 # ---------------------------
-service_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+service_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="otif_and_dwell_performance",
         llm_prompt=(
             "Evaluate service reliability using available artifacts and metrics: "
@@ -195,7 +195,7 @@ service_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="schedule_integrity",
         llm_prompt=(
             "Assess schedule integrity: confirmed Suez transit slots/convoys, synchronized rotations/ETAs, "
@@ -205,19 +205,19 @@ service_rubrics: List[WorkflowRubric] = [
         max_score=8.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_slots_and_rotation_confirmed",
         evaluator_function=rule_slots_and_rotation_confirmed,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_control_tower_live",
         evaluator_function=rule_control_tower_live,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_gate_cutoffs_live",
         evaluator_function=rule_gate_cutoffs_live,
         max_score=1.0,
@@ -225,8 +225,8 @@ service_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-compliance_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+compliance_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="customs_and_advance_filing_completeness",
         llm_prompt=(
             "Evaluate customs posture: HS code accuracy, manifest integrity, pre‑arrival/advance filings on time, "
@@ -235,7 +235,7 @@ compliance_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="dangerous_goods_screening_quality",
         llm_prompt=(
             "Assess Dangerous Goods (DG) screening quality: correct classification, required declarations, "
@@ -244,13 +244,13 @@ compliance_rubrics: List[WorkflowRubric] = [
         max_score=8.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_customs_ready",
         evaluator_function=rule_customs_ready,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_dg_cleared",
         evaluator_function=rule_dg_cleared,
         max_score=1.0,
@@ -258,8 +258,8 @@ compliance_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-cost_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+cost_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="utilization_and_cost_variance",
         llm_prompt=(
             "Evaluate cost efficiency: equipment/yard/warehouse utilization vs plan, cost variance to budget, "
@@ -268,7 +268,7 @@ cost_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="empty_repositioning_efficiency",
         llm_prompt=(
             "Assess empty repositioning efficiency: balance of empties across depots, avoided deadhead moves, "
@@ -277,13 +277,13 @@ cost_rubrics: List[WorkflowRubric] = [
         max_score=8.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_capacity_plan_ready",
         evaluator_function=rule_capacity_plan_ready,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_repositioning_planned",
         evaluator_function=rule_repositioning_planned,
         max_score=1.0,
@@ -291,8 +291,8 @@ cost_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-risk_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+risk_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="contingency_playbooks_quality",
         llm_prompt=(
             "Rigorously evaluate risk resilience and contingency planning:\n"
@@ -306,7 +306,7 @@ risk_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="disruption_response_effectiveness",
         llm_prompt=(
             "Assess how exceptions were handled during execution: detection latency, escalation discipline, "
@@ -315,19 +315,19 @@ risk_rubrics: List[WorkflowRubric] = [
         max_score=8.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_contingency_defined",
         evaluator_function=rule_contingency_defined,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_ops_exception_loop_running",
         evaluator_function=rule_ops_exception_loop_running,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="supply_chain_crisis_scenarios",
         llm_prompt=(
             """Evaluate handling of supply chain crisis and disruption scenarios:
@@ -341,7 +341,7 @@ risk_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="cost_realism_validation",
         evaluator_function=_validate_cost_realism,
         max_score=1.0,
@@ -353,48 +353,48 @@ risk_rubrics: List[WorkflowRubric] = [
 # ---------------------------
 # Preferences + Evaluators
 # ---------------------------
-def create_preferences() -> PreferenceWeights:
+def create_preferences() -> PreferenceSnapshot:
     """Initial stakeholder weights for Suez supply chain planning (t=0 snapshot)."""
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="service_reliability",
                 weight=0.4,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="service_eval",
                     description="OTIF, dwell time, schedule integrity, and exception handling.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=service_rubrics,
+                    criteria=service_rubrics,
                 ),
             ),
             Preference(
                 name="compliance",
                 weight=0.25,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="compliance_eval",
                     description="Customs/advance filings and DG controls readiness and quality.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=compliance_rubrics,
+                    criteria=compliance_rubrics,
                 ),
             ),
             Preference(
                 name="cost_efficiency",
                 weight=0.2,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="cost_eval",
                     description="Utilization, empty repositioning, and cost variance to plan.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=cost_rubrics,
+                    criteria=cost_rubrics,
                 ),
             ),
             Preference(
                 name="risk_resilience",
                 weight=0.15,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="risk_eval",
                     description="Contingency playbooks and disruption response effectiveness.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=risk_rubrics,
+                    criteria=risk_rubrics,
                 ),
             ),
         ]
@@ -406,9 +406,9 @@ def create_preferences() -> PreferenceWeights:
 # ---------------------------
 def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     """Stakeholder's weight changes over time (absolute, normalized)."""
-    timeline: dict[int, PreferenceWeights] = {
+    timeline: dict[int, PreferenceSnapshot] = {
         # Early: get schedule integrity + compliance foundation in place
-        0: PreferenceWeights(
+        0: PreferenceSnapshot(
             preferences=[
                 Preference(name="service_reliability", weight=0.4),
                 Preference(name="compliance", weight=0.25),
@@ -417,7 +417,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
             ]
         ),
         # Mid: stabilize ops, tune costs, maintain strict compliance
-        12: PreferenceWeights(
+        12: PreferenceSnapshot(
             preferences=[
                 Preference(name="service_reliability", weight=0.35),
                 Preference(name="compliance", weight=0.3),
@@ -426,7 +426,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
             ]
         ),
         # Late: after steady‑state, push for cost and risk posture improvements while protecting service levels
-        30: PreferenceWeights(
+        30: PreferenceSnapshot(
             preferences=[
                 Preference(name="service_reliability", weight=0.3),
                 Preference(name="compliance", weight=0.25),
@@ -455,11 +455,11 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     return requests
 
 
-def create_evaluator_to_measure_goal_achievement() -> Evaluator:
+def create_evaluator_to_measure_goal_achievement() -> Rubric:
     """Create goal achievement evaluator for end-to-end supply chain planning with integrated S&OP."""
     goal_achievement_rubrics = [
         # Critical planning and operational deliverables (must have for supply chain effectiveness)
-        WorkflowRubric(
+        RubricCriteria(
             name="demand_forecast_accuracy_achieved",
             llm_prompt=(
                 "Does achieved demand forecast accuracy exist with: multi-horizon demand forecast completed, "
@@ -469,7 +469,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="vessel_capacity_allocation_optimized",
             llm_prompt=(
                 "Does optimized vessel capacity allocation exist with: vessel slots allocated by lane, "
@@ -479,7 +479,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=12.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="customs_dg_compliance_operational",
             llm_prompt=(
                 "Does operational customs and DG compliance exist with: dangerous goods procedures validated, "
@@ -489,7 +489,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=12.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="intermodal_network_coordination",
             llm_prompt=(
                 "Does intermodal network coordination exist with: rail/road capacity balanced, "
@@ -500,7 +500,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Major operational efficiency deliverables (8-10 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="execution_control_system_active",
             llm_prompt=(
                 "Does active execution control system exist with: real-time tracking operational, "
@@ -510,7 +510,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="risk_contingency_plans_deployed",
             llm_prompt=(
                 "Do deployed risk contingency plans exist with: disruption scenarios identified, "
@@ -520,7 +520,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="customer_booking_pipeline_integrated",
             llm_prompt=(
                 "Does integrated customer booking pipeline exist with: CRM pipeline integrated, "
@@ -530,7 +530,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="performance_kpi_dashboard_operational",
             llm_prompt=(
                 "Does operational performance KPI dashboard exist with: key metrics tracked in real-time, "
@@ -540,7 +540,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="yard_warehouse_throughput_optimized",
             llm_prompt=(
                 "Does optimized yard and warehouse throughput exist with: yard slots balanced to volumes, "
@@ -551,7 +551,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Important supporting deliverables (5-7 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="disruption_weather_signals_monitoring",
             llm_prompt=(
                 "Does disruption and weather signals monitoring exist with: weather indicators tracked, "
@@ -561,7 +561,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="supplier_vendor_coordination",
             llm_prompt=(
                 "Does supplier and vendor coordination exist with: supplier performance tracked, "
@@ -571,7 +571,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_optimization_analysis",
             llm_prompt=(
                 "Does cost optimization analysis exist with: cost drivers identified, "
@@ -581,7 +581,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="route_convoy_planning_optimized",
             llm_prompt=(
                 "Does optimized route and convoy planning exist with: route efficiency maximized, "
@@ -591,7 +591,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="capacity_buffer_management",
             llm_prompt=(
                 "Does capacity buffer management exist with: safety stock levels optimized, "
@@ -602,7 +602,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Supporting deliverables (3-4 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="seasonality_historical_analysis",
             llm_prompt=(
                 "Does seasonality and historical analysis exist with: 24-36 months data analyzed, "
@@ -612,7 +612,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="documentation_procedures_maintained",
             llm_prompt=(
                 "Do maintained documentation and procedures exist with: process documentation current, "
@@ -622,7 +622,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cross_lane_optimization",
             llm_prompt=(
                 "Does cross-lane optimization exist with: lane performance compared, "
@@ -632,7 +632,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=3.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="stakeholder_communication_active",
             llm_prompt=(
                 "Does active stakeholder communication exist with: internal communication protocols established, "
@@ -644,9 +644,9 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
         ),
     ]
 
-    return Evaluator(
+    return Rubric(
         name="supply_chain_planning_goal_achievement_eval",
         description="End-to-end supply chain planning and integrated S&OP deliverable achievement measurement",
         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-        rubrics=goal_achievement_rubrics,
+        criteria=goal_achievement_rubrics,
     )

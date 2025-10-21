@@ -7,9 +7,10 @@ These can be passed to the engine via the `timestep_end_callbacks` parameter.
 from __future__ import annotations
 
 
-from ..common.logging import logger
-from ...schemas.execution.callbacks import TimestepEndContext
-from ...schemas.core.base import TaskStatus
+from manager_agent_gym.core.common.logging import logger
+from manager_agent_gym.core.execution.schemas.callbacks import TimestepEndContext
+from manager_agent_gym.schemas.domain.base import TaskStatus
+from manager_agent_gym.core.workflow.services import WorkflowQueries
 
 
 def _group_tasks_by_status(ctx: TimestepEndContext) -> dict[str, list[str]]:
@@ -36,7 +37,7 @@ async def log_workflow_brief_summary(ctx: TimestepEndContext) -> None:
             [t for t in ctx.workflow.tasks.values() if t.status == TaskStatus.READY]
         )
         # Available agents snapshot
-        available_agents = ctx.workflow.get_available_agents()
+        available_agents = WorkflowQueries.get_available_agents(ctx.workflow)
         available_count = len(available_agents)
         progress = (completed / total) if total else 0.0
         logger.info(
@@ -68,7 +69,7 @@ async def log_tasks_grouped_by_status(ctx: TimestepEndContext) -> None:
 async def log_available_agents(ctx: TimestepEndContext) -> None:
     """Log which agents are currently available this timestep (preview)."""
     try:
-        agents = ctx.workflow.get_available_agents()
+        agents = WorkflowQueries.get_available_agents(ctx.workflow)
         count = len(agents)
         preview_items: list[str] = []
         for agent in agents[:5]:

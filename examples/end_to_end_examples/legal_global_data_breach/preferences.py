@@ -9,24 +9,24 @@ Preferences (4):
 
 Mirrors schema style in prior examples:
   * PreferenceWeights / Preference
-  * Evaluator(aggregation=AggregationStrategy.WEIGHTED_AVERAGE, rubrics=[WorkflowRubric...])
-  * WorkflowRubric with llm_prompt or evaluator_function
+  * Rubric(aggregation=AggregationStrategy.WEIGHTED_AVERAGE, criteria=[RubricCriteria...])
+  * RubricCriteria with llm_prompt or evaluator_function
   * create_*_preference_update_requests(): absolute, normalized timeline updates
 """
 
 from typing import List
 from manager_agent_gym.schemas.preferences.preference import (
     Preference,
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric, RunCondition
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria, RunCondition
 from manager_agent_gym.schemas.preferences import PreferenceWeightUpdateRequest
-from manager_agent_gym.schemas.core import Workflow
-from manager_agent_gym.schemas.core.base import TaskStatus
+from manager_agent_gym.schemas.domain import Workflow
+from manager_agent_gym.schemas.domain.base import TaskStatus
 
 
 # ---------------------------
@@ -85,8 +85,8 @@ def rule_privileged_report_complete(workflow: Workflow) -> float:
 # ---------------------------
 # LLM Rubrics
 # ---------------------------
-speed_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+speed_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="speed_to_containment_and_clock_handling",
         llm_prompt=(
             "Evaluate the team's speed and discipline: "
@@ -99,19 +99,19 @@ speed_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_triage_started",
         evaluator_function=rule_triage_started,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_evidence_custody_ok",
         evaluator_function=rule_evidence_custody_ok,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_containment_complete",
         evaluator_function=rule_containment_complete,
         max_score=1.0,
@@ -119,8 +119,8 @@ speed_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-compliance_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+compliance_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="regulatory_clock_adherence_and_jurisdictional_accuracy",
         llm_prompt=(
             "Assess regulatory compliance posture: "
@@ -132,13 +132,13 @@ compliance_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_obligations_matrix_ready",
         evaluator_function=rule_obligations_matrix_ready,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_notifications_sent",
         evaluator_function=rule_notifications_sent,
         max_score=1.0,
@@ -146,8 +146,8 @@ compliance_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-communications_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+communications_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="communications_quality_and_consistency",
         llm_prompt=(
             "Evaluate regulator/customer/partner communications: "
@@ -159,7 +159,7 @@ communications_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_comms_plan_ready",
         evaluator_function=rule_comms_plan_ready,
         max_score=1.0,
@@ -167,8 +167,8 @@ communications_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-documentation_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+documentation_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="evidence_chain_and_auditability",
         llm_prompt=(
             "Assess documentation hygiene and auditability: "
@@ -178,13 +178,13 @@ documentation_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_recordkeeping_updates_done",
         evaluator_function=rule_recordkeeping_updates_done,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_privileged_report_complete",
         evaluator_function=rule_privileged_report_complete,
         max_score=1.0,
@@ -196,48 +196,48 @@ documentation_rubrics: List[WorkflowRubric] = [
 # ---------------------------
 # Preferences + Evaluators
 # ---------------------------
-def create_preferences() -> PreferenceWeights:
+def create_preferences() -> PreferenceSnapshot:
     """Initial stakeholder weights for breach response (t=0 snapshot)."""
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="speed",
                 weight=0.45,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="speed_eval",
                     description="Speed-to-triage/containment and disciplined handling of regulatory clocks.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=speed_rubrics,
+                    criteria=speed_rubrics,
                 ),
             ),
             Preference(
                 name="regulatory_compliance",
                 weight=0.3,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="compliance_eval",
                     description="Jurisdictional accuracy and timeliness of notifications (regulators/individuals/partners).",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=compliance_rubrics,
+                    criteria=compliance_rubrics,
                 ),
             ),
             Preference(
                 name="communications",
                 weight=0.15,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="comms_eval",
                     description="Quality and consistency of regulator/customer/partner communications.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=communications_rubrics,
+                    criteria=communications_rubrics,
                 ),
             ),
             Preference(
                 name="documentation",
                 weight=0.1,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="docs_eval",
                     description="Evidence chain, privilege hygiene, reproducibility, and audit-ready reporting.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=documentation_rubrics,
+                    criteria=documentation_rubrics,
                 ),
             ),
         ]
@@ -249,8 +249,8 @@ def create_preferences() -> PreferenceWeights:
 # ---------------------------
 def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     """Stakeholder's weight changes over time (absolute, normalized)."""
-    timeline: dict[int, PreferenceWeights] = {
-        0: PreferenceWeights(
+    timeline: dict[int, PreferenceSnapshot] = {
+        0: PreferenceSnapshot(
             preferences=[
                 Preference(name="speed", weight=0.45),
                 Preference(name="regulatory_compliance", weight=0.3),
@@ -258,7 +258,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="documentation", weight=0.1),
             ]
         ),
-        12: PreferenceWeights(
+        12: PreferenceSnapshot(
             preferences=[
                 Preference(name="speed", weight=0.25),
                 Preference(name="regulatory_compliance", weight=0.4),
@@ -266,7 +266,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="documentation", weight=0.1),
             ]
         ),
-        28: PreferenceWeights(
+        28: PreferenceSnapshot(
             preferences=[
                 Preference(name="speed", weight=0.15),
                 Preference(name="regulatory_compliance", weight=0.3),
@@ -295,11 +295,11 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     return requests
 
 
-def create_evaluator_to_measure_goal_achievement() -> Evaluator:
+def create_evaluator_to_measure_goal_achievement() -> Rubric:
     """Create goal achievement evaluator for global data breach incident response."""
     goal_achievement_rubrics = [
         # Critical incident response deliverables (must have for breach containment and compliance)
-        WorkflowRubric(
+        RubricCriteria(
             name="incident_containment_achieved",
             llm_prompt=(
                 "Does the workflow show evidence of incident containment with details including: incident scope contained, "
@@ -309,7 +309,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=20.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_notifications_compliant",
             llm_prompt=(
                 "Do the output resources / generated tasks show evidence of regulatory notifications being sent with details including: GDPR 72-hour notification met, "
@@ -319,7 +319,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=13.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="legal_privilege_preserved",
             llm_prompt=(
                 "Does preserved legal privilege exist with: attorney-client privilege maintained, "
@@ -329,7 +329,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="evidence_preservation_complete",
             llm_prompt=(
                 "Is there a sign of evidence preservation being performed with intention of building a clear chain of custody for governance and reporting? "
@@ -339,7 +339,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Major communication and remediation deliverables (8-10 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="customer_notification_executed",
             llm_prompt=(
                 "Does executed customer notification exist with: affected customers identified and notified, "
@@ -349,7 +349,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="incident_investigation_completed",
             llm_prompt=(
                 "Does completed incident investigation exist with: root cause analysis performed, "
@@ -359,7 +359,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="remediation_actions_implemented",
             llm_prompt=(
                 "Do implemented remediation actions exist with: security vulnerabilities patched, "
@@ -369,7 +369,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="board_executive_reporting",
             llm_prompt=(
                 "Does board and executive reporting exist with: board briefing completed, "
@@ -380,7 +380,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Important supporting deliverables (5-7 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="media_crisis_communication",
             llm_prompt=(
                 "Is there a sign of media crisis communication being performed with intention of managing the impact of the breach on the company's reputation? "
@@ -389,7 +389,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="partner_vendor_coordination",
             llm_prompt=(
                 "Does partner and vendor coordination exist with: third-party partners notified, "
@@ -399,7 +399,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cyber_insurance_claims",
             llm_prompt=(
                 "Do cyber insurance claims exist with: insurance coverage assessed, "
@@ -409,7 +409,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="litigation_preparedness",
             llm_prompt=(
                 "Does litigation preparedness exist with: potential litigation assessed, "
@@ -419,7 +419,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="post_incident_audit_complete",
             llm_prompt=(
                 "Does complete post-incident audit exist with: incident response evaluated, "
@@ -430,7 +430,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Supporting deliverables (3-4 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="credit_monitoring_services",
             llm_prompt=(
                 "Do credit monitoring services exist with: credit monitoring offered to affected individuals, "
@@ -440,7 +440,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="incident_response_team_coordination",
             llm_prompt=(
                 "Does incident response team coordination exist with: response team activated, "
@@ -450,7 +450,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="security_improvements_documented",
             llm_prompt=(
                 "Do documented security improvements exist with: security enhancements identified, "
@@ -460,7 +460,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=3.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="stakeholder_communication_maintained",
             llm_prompt=(
                 "Does maintained stakeholder communication exist with: stakeholder updates regular, "
@@ -472,9 +472,9 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
         ),
     ]
 
-    return Evaluator(
+    return Rubric(
         name="legal_global_data_breach_goal_achievement_eval",
         description="Global data breach incident response and recovery deliverable achievement measurement",
         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-        rubrics=goal_achievement_rubrics,
+        criteria=goal_achievement_rubrics,
     )

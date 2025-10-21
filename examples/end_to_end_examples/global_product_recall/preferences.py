@@ -18,18 +18,18 @@ from examples.end_to_end_examples.standard_rules import (
 from math import exp
 from manager_agent_gym.schemas.preferences.preference import (
     Preference,
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
-from manager_agent_gym.schemas.core import Workflow
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric, RunCondition
+from manager_agent_gym.schemas.domain import Workflow
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria, RunCondition
 from manager_agent_gym.schemas.preferences import PreferenceWeightUpdateRequest
 
 
-def create_preferences() -> PreferenceWeights:
+def create_preferences() -> PreferenceSnapshot:
     # ---------------------------
     # Deterministic helper rules
     # ---------------------------
@@ -313,7 +313,7 @@ def create_preferences() -> PreferenceWeights:
     # CONSUMER SAFETY
     # ---------------------------
     consumer_safety_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="immediate_safety_response",
             llm_prompt=(
                 """Evaluate immediate safety response effectiveness. Award credit for evidence of:
@@ -326,7 +326,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="zero_tolerance_safety_incidents",
             llm_prompt=(
                 """Assess prevention of additional safety incidents post-recall announcement:
@@ -336,7 +336,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="consumer_protection_prioritization",
             llm_prompt=(
                 """Evaluate consumer protection prioritization over financial considerations:
@@ -346,20 +346,20 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="safety_prioritization_signal",
             evaluator_function=consumer_safety_prioritization,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="crisis_response_speed_signal",
             evaluator_function=crisis_response_speed,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
         # Evidence gate: safety deliverables must exist
-        WorkflowRubric(
+        RubricCriteria(
             name="safety_deliverables_evidence",
             llm_prompt=(
                 "Award credit ONLY if concrete safety deliverables exist: completed Safety Impact Assessment,\n"
@@ -374,7 +374,7 @@ def create_preferences() -> PreferenceWeights:
     # REGULATORY COMPLIANCE
     # ---------------------------
     regulatory_compliance_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="multi_jurisdiction_coordination",
             llm_prompt=(
                 """Evaluate multi-jurisdiction regulatory coordination across 15 countries. Award credit for evidence of:
@@ -387,7 +387,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_approval_achievement",
             llm_prompt=(
                 """Assess regulatory approval achievement for market re-entry:
@@ -397,7 +397,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="compliance_documentation_completeness",
             llm_prompt=(
                 """Evaluate regulatory compliance documentation completeness:
@@ -407,7 +407,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_excellence_standard",
             llm_prompt=(
                 """Assess adherence to regulatory excellence standard:
@@ -417,7 +417,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_coordination_signal",
             evaluator_function=regulatory_coordination_effectiveness,
             max_score=1.0,
@@ -429,7 +429,7 @@ def create_preferences() -> PreferenceWeights:
     # CRISIS MANAGEMENT
     # ---------------------------
     crisis_management_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="crisis_team_activation_effectiveness",
             llm_prompt=(
                 """Evaluate crisis management team activation and coordination:
@@ -439,7 +439,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="stakeholder_communication_strategy",
             llm_prompt=(
                 """Assess stakeholder communication strategy effectiveness:
@@ -449,7 +449,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="decision_authority_documentation",
             llm_prompt=(
                 """Evaluate decision authority documentation and governance:
@@ -459,7 +459,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="crisis_timeline_management",
             llm_prompt=(
                 """Assess crisis timeline management and milestone achievement:
@@ -469,20 +469,20 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="stakeholder_communication_coverage_signal",
             evaluator_function=stakeholder_communication_coverage,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="crisis_timeline_adherence_signal",
             evaluator_function=crisis_timeline_adherence,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
         # Evidence gate: comms and governance artifacts
-        WorkflowRubric(
+        RubricCriteria(
             name="comms_governance_artifacts_evidence",
             llm_prompt=(
                 "Require uploaded artifacts for: consumer comms (templates, schedules, dispatch proof), media decision tree, dealer kit,\n"
@@ -497,7 +497,7 @@ def create_preferences() -> PreferenceWeights:
     # OPERATIONAL EXECUTION
     # ---------------------------
     operational_execution_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="global_logistics_coordination",
             llm_prompt=(
                 """Evaluate global product retrieval logistics coordination:
@@ -508,7 +508,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="recall_completion_effectiveness",
             llm_prompt=(
                 """Assess recall completion effectiveness targeting >95% completion rate:
@@ -518,7 +518,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="root_cause_remediation_quality",
             llm_prompt=(
                 """Evaluate root cause analysis and remediation quality:
@@ -528,7 +528,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="supply_chain_partner_retention",
             llm_prompt=(
                 """Assess supply chain partner and dealer network retention:
@@ -538,14 +538,14 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="recall_completion_tracking_signal",
             evaluator_function=recall_completion_tracking,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Evidence gate: logistics artifacts per country
-        WorkflowRubric(
+        RubricCriteria(
             name="logistics_artifacts_evidence",
             llm_prompt=(
                 "Award credit only if country-level reverse-logistics plans, dealer coordination agreements, customer return SOPs,\n"
@@ -560,7 +560,7 @@ def create_preferences() -> PreferenceWeights:
     # BRAND RECOVERY
     # ---------------------------
     brand_recovery_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="customer_confidence_restoration",
             llm_prompt=(
                 """Evaluate customer confidence restoration strategy targeting >80% pre-recall levels:
@@ -570,7 +570,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="market_reentry_strategy_quality",
             llm_prompt=(
                 """Assess market re-entry strategy quality and execution:
@@ -580,7 +580,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="brand_reputation_recovery_evidence",
             llm_prompt=(
                 """Evaluate brand reputation recovery evidence and measurement:
@@ -590,7 +590,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="competitive_repositioning_effectiveness",
             llm_prompt=(
                 """Assess competitive repositioning effectiveness:
@@ -601,7 +601,7 @@ def create_preferences() -> PreferenceWeights:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Evidence gate: reputation and confidence metrics
-        WorkflowRubric(
+        RubricCriteria(
             name="reputation_metrics_evidence",
             llm_prompt=(
                 "Require independent survey results, brand-sentiment dashboards, and recovery KPI reports before awarding credit. [0,10]"
@@ -615,7 +615,7 @@ def create_preferences() -> PreferenceWeights:
     # FINANCIAL RISK MANAGEMENT
     # ---------------------------
     financial_risk_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="financial_impact_containment",
             llm_prompt=(
                 """Evaluate financial impact containment within crisis budget parameters:
@@ -625,7 +625,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="legal_liability_management",
             llm_prompt=(
                 """Assess legal liability management across 15 jurisdictions:
@@ -635,7 +635,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="insurance_claims_optimization",
             llm_prompt=(
                 """Evaluate insurance claims processing and coverage optimization:
@@ -645,14 +645,14 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_efficiency",
             evaluator_function=cost_rubric,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Evidence gate: insurance and liability artifacts
-        WorkflowRubric(
+        RubricCriteria(
             name="insurance_liability_artifacts_evidence",
             llm_prompt=(
                 "Require filed insurance claims package, coverage analysis, litigation strategy docs, and exposure matrices before credit. [0,10]"
@@ -667,27 +667,27 @@ def create_preferences() -> PreferenceWeights:
     # ---------------------------
     speed_rubrics = [
         # Deterministic
-        WorkflowRubric(
+        RubricCriteria(
             name="crisis_response_speed",
             evaluator_function=crisis_response_speed,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="crisis_timeline_adherence",
             evaluator_function=crisis_timeline_adherence,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
         # Standard speed rule
-        WorkflowRubric(
+        RubricCriteria(
             name="speed_efficiency",
             evaluator_function=speed_rubric,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # LLM speed assessments
-        WorkflowRubric(
+        RubricCriteria(
             name="emergency_response_timing",
             llm_prompt=(
                 """Evaluate emergency response timing and urgency management:
@@ -697,7 +697,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="milestone_achievement_pace",
             llm_prompt=(
                 """Assess milestone achievement pace for 6-month recall completion:
@@ -709,76 +709,76 @@ def create_preferences() -> PreferenceWeights:
         ),
     ]
 
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="consumer_safety",
                 weight=0.40,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="consumer_safety",
                     description="Measures the consumer safety of the crisis response",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=consumer_safety_rubrics,
+                    criteria=consumer_safety_rubrics,
                 ),
             ),
             Preference(
                 name="regulatory_compliance",
                 weight=0.25,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="regulatory_compliance",
                     description="Measures the regulatory compliance of the crisis response",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=regulatory_compliance_rubrics,
+                    criteria=regulatory_compliance_rubrics,
                 ),
             ),
             Preference(
                 name="crisis_management",
                 weight=0.15,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="crisis_management",
                     description="Measures the crisis management of the crisis response",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=crisis_management_rubrics,
+                    criteria=crisis_management_rubrics,
                 ),
             ),
             Preference(
                 name="operational_execution",
                 weight=0.10,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="operational_execution",
                     description="Measures the operational execution of the crisis response",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=operational_execution_rubrics,
+                    criteria=operational_execution_rubrics,
                 ),
             ),
             Preference(
                 name="brand_recovery",
                 weight=0.05,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="brand_recovery",
                     description="Measures the brand recovery of the crisis response",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=brand_recovery_rubrics,
+                    criteria=brand_recovery_rubrics,
                 ),
             ),
             Preference(
                 name="financial_risk_management",
                 weight=0.03,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="financial_risk_management",
                     description="Measures the financial risk management of the crisis response",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=financial_risk_rubrics,
+                    criteria=financial_risk_rubrics,
                 ),
             ),
             Preference(
                 name="speed",
                 weight=0.02,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="speed",
                     description="Measures the speed of the crisis response",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=speed_rubrics,
+                    criteria=speed_rubrics,
                 ),
             ),
         ]
@@ -787,8 +787,8 @@ def create_preferences() -> PreferenceWeights:
 
 def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     """Return weight update requests for crisis → recovery dynamics."""
-    timeline: dict[int, PreferenceWeights] = {
-        0: PreferenceWeights(
+    timeline: dict[int, PreferenceSnapshot] = {
+        0: PreferenceSnapshot(
             preferences=[
                 Preference(name="consumer_safety", weight=0.5),
                 Preference(name="regulatory_compliance", weight=0.2),
@@ -799,7 +799,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="speed", weight=0.01),
             ]
         ),
-        10: PreferenceWeights(
+        10: PreferenceSnapshot(
             preferences=[
                 Preference(name="consumer_safety", weight=0.4),
                 Preference(name="regulatory_compliance", weight=0.25),
@@ -810,7 +810,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="speed", weight=0.01),
             ]
         ),
-        25: PreferenceWeights(
+        25: PreferenceSnapshot(
             preferences=[
                 Preference(name="consumer_safety", weight=0.35),
                 Preference(name="regulatory_compliance", weight=0.25),
@@ -821,7 +821,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="speed", weight=0.02),
             ]
         ),
-        40: PreferenceWeights(
+        40: PreferenceSnapshot(
             preferences=[
                 Preference(name="consumer_safety", weight=0.3),
                 Preference(name="regulatory_compliance", weight=0.25),
@@ -832,7 +832,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="speed", weight=0.05),
             ]
         ),
-        60: PreferenceWeights(
+        60: PreferenceSnapshot(
             preferences=[
                 Preference(name="consumer_safety", weight=0.25),
                 Preference(name="regulatory_compliance", weight=0.2),
@@ -863,11 +863,11 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     return requests
 
 
-def create_evaluator_to_measure_goal_achievement() -> Evaluator:
+def create_evaluator_to_measure_goal_achievement() -> Rubric:
     """Create goal achievement evaluator for global product recall and market re-entry strategy."""
     goal_achievement_rubrics = [
         # Critical safety and regulatory deliverables (absolutely must have for recall success)
-        WorkflowRubric(
+        RubricCriteria(
             name="recall_execution_framework_ready",
             llm_prompt=(
                 "Does ready recall execution framework exist with: comprehensive tracking methodology for all 15 markets, "
@@ -877,7 +877,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=20.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="safety_incident_prevention_protocols_established",
             llm_prompt=(
                 "Do established safety incident prevention protocols exist with: comprehensive hazard containment procedures documented, "
@@ -887,7 +887,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=18.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_notification_packages_prepared",
             llm_prompt=(
                 "Do prepared regulatory notification packages exist with: NHTSA/Transport Canada/EU GPSR filing templates completed, "
@@ -897,7 +897,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="market_reentry_strategy_documented",
             llm_prompt=(
                 "Does documented market re-entry strategy exist with: comprehensive re-entry plan for all jurisdictions, "
@@ -908,7 +908,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Major operational and customer recovery deliverables (8-10 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="customer_confidence_metrics_restored",
             llm_prompt=(
                 "Do restored customer confidence metrics exist with: >80% of pre-recall confidence levels achieved within 12 months, "
@@ -918,7 +918,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="product_retrieval_logistics_operational",
             llm_prompt=(
                 "Does operational product retrieval logistics exist with: reverse supply chain activated, "
@@ -928,7 +928,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="root_cause_analysis_remediation",
             llm_prompt=(
                 "Does root cause analysis and remediation exist with: technical failure investigation completed, "
@@ -938,7 +938,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="crisis_management_coordination",
             llm_prompt=(
                 "Does crisis management coordination exist with: cross-functional recall team activated, "
@@ -948,7 +948,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="consumer_communication_campaign",
             llm_prompt=(
                 "Does consumer communication campaign exist with: multi-channel safety notifications deployed (mail/electronic/dealer), "
@@ -959,7 +959,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Important supporting deliverables (5-7 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_compliance_documentation",
             llm_prompt=(
                 "Does regulatory compliance documentation exist with: recall effectiveness monitoring active, "
@@ -969,7 +969,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="financial_impact_contained",
             llm_prompt=(
                 "Does contained financial impact exist with: crisis management budget parameters maintained, "
@@ -979,7 +979,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="supply_chain_partners_retained",
             llm_prompt=(
                 "Do retained supply chain partners exist with: enhanced quality agreements executed, "
@@ -989,7 +989,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="legal_liability_management",
             llm_prompt=(
                 "Does legal liability management exist with: liability management across jurisdictions, "
@@ -999,7 +999,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="enhanced_quality_assurance",
             llm_prompt=(
                 "Does enhanced quality assurance exist with: quality protocols upgraded, "
@@ -1010,7 +1010,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Supporting deliverables (3-4 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="social_media_crisis_management",
             llm_prompt=(
                 "Does social media crisis management exist with: social media monitoring active, "
@@ -1020,7 +1020,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="competitive_repositioning_plan",
             llm_prompt=(
                 "Does competitive repositioning plan exist with: market positioning strategy updated, "
@@ -1030,7 +1030,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="disposal_recycling_protocols",
             llm_prompt=(
                 "Do disposal and recycling protocols exist with: environmental compliance maintained, "
@@ -1040,7 +1040,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=3.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="recall_effectiveness_monitoring",
             llm_prompt=(
                 "Does recall effectiveness monitoring exist with: monitoring systems operational, "
@@ -1052,9 +1052,9 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
         ),
     ]
 
-    return Evaluator(
+    return Rubric(
         name="global_product_recall_goal_achievement_eval",
         description="Global product recall and market re-entry strategy deliverable achievement measurement",
         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-        rubrics=goal_achievement_rubrics,
+        criteria=goal_achievement_rubrics,
     )

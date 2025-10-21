@@ -1,16 +1,17 @@
 import pytest
 from uuid import uuid4
 
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.schemas.config import OutputConfig
-from manager_agent_gym.core.execution.engine import WorkflowExecutionEngine
-from manager_agent_gym.core.workflow_agents.registry import AgentRegistry
-from manager_agent_gym.schemas.preferences.preference import PreferenceWeights
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.domain.task import Task
+from manager_agent_gym.core.workflow.schemas.config import OutputConfig
+from manager_agent_gym.core.workflow.engine import WorkflowExecutionEngine
+from manager_agent_gym.core.agents.workflow_agents.tools.registry import AgentRegistry
+from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
 from tests.helpers.stubs import (
     StubAgent,
     ManagerNoOp,
 )
+from manager_agent_gym.core.workflow.services import WorkflowMutations
 
 pytestmark = pytest.mark.integration
 
@@ -21,20 +22,20 @@ async def test_human_simulated_time_inflates_workflow_time(tmp_path):
     # Two-step chain so both complete in sequence
     a = Task(name="A", description="d")
     b = Task(name="B", description="d", dependency_task_ids=[a.id])
-    w.add_task(a)
-    w.add_task(b)
+    WorkflowMutations.add_task(w, a)
+    WorkflowMutations.add_task(w, b)
 
     # One human-like stub that reports 1 hour per task and is pre-assigned
     human = StubAgent(agent_id="human-1", agent_type="human_mock", seconds=3600.0)
-    w.add_agent(human)
+    WorkflowMutations.add_agent(w, human)
     a.assigned_agent_id = human.agent_id
     b.assigned_agent_id = human.agent_id
 
     # Minimal stakeholder with empty preferences to satisfy engine signature
-    from manager_agent_gym.core.workflow_agents.stakeholder_agent import (
+    from manager_agent_gym.core.agents.stakeholder_agent.stakeholder_agent import (
         StakeholderAgent,
     )
-    from manager_agent_gym.schemas.workflow_agents.stakeholder import StakeholderConfig
+    from manager_agent_gym.schemas.agents.stakeholder import StakeholderConfig
 
     stakeholder = StakeholderAgent(
         config=StakeholderConfig(
@@ -44,7 +45,7 @@ async def test_human_simulated_time_inflates_workflow_time(tmp_path):
             model_name="o3",
             name="Stakeholder",
             role="Owner",
-            initial_preferences=PreferenceWeights(preferences=[]),
+            preference_data=PreferenceSnapshot(preferences=[]),
             agent_description="Stakeholder",
             agent_capabilities=["Stakeholder"],
         )
@@ -63,7 +64,7 @@ async def test_human_simulated_time_inflates_workflow_time(tmp_path):
         max_timesteps=10,
         seed=42,
     )
-    w.add_agent(stakeholder)
+    WorkflowMutations.add_agent(w, stakeholder)
     # Avoid stakeholder being selected as available by other code paths
     stakeholder.is_available = False
 
@@ -86,20 +87,20 @@ async def test_parallel_ready_humans_sum_in_timestep(tmp_path):
     # Pre-assign to distinct agents so engine starts both when ready
     t1.assigned_agent_id = "h1"
     t2.assigned_agent_id = "h2"
-    w.add_task(t1)
-    w.add_task(t2)
+    WorkflowMutations.add_task(w, t1)
+    WorkflowMutations.add_task(w, t2)
 
     # Each reports 0.5 hour (1800 seconds)
     h1 = StubAgent(agent_id="h1", agent_type="human_mock", seconds=1800.0)
     h2 = StubAgent(agent_id="h2", agent_type="human_mock", seconds=1800.0)
-    w.add_agent(h1)
-    w.add_agent(h2)
+    WorkflowMutations.add_agent(w, h1)
+    WorkflowMutations.add_agent(w, h2)
 
     # Manager not needed for assignment since tasks are pre-assigned
-    from manager_agent_gym.core.workflow_agents.stakeholder_agent import (
+    from manager_agent_gym.core.agents.stakeholder_agent.stakeholder_agent import (
         StakeholderAgent,
     )
-    from manager_agent_gym.schemas.workflow_agents.stakeholder import StakeholderConfig
+    from manager_agent_gym.schemas.agents.stakeholder import StakeholderConfig
 
     stakeholder = StakeholderAgent(
         config=StakeholderConfig(
@@ -109,7 +110,7 @@ async def test_parallel_ready_humans_sum_in_timestep(tmp_path):
             model_name="o3",
             name="Stakeholder",
             role="Owner",
-            initial_preferences=PreferenceWeights(preferences=[]),
+            preference_data=PreferenceSnapshot(preferences=[]),
             agent_description="Stakeholder",
             agent_capabilities=["Stakeholder"],
         )
@@ -127,7 +128,7 @@ async def test_parallel_ready_humans_sum_in_timestep(tmp_path):
         max_timesteps=10,
         seed=42,
     )
-    w.add_agent(stakeholder)
+    WorkflowMutations.add_agent(w, stakeholder)
     stakeholder.is_available = False
 
     # T0 starts both -> tasks_started populated
@@ -145,9 +146,11 @@ async def test_parallel_ready_humans_sum_in_timestep(tmp_path):
 @pytest.mark.asyncio
 async def test_missing_simulated_hours_raises_if_agent_omits_it(tmp_path):
     # Agents must now set simulated_duration_hours explicitly for tasks.
-    from manager_agent_gym.schemas.unified_results import create_task_result
-    from manager_agent_gym.core.workflow_agents.interface import AgentInterface
-    from manager_agent_gym.schemas.workflow_agents import AgentConfig
+    from manager_agent_gym.core.execution.schemas.results import create_task_result
+    from manager_agent_gym.core.agents.workflow_agents.common.interface import (
+        AgentInterface,
+    )
+    from manager_agent_gym.schemas.agents import AgentConfig
 
     class _AgentNoSimHours(AgentInterface[AgentConfig]):
         def __init__(self) -> None:
@@ -176,13 +179,13 @@ async def test_missing_simulated_hours_raises_if_agent_omits_it(tmp_path):
     w = Workflow(name="timing-w3", workflow_goal="d", owner_id=uuid4())
     t = Task(name="X", description="d")
     t.assigned_agent_id = "no-sim"
-    w.add_task(t)
-    w.add_agent(_AgentNoSimHours())
+    WorkflowMutations.add_task(w, t)
+    WorkflowMutations.add_agent(w, _AgentNoSimHours())
 
-    from manager_agent_gym.core.workflow_agents.stakeholder_agent import (
+    from manager_agent_gym.core.agents.stakeholder_agent.stakeholder_agent import (
         StakeholderAgent,
     )
-    from manager_agent_gym.schemas.workflow_agents.stakeholder import StakeholderConfig
+    from manager_agent_gym.schemas.agents.stakeholder import StakeholderConfig
 
     stakeholder = StakeholderAgent(
         config=StakeholderConfig(
@@ -192,7 +195,7 @@ async def test_missing_simulated_hours_raises_if_agent_omits_it(tmp_path):
             model_name="o3",
             name="Stakeholder",
             role="Owner",
-            initial_preferences=PreferenceWeights(preferences=[]),
+            preference_data=PreferenceSnapshot(preferences=[]),
             agent_description="Stakeholder",
             agent_capabilities=["Stakeholder"],
         )
@@ -210,7 +213,7 @@ async def test_missing_simulated_hours_raises_if_agent_omits_it(tmp_path):
         max_timesteps=5,
         seed=42,
     )
-    w.add_agent(stakeholder)
+    WorkflowMutations.add_agent(w, stakeholder)
     stakeholder.is_available = False
 
     # Start then complete

@@ -1,11 +1,12 @@
-from manager_agent_gym.schemas.core.workflow import Workflow
+from manager_agent_gym.schemas.domain.workflow import Workflow
 
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.schemas.core.base import TaskStatus
+from manager_agent_gym.schemas.domain.task import Task
+from manager_agent_gym.schemas.domain.base import TaskStatus
 from manager_agent_gym.schemas.preferences import Constraint
 from uuid import uuid4
 from examples.common_stakeholders import create_stakeholder_agent
 from .preferences import create_preferences
+from manager_agent_gym.core.workflow.services import WorkflowMutations
 
 
 def create_litigation_workflow() -> Workflow:
@@ -154,7 +155,7 @@ def create_litigation_workflow() -> Workflow:
 
     # Add to workflow
     for t in [legal_hold, collection, review, production]:
-        wf.add_task(t)
+        WorkflowMutations.add_task(wf, t)
     # Constraints for defensible eDiscovery and confidentiality
     wf.constraints.extend(
         [
@@ -208,7 +209,7 @@ def create_litigation_workflow() -> Workflow:
     try:
         prefs = create_preferences()
         stakeholder = create_stakeholder_agent(persona="balanced", preferences=prefs)
-        wf.add_agent(stakeholder)
+        WorkflowMutations.add_agent(wf, stakeholder)
     except Exception:
         pass
     return wf

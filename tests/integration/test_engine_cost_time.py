@@ -2,29 +2,35 @@ import pytest
 
 from uuid import uuid4
 
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.schemas.preferences.preference import PreferenceWeights
-from manager_agent_gym.schemas.config import OutputConfig
-from manager_agent_gym.core.execution.engine import WorkflowExecutionEngine
-from manager_agent_gym.core.workflow_agents.interface import AgentInterface
-from manager_agent_gym.core.workflow_agents.registry import AgentRegistry
-from manager_agent_gym.core.manager_agent.interface import ManagerAgent
-from manager_agent_gym.schemas.execution.manager import ManagerObservation
-from manager_agent_gym.schemas.unified_results import create_task_result
-from manager_agent_gym.core.workflow_agents.stakeholder_agent import StakeholderAgent
-from manager_agent_gym.schemas.workflow_agents.stakeholder import StakeholderConfig
-from manager_agent_gym.schemas.workflow_agents.stakeholder import (
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.domain.task import Task
+from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
+from manager_agent_gym.core.workflow.schemas.config import OutputConfig
+from manager_agent_gym.core.workflow.engine import WorkflowExecutionEngine
+from manager_agent_gym.core.agents.workflow_agents.common.interface import (
+    AgentInterface,
+)
+from manager_agent_gym.core.agents.workflow_agents.tools.registry import AgentRegistry
+from manager_agent_gym.core.agents.manager_agent.common.interface import ManagerAgent
+from manager_agent_gym.schemas.manager.observation import ManagerObservation
+from manager_agent_gym.core.execution.schemas.results import create_task_result
+from manager_agent_gym.core.agents.stakeholder_agent.stakeholder_agent import (
+    StakeholderAgent,
+)
+from manager_agent_gym.schemas.agents.stakeholder import StakeholderConfig
+from manager_agent_gym.schemas.agents.stakeholder import (
     StakeholderPublicProfile,
 )
-from manager_agent_gym.schemas.execution.state import ExecutionState
+from manager_agent_gym.core.workflow.services import WorkflowQueries
+from manager_agent_gym.core.workflow.services import WorkflowMutations
+from manager_agent_gym.core.execution.schemas.state import ExecutionState
 
 pytestmark = pytest.mark.integration
 
 
 class _CostTimeStubAgent(AgentInterface):
     def __init__(self, agent_id: str, agent_type: str, cost: float, seconds: float):
-        from manager_agent_gym.schemas.workflow_agents import AgentConfig
+        from manager_agent_gym.schemas.agents import AgentConfig
 
         super().__init__(
             AgentConfig(
@@ -55,12 +61,12 @@ class _CostTimeStubAgent(AgentInterface):
 class _AlternatingAssignManager(ManagerAgent):
     def __init__(self):
         super().__init__(
-            agent_id="stub_manager", preferences=PreferenceWeights(preferences=[])
+            agent_id="stub_manager", preferences=PreferenceSnapshot(preferences=[])
         )
         self._last_idx = -1
 
     async def take_action(self, observation: ManagerObservation):
-        from manager_agent_gym.schemas.execution.manager_actions import (
+        from manager_agent_gym.core.agents.manager_agent.actions import (
             AssignTaskAction,
             NoOpAction,
         )
@@ -86,11 +92,11 @@ class _AlternatingAssignManager(ManagerAgent):
         self,
         workflow: Workflow,
         execution_state: ExecutionState,
-        stakeholder_profile: StakeholderPublicProfile,
-        current_timestep: int,
-        running_tasks: dict,
-        completed_task_ids: set,
-        failed_task_ids: set,
+        stakeholder_profile: StakeholderPublicProfile | None = None,
+        current_timestep: int = 0,
+        running_tasks: dict | None = None,
+        completed_task_ids: set | None = None,
+        failed_task_ids: set | None = None,
         communication_service=None,
         previous_reward: float = 0.0,
         done: bool = False,
@@ -103,7 +109,6 @@ class _AlternatingAssignManager(ManagerAgent):
             completed_task_ids=completed_task_ids,
             failed_task_ids=failed_task_ids,
             communication_service=communication_service,
-            stakeholder_profile=stakeholder_profile,
         )
         return await self.take_action(obs)
 
@@ -122,16 +127,16 @@ def cost_time_workflow():
         estimated_duration_hours=2.0,
         dependency_task_ids=[t1.id],
     )
-    w.add_task(t1)
-    w.add_task(t2)
+    WorkflowMutations.add_task(w, t1)
+    WorkflowMutations.add_task(w, t2)
 
     # Register one AI and one Human stub agent with distinct costs and times
     ai = _CostTimeStubAgent("ai-1", "ai", cost=60.0, seconds=3.6)  # 0.001 hours
     human = _CostTimeStubAgent(
         "human-1", "human_mock", cost=80.0, seconds=7.2
     )  # 0.002 hours
-    w.add_agent(ai)
-    w.add_agent(human)
+    WorkflowMutations.add_agent(w, ai)
+    WorkflowMutations.add_agent(w, human)
     # Minimal stakeholder with empty preferences to satisfy evaluation
     stakeholder_cfg = StakeholderConfig(
         agent_id="stakeholder",
@@ -140,11 +145,11 @@ def cost_time_workflow():
         model_name="o3",
         name="Stakeholder",
         role="Owner",
-        initial_preferences=PreferenceWeights(preferences=[]),
+        preference_data=PreferenceSnapshot(preferences=[]),
         agent_description="Stakeholder",
         agent_capabilities=["Stakeholder"],
     )
-    w.add_agent(StakeholderAgent(config=stakeholder_cfg))
+    WorkflowMutations.add_agent(w, StakeholderAgent(config=stakeholder_cfg))
     return w
 
 
@@ -168,7 +173,7 @@ async def test_costs_are_aggregated_from_task_results(tmp_path, cost_time_workfl
     )
 
     results = await engine.run_full_execution()
-    assert engine.workflow.is_complete()
+    assert WorkflowQueries.is_complete(engine.workflow)
     # Sum actual_cost stored on tasks
     total_actual = sum(
         float(t.actual_cost or 0.0) for t in engine.workflow.tasks.values()

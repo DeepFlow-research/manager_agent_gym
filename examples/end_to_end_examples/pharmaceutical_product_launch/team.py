@@ -12,13 +12,13 @@ Demonstrates:
 - Resource reallocation under strict regulatory constraints and budget pressures
 """
 
-from manager_agent_gym.schemas.workflow_agents import (
+from manager_agent_gym.schemas.agents import (
     AIAgentConfig,
     HumanAgentConfig,
     StakeholderConfig,
 )
 from manager_agent_gym.schemas.preferences.preference import (
-    PreferenceWeights,
+    PreferenceSnapshot,
     Preference,
 )
 
@@ -354,7 +354,7 @@ def create_team_configs():
         clarification_reply_rate=0.9,
         strictness=0.8,
         verbosity=3,
-        initial_preferences=PreferenceWeights(
+        preference_data=PreferenceSnapshot(
             preferences=[
                 Preference(name="patient_safety", weight=0.4),
                 Preference(name="regulatory_compliance", weight=0.3),

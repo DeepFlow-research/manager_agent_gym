@@ -9,24 +9,24 @@ Preferences (4):
 
 Mirrors schema style in prior examples:
   * PreferenceWeights / Preference
-  * Evaluator(aggregation=AggregationStrategy.WEIGHTED_AVERAGE, rubrics=[WorkflowRubric...])
-  * WorkflowRubric with llm_prompt or evaluator_function
+  * Rubric(aggregation=AggregationStrategy.WEIGHTED_AVERAGE, criteria=[RubricCriteria...])
+  * RubricCriteria with llm_prompt or evaluator_function
   * create_*_preference_update_requests(): absolute, normalized timeline updates
 """
 
 from typing import List
 from manager_agent_gym.schemas.preferences.preference import (
     Preference,
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric, RunCondition
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria, RunCondition
 from manager_agent_gym.schemas.preferences import PreferenceWeightUpdateRequest
-from manager_agent_gym.schemas.core import Workflow
-from manager_agent_gym.schemas.core.base import TaskStatus
+from manager_agent_gym.schemas.domain import Workflow
+from manager_agent_gym.schemas.domain.base import TaskStatus
 
 
 # ---------------------------
@@ -204,8 +204,8 @@ def rule_obligations_handoff_complete(workflow: Workflow) -> float:
 # ---------------------------
 # LLM Rubrics
 # ---------------------------
-speed_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+speed_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="cycle_time_efficiency",
         llm_prompt=(
             "Evaluate cycle-time discipline with specific efficiency requirements:\n"
@@ -218,25 +218,25 @@ speed_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_intake_tiering_done",
         evaluator_function=rule_intake_tiering_done,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_playbook_selected",
         evaluator_function=rule_playbook_selected,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_redlines_round1_done",
         evaluator_function=rule_redlines_round1_done,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_signature_package_ready",
         evaluator_function=rule_signature_package_ready,
         max_score=1.0,
@@ -244,8 +244,8 @@ speed_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-risk_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+risk_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="risk_posture_and_compliance",
         llm_prompt=(
             "Rigorously assess risk/compliance posture with validation requirements:\n"
@@ -259,37 +259,37 @@ risk_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_dpa_transfers_attached",
         evaluator_function=rule_dpa_transfers_attached,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_security_questionnaire_done",
         evaluator_function=rule_security_questionnaire_done,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_export_sanctions_cleared",
         evaluator_function=rule_export_sanctions_cleared,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_insurance_verified",
         evaluator_function=rule_insurance_verified,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_internal_approvals_done",
         evaluator_function=rule_internal_approvals_done,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="negotiation_adversarial_scenarios",
         llm_prompt=(
             "Evaluate handling of adversarial negotiation scenarios:\n"
@@ -303,7 +303,7 @@ risk_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="cost_realism_validation",
         evaluator_function=_validate_cost_realism,
         max_score=1.0,
@@ -311,8 +311,8 @@ risk_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-playbook_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+playbook_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="playbook_deviation_discipline",
         llm_prompt=(
             "Evaluate playbook adherence and deviation discipline: "
@@ -324,13 +324,13 @@ playbook_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_deviation_register_active",
         evaluator_function=rule_deviation_register_active,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_negotiation_round2_complete",
         evaluator_function=rule_negotiation_round2_complete,
         max_score=1.0,
@@ -338,8 +338,8 @@ playbook_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-handoff_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+handoff_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="handoff_and_metadata_quality",
         llm_prompt=(
             "Evaluate handoff quality: "
@@ -351,13 +351,13 @@ handoff_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_clm_ingest_complete",
         evaluator_function=rule_clm_ingest_complete,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_obligations_handoff_complete",
         evaluator_function=rule_obligations_handoff_complete,
         max_score=1.0,
@@ -369,48 +369,48 @@ handoff_rubrics: List[WorkflowRubric] = [
 # ---------------------------
 # Preferences + Evaluators
 # ---------------------------
-def create_preferences() -> PreferenceWeights:
+def create_preferences() -> PreferenceSnapshot:
     """Initial stakeholder weights for MSA/SOW factory (t=0 snapshot)."""
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="speed",
                 weight=0.4,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="speed_eval",
                     description="Cycle-time discipline from intake to signature readiness.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=speed_rubrics,
+                    criteria=speed_rubrics,
                 ),
             ),
             Preference(
                 name="risk_compliance",
                 weight=0.3,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="risk_eval",
                     description="DPA/transfers, security questionnaire, export/sanctions, insurance approvals, and internal approvals.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=risk_rubrics,
+                    criteria=risk_rubrics,
                 ),
             ),
             Preference(
                 name="playbook_adherence",
                 weight=0.2,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="playbook_eval",
                     description="Deviation discipline and approval hygiene; focus Round 2 on true deltas.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=playbook_rubrics,
+                    criteria=playbook_rubrics,
                 ),
             ),
             Preference(
                 name="handoff_quality",
                 weight=0.1,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="handoff_eval",
                     description="CLM ingest with metadata; obligations matrix & alerts to GTM/Success.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=handoff_rubrics,
+                    criteria=handoff_rubrics,
                 ),
             ),
         ]
@@ -422,9 +422,9 @@ def create_preferences() -> PreferenceWeights:
 # ---------------------------
 def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     """Stakeholder's weight changes over time (absolute, normalized)."""
-    timeline: dict[int, PreferenceWeights] = {
+    timeline: dict[int, PreferenceSnapshot] = {
         # Early: speed to first redlines + package readiness
-        0: PreferenceWeights(
+        0: PreferenceSnapshot(
             preferences=[
                 Preference(name="speed", weight=0.4),
                 Preference(name="risk_compliance", weight=0.3),
@@ -433,7 +433,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
             ]
         ),
         # Mid: tighten risk/compliance and playbook discipline during negotiation/approvals
-        18: PreferenceWeights(
+        18: PreferenceSnapshot(
             preferences=[
                 Preference(name="speed", weight=0.25),
                 Preference(name="risk_compliance", weight=0.4),
@@ -442,7 +442,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
             ]
         ),
         # Late: ensure clean handoff and metadata; protect renewal/SLAs
-        26: PreferenceWeights(
+        26: PreferenceSnapshot(
             preferences=[
                 Preference(name="speed", weight=0.15),
                 Preference(name="risk_compliance", weight=0.25),
@@ -471,11 +471,11 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     return requests
 
 
-def create_evaluator_to_measure_goal_achievement() -> Evaluator:
+def create_evaluator_to_measure_goal_achievement() -> Rubric:
     """Create goal achievement evaluator for enterprise SaaS MSA/SOW negotiation factory."""
     goal_achievement_rubrics = [
         # Critical contracting process deliverables (must have for commercial deals)
-        WorkflowRubric(
+        RubricCriteria(
             name="deal_tiering_risk_assessment_complete",
             llm_prompt=(
                 "Does complete deal tiering and risk assessment exist with: risk tier assigned (L/M/H), "
@@ -485,7 +485,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=12.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="msa_sow_execution_ready",
             llm_prompt=(
                 "Does execution-ready MSA/SOW exist with: negotiated terms finalized, "
@@ -495,7 +495,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="dpa_security_review_approved",
             llm_prompt=(
                 "Does approved DPA and security review exist with: data processing addendum finalized, "
@@ -505,7 +505,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=12.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="signature_execution_complete",
             llm_prompt=(
                 "Does complete signature execution exist with: electronic signatures secured, "
@@ -516,7 +516,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Major operational efficiency deliverables (8-10 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="clm_ingest_obligation_handoff",
             llm_prompt=(
                 "Does CLM ingest and obligation handoff exist with: contract management system integration complete, "
@@ -526,7 +526,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="customer_data_profile_mapped",
             llm_prompt=(
                 "Does mapped customer data profile exist with: data categories identified (PII/PHI/PCI), "
@@ -536,7 +536,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="playbook_selection_optimization",
             llm_prompt=(
                 "Does playbook selection optimization exist with: appropriate playbooks selected for deal type, "
@@ -546,7 +546,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="approval_workflow_streamlined",
             llm_prompt=(
                 "Does streamlined approval workflow exist with: approver hierarchy established, "
@@ -556,7 +556,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="metrics_driven_cycle_time",
             llm_prompt=(
                 "Does metrics-driven cycle time optimization exist with: cycle time tracking active, "
@@ -567,7 +567,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Important supporting deliverables (5-7 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="export_control_compliance",
             llm_prompt=(
                 "Does export control compliance exist with: export restrictions assessed, "
@@ -577,7 +577,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="insurance_verification_complete",
             llm_prompt=(
                 "Does complete insurance verification exist with: insurance requirements validated, "
@@ -587,7 +587,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="financial_terms_validation",
             llm_prompt=(
                 "Does financial terms validation exist with: pricing terms confirmed, "
@@ -597,7 +597,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cross_border_data_transfers",
             llm_prompt=(
                 "Do cross-border data transfers exist with: transfer mechanisms documented, "
@@ -607,7 +607,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="template_deviation_control",
             llm_prompt=(
                 "Does template deviation control exist with: deviation tracking active, "
@@ -618,7 +618,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Supporting deliverables (3-4 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="repeatable_factory_process",
             llm_prompt=(
                 "Does repeatable factory process exist with: standardized workflows documented, "
@@ -628,7 +628,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="stakeholder_coordination_active",
             llm_prompt=(
                 "Does active stakeholder coordination exist with: internal alignment maintained, "
@@ -638,7 +638,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="risk_exposure_minimized",
             llm_prompt=(
                 "Does minimized risk exposure exist with: legal risks assessed and mitigated, "
@@ -648,7 +648,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=3.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="contract_portfolio_optimization",
             llm_prompt=(
                 "Does contract portfolio optimization exist with: contract terms standardized, "
@@ -660,9 +660,9 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
         ),
     ]
 
-    return Evaluator(
+    return Rubric(
         name="enterprise_saas_negotiation_goal_achievement_eval",
         description="Enterprise SaaS MSA/SOW negotiation factory deliverable achievement measurement",
         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-        rubrics=goal_achievement_rubrics,
+        criteria=goal_achievement_rubrics,
     )

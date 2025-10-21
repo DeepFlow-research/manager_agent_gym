@@ -13,15 +13,15 @@ Preferences (5):
 from typing import List, Optional
 from manager_agent_gym.schemas.preferences.preference import (
     Preference,
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric, RunCondition
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria, RunCondition
 from manager_agent_gym.schemas.preferences import PreferenceWeightUpdateRequest
-from manager_agent_gym.schemas.core import Workflow, TaskStatus
+from manager_agent_gym.schemas.domain import Workflow, TaskStatus
 
 
 # -------------
@@ -216,8 +216,8 @@ def rule_audit_and_records(workflow: Workflow) -> float:
 # -------------
 # LLM Rubrics
 # -------------
-compliance_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+compliance_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="jurisdictional_obligations_and_sequencing",
         llm_prompt=(
             "Evaluate compliance posture of the RIF: Does the plan respect EU collective redundancy rules and UK s.188 "
@@ -228,19 +228,19 @@ compliance_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_consultation_before_notice",
         evaluator_function=rule_consultation_before_notice,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_warn_matrix_and_filings",
         evaluator_function=rule_warn_matrix_and_filings,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_uk_eu_consult_notifications",
         evaluator_function=rule_uk_eu_consult_notifications,
         max_score=1.0,
@@ -248,8 +248,8 @@ compliance_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-fairness_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+fairness_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="selection_defensibility",
         llm_prompt=(
             "RIGOROUSLY assess selection fairness and defensibility:\n"
@@ -263,19 +263,19 @@ fairness_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_selection_docs_complete",
         evaluator_function=rule_selection_docs_complete,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_adverse_impact_tested",
         evaluator_function=rule_adverse_impact_tested,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="adversarial_resistance_handling",
         llm_prompt=(
             "Evaluate adversarial stakeholder resistance handling:\n"
@@ -291,8 +291,8 @@ fairness_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-employee_exp_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+employee_exp_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="humane_communications_and_support",
         llm_prompt=(
             "Evaluate the employee experience: clarity and empathy of manager scripts and letters, availability of "
@@ -301,13 +301,13 @@ employee_exp_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_comms_playbooks_ready",
         evaluator_function=rule_comms_playbooks_ready,
         max_score=1.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_payroll_benefits_ready",
         evaluator_function=rule_payroll_benefits_ready,
         max_score=1.0,
@@ -315,8 +315,8 @@ employee_exp_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-timeline_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+timeline_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="milestone_discipline",
         llm_prompt=(
             "Evaluate timeline discipline:\n"
@@ -330,7 +330,7 @@ timeline_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_timeline_milestones_locked",
         evaluator_function=rule_timeline_milestones_locked,
         max_score=1.0,
@@ -338,8 +338,8 @@ timeline_rubrics: List[WorkflowRubric] = [
     ),
 ]
 
-docs_rubrics: List[WorkflowRubric] = [
-    WorkflowRubric(
+docs_rubrics: List[RubricCriteria] = [
+    RubricCriteria(
         name="audit_trail_and_recordkeeping",
         llm_prompt=(
             "Assess documentation/audit trail: decision logs, consultation minutes and responses, notice copies, "
@@ -348,7 +348,7 @@ docs_rubrics: List[WorkflowRubric] = [
         max_score=10.0,
         run_condition=RunCondition.ON_COMPLETION,
     ),
-    WorkflowRubric(
+    RubricCriteria(
         name="rule_audit_and_records",
         evaluator_function=rule_audit_and_records,
         max_score=1.0,
@@ -360,58 +360,58 @@ docs_rubrics: List[WorkflowRubric] = [
 # -------------
 # Preferences + Evaluators
 # -------------
-def create_preferences() -> PreferenceWeights:
+def create_preferences() -> PreferenceSnapshot:
     """Initial stakeholder weights for a global RIF (t=0 snapshot)."""
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="compliance",
                 weight=0.35,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="compliance_eval",
                     description="Jurisdictional obligations & sequencing across EU/UK/US; statutory overlays.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=compliance_rubrics,
+                    criteria=compliance_rubrics,
                 ),
             ),
             Preference(
                 name="fairness_defensibility",
                 weight=0.25,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="fairness_eval",
                     description="Selection criteria integrity, calibration, adverse‑impact testing and remediation.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=fairness_rubrics,
+                    criteria=fairness_rubrics,
                 ),
             ),
             Preference(
                 name="employee_experience",
                 weight=0.2,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="employee_exp_eval",
                     description="Humane communications and accurate pay/benefits execution.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=employee_exp_rubrics,
+                    criteria=employee_exp_rubrics,
                 ),
             ),
             Preference(
                 name="timeline_certainty",
                 weight=0.1,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="timeline_eval",
                     description="Milestone discipline and cross‑jurisdictional sequencing certainty.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=timeline_rubrics,
+                    criteria=timeline_rubrics,
                 ),
             ),
             Preference(
                 name="documentation_quality",
                 weight=0.1,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="docs_eval",
                     description="Audit‑ready recordkeeping and post‑action audit completeness.",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=docs_rubrics,
+                    criteria=docs_rubrics,
                 ),
             ),
         ]
@@ -423,9 +423,9 @@ def create_preferences() -> PreferenceWeights:
 # -------------
 def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     """Stakeholder's weight changes over time (absolute, normalized)."""
-    timeline: dict[int, PreferenceWeights] = {
+    timeline: dict[int, PreferenceSnapshot] = {
         # Early: align criteria and jurisdictional plan; protect compliance & fairness
-        0: PreferenceWeights(
+        0: PreferenceSnapshot(
             preferences=[
                 Preference(name="compliance", weight=0.35),
                 Preference(name="fairness_defensibility", weight=0.3),
@@ -435,7 +435,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
             ]
         ),
         # Mid: consultation underway, selections frozen; emphasize employee experience and documentation hygiene
-        18: PreferenceWeights(
+        18: PreferenceSnapshot(
             preferences=[
                 Preference(name="compliance", weight=0.3),
                 Preference(name="fairness_defensibility", weight=0.25),
@@ -445,7 +445,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
             ]
         ),
         # Late: protect execution day, filings, and post‑action audit
-        26: PreferenceWeights(
+        26: PreferenceSnapshot(
             preferences=[
                 Preference(name="compliance", weight=0.25),
                 Preference(name="fairness_defensibility", weight=0.2),
@@ -475,11 +475,11 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     return requests
 
 
-def create_evaluator_to_measure_goal_achievement() -> Evaluator:
+def create_evaluator_to_measure_goal_achievement() -> Rubric:
     """Create goal achievement evaluator for global workforce restructuring/RIF program."""
     goal_achievement_rubrics = [
         # Critical legal compliance and governance deliverables (must have for defensible restructuring)
-        WorkflowRubric(
+        RubricCriteria(
             name="legal_compliance_multijiurisdictional",
             llm_prompt=(
                 "Does multi-jurisdictional legal compliance exist with: US WARN/mini-WARN compliance confirmed, "
@@ -490,7 +490,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=20.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="selection_criteria_defensible_documented",
             llm_prompt=(
                 "Do documented defensible selection criteria exist with: objective selection criteria established, "
@@ -500,7 +500,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=18.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="privilege_strategy_confidentiality_maintained",
             llm_prompt=(
                 "Does maintained privilege strategy and confidentiality exist with: attorney-client privilege preserved, "
@@ -510,7 +510,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="governance_approval_accountability",
             llm_prompt=(
                 "Does governance approval and accountability exist with: executive decision-making documented, "
@@ -521,7 +521,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Major operational and human impact deliverables (8-10 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="redeployment_mitigation_efforts_documented",
             llm_prompt=(
                 "Do documented redeployment and mitigation efforts exist with: redeployment opportunities explored, "
@@ -531,7 +531,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="employee_communications_executed",
             llm_prompt=(
                 "Does executed employee communications exist with: employee notification strategy implemented, "
@@ -541,7 +541,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="benefits_payroll_transitions_complete",
             llm_prompt=(
                 "Do complete benefits and payroll transitions exist with: severance packages processed, "
@@ -551,7 +551,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulator_filings_notifications_timely",
             llm_prompt=(
                 "Do timely regulator filings and notifications exist with: WARN notices filed, "
@@ -561,7 +561,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="post_action_audit_lessons_learned",
             llm_prompt=(
                 "Do post-action audit and lessons learned exist with: implementation review completed, "
@@ -572,7 +572,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Important supporting deliverables (5-7 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="workforce_planning_analytics",
             llm_prompt=(
                 "Does workforce planning analytics exist with: headcount analysis completed, "
@@ -582,7 +582,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=7.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="employee_support_services",
             llm_prompt=(
                 "Do employee support services exist with: outplacement services provided, "
@@ -592,7 +592,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="stakeholder_communication_management",
             llm_prompt=(
                 "Does stakeholder communication management exist with: internal stakeholder communication coordinated, "
@@ -602,7 +602,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="legal_risk_mitigation",
             llm_prompt=(
                 "Does legal risk mitigation exist with: legal risks identified and assessed, "
@@ -612,7 +612,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="union_works_council_engagement",
             llm_prompt=(
                 "Does union and works council engagement exist with: union consultation conducted, "
@@ -623,7 +623,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Supporting deliverables (3-4 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="documentation_version_control",
             llm_prompt=(
                 "Does documentation version control exist with: document management systematic, "
@@ -633,7 +633,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="change_management_support",
             llm_prompt=(
                 "Does change management support exist with: change management strategy implemented, "
@@ -643,7 +643,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="business_continuity_maintained",
             llm_prompt=(
                 "Does maintained business continuity exist with: operational continuity preserved, "
@@ -653,7 +653,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=3.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_benefit_analysis_validated",
             llm_prompt=(
                 "Does validated cost-benefit analysis exist with: financial analysis completed, "
@@ -665,9 +665,9 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
         ),
     ]
 
-    return Evaluator(
+    return Rubric(
         name="mnc_workforce_restructuring_goal_achievement_eval",
         description="Global workforce restructuring/RIF program deliverable achievement measurement",
         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-        rubrics=goal_achievement_rubrics,
+        criteria=goal_achievement_rubrics,
     )

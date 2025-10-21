@@ -1,12 +1,13 @@
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.core.tasks import Task
-from manager_agent_gym.schemas.core.base import TaskStatus
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.domain.task import Task
+from manager_agent_gym.schemas.domain.base import TaskStatus
 from manager_agent_gym.schemas.preferences import Constraint
 from uuid import uuid4
 from examples.common_stakeholders import create_stakeholder_agent
 from examples.end_to_end_examples.data_science_analytics.preferences import (
     create_preferences,
 )
+from manager_agent_gym.core.workflow.services import WorkflowMutations
 
 
 def create_workflow() -> Workflow:
@@ -248,7 +249,7 @@ def create_workflow() -> Workflow:
         monitoring,
         exec_readout,
     ]:
-        workflow.add_task(task)
+        WorkflowMutations.add_task(workflow, task)
 
     # Governance and organizational constraints for DS analytics
     workflow.constraints.extend(
@@ -346,6 +347,6 @@ def create_workflow() -> Workflow:
 
     prefs = create_preferences()
     stakeholder = create_stakeholder_agent(persona="balanced", preferences=prefs)
-    workflow.add_agent(stakeholder)
+    WorkflowMutations.add_agent(workflow, stakeholder)
 
     return workflow

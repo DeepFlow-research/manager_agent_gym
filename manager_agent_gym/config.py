@@ -4,8 +4,8 @@ from datetime import datetime
 
 from pydantic_settings import BaseSettings
 
-from .schemas.config import OutputConfig, SimulationConfig
-from .core.common.logging import logger
+from manager_agent_gym.core.workflow.schemas.config import OutputConfig, SimulationConfig
+from manager_agent_gym.core.common.logging import logger
 
 
 class Settings(BaseSettings):

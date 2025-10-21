@@ -2,25 +2,30 @@ import pytest
 from uuid import uuid4
 from typing import Any
 
-from manager_agent_gym.core.workflow_agents.interface import AgentInterface
-from manager_agent_gym.schemas.workflow_agents import AgentConfig
-from manager_agent_gym.schemas.core import Task, Resource
-from manager_agent_gym.schemas.unified_results import (
+from manager_agent_gym.core.agents.workflow_agents.common.interface import (
+    AgentInterface,
+)
+from manager_agent_gym.schemas.agents import AgentConfig
+from manager_agent_gym.schemas.domain import Task, Resource
+from manager_agent_gym.core.execution.schemas.results import (
     ExecutionResult,
     create_task_result,
 )
-from manager_agent_gym.schemas.core.workflow import Workflow
-from manager_agent_gym.schemas.core.tasks import Task as WorkflowTask
-from manager_agent_gym.core.workflow_agents.stakeholder_agent import StakeholderAgent
-from manager_agent_gym.schemas.workflow_agents.stakeholder import StakeholderConfig
-from manager_agent_gym.schemas.preferences.preference import PreferenceWeights
-from manager_agent_gym.schemas.config import OutputConfig
+from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.core.workflow.services import WorkflowMutations
+from manager_agent_gym.schemas.domain.task import Task as WorkflowTask
+from manager_agent_gym.core.agents.stakeholder_agent.stakeholder_agent import (
+    StakeholderAgent,
+)
+from manager_agent_gym.schemas.agents.stakeholder import StakeholderConfig
+from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
+from manager_agent_gym.core.workflow.schemas.config import OutputConfig
 
 
 class MockConfig(AgentConfig):
     agent_id: str
     agent_type: str
-    system_prompt: str
+    system_prompt: str | None = None
 
 
 class DummyAI(AgentInterface[MockConfig]):
@@ -116,8 +121,8 @@ def workflow_two_step() -> Workflow:
     w = Workflow(name="w", workflow_goal="d", owner_id=uuid4())
     a = WorkflowTask(name="A", description="d")
     b = WorkflowTask(name="B", description="d", dependency_task_ids=[a.id])
-    w.add_task(a)
-    w.add_task(b)
+    WorkflowMutations.add_task(w, a)
+    WorkflowMutations.add_task(w, b)
     return w
 
 
@@ -130,7 +135,7 @@ def stakeholder_agent_empty_prefs() -> StakeholderAgent:
         model_name="o3",
         name="Stakeholder",
         role="Owner",
-        initial_preferences=PreferenceWeights(preferences=[]),
+        preference_data=PreferenceSnapshot(preferences=[]),
         agent_description="Stakeholder",
         agent_capabilities=["Stakeholder"],
     )

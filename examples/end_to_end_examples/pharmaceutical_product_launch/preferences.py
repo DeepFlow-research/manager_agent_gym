@@ -19,18 +19,18 @@ from examples.end_to_end_examples.standard_rules import (
 from math import exp
 from manager_agent_gym.schemas.preferences.preference import (
     Preference,
-    PreferenceWeights,
+    PreferenceSnapshot,
 )
 from manager_agent_gym.schemas.preferences.evaluator import (
-    Evaluator,
+    Rubric,
     AggregationStrategy,
 )
-from manager_agent_gym.schemas.core import Workflow
-from manager_agent_gym.schemas.preferences.rubric import WorkflowRubric, RunCondition
+from manager_agent_gym.schemas.domain import Workflow
+from manager_agent_gym.schemas.preferences.rubric import RubricCriteria, RunCondition
 from manager_agent_gym.schemas.preferences import PreferenceWeightUpdateRequest
 
 
-def create_preferences() -> PreferenceWeights:
+def create_preferences() -> PreferenceSnapshot:
     # ---------------------------
     # Deterministic helper rules
     # ---------------------------
@@ -249,7 +249,7 @@ def create_preferences() -> PreferenceWeights:
     # REGULATORY COMPLIANCE
     # ---------------------------
     regulatory_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="ectd_dossier_completeness",
             llm_prompt=(
                 """Evaluate eCTD dossier completeness and ICH compliance. Award partial credit for:
@@ -262,7 +262,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_submission_quality",
             llm_prompt=(
                 """Assess regulatory submission quality and agency readiness:
@@ -273,7 +273,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="ich_guideline_adherence",
             llm_prompt=(
                 """Evaluate adherence to ICH guidelines (Q8-Q11, M4):
@@ -284,13 +284,13 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_compliance_tracking",
             evaluator_function=regulatory_compliance_indicators,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_timeline_management",
             llm_prompt=(
                 """
@@ -302,7 +302,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="multi_jurisdiction_coordination",
             llm_prompt=(
                 "Score 0–6 for multi-jurisdictional coordination: FDA/EMA alignment, local authority submissions,"
@@ -317,7 +317,7 @@ def create_preferences() -> PreferenceWeights:
     # MANUFACTURING QUALITY
     # ---------------------------
     manufacturing_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="cgmp_compliance_validation",
             llm_prompt=(
                 """Evaluate cGMP compliance and manufacturing validation. Award partial credit for:
@@ -330,7 +330,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="qbd_implementation_depth",
             llm_prompt=(
                 """Assess Quality by Design implementation depth:
@@ -341,7 +341,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="manufacturing_process_control",
             llm_prompt=(
                 """Evaluate manufacturing process control and consistency:
@@ -352,19 +352,19 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="manufacturing_validation_artifacts",
             evaluator_function=manufacturing_validation_density,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="quality_system_implementation",
             evaluator_function=quality_system_maturity,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="supply_chain_qualification",
             llm_prompt=(
                 "Assess supply chain and distribution qualification: logistics partner validation,"
@@ -380,7 +380,7 @@ def create_preferences() -> PreferenceWeights:
     # PATIENT SAFETY
     # ---------------------------
     safety_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="pharmacovigilance_system_robustness",
             llm_prompt=(
                 """Evaluate pharmacovigilance system completeness and robustness:
@@ -391,7 +391,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="risk_management_effectiveness",
             llm_prompt=(
                 """Assess risk management plan effectiveness and implementation:
@@ -402,7 +402,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="safety_signal_preparedness",
             llm_prompt=(
                 """Evaluate safety signal detection and management preparedness:
@@ -413,19 +413,19 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="patient_safety_prioritization",
             evaluator_function=patient_safety_progress,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="safety_timeline_adherence",
             evaluator_function=safety_monitoring_adherence,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="pharma_crisis_scenarios",
             llm_prompt=(
                 """Evaluate handling of pharmaceutical crisis scenarios:
@@ -439,7 +439,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_realism_validation",
             evaluator_function=_validate_cost_realism,
             max_score=1.0,
@@ -451,7 +451,7 @@ def create_preferences() -> PreferenceWeights:
     # COMMERCIAL READINESS
     # ---------------------------
     commercial_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="market_access_strategy_quality",
             llm_prompt=(
                 """Evaluate market access strategy development and execution:
@@ -462,7 +462,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="launch_readiness_preparation",
             llm_prompt=(
                 """Assess commercial launch readiness and preparation quality:
@@ -473,7 +473,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="stakeholder_engagement_effectiveness",
             llm_prompt=(
                 """Evaluate stakeholder engagement across the launch process:
@@ -484,7 +484,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="commercial_milestone_tracking",
             evaluator_function=commercial_readiness_tracking,
             max_score=1.0,
@@ -496,7 +496,7 @@ def create_preferences() -> PreferenceWeights:
     # GOVERNANCE
     # ---------------------------
     governance_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="cross_functional_governance",
             llm_prompt=(
                 """Evaluate cross-functional governance effectiveness:
@@ -507,13 +507,13 @@ def create_preferences() -> PreferenceWeights:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_governance_discipline",
             evaluator_function=regulatory_governance_discipline,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="launch_gate_management",
             llm_prompt=(
                 """Assess launch gate and milestone management:
@@ -530,13 +530,13 @@ def create_preferences() -> PreferenceWeights:
     # SPEED
     # ---------------------------
     speed_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="speed_efficiency",
             evaluator_function=speed_rubric,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_timeline_optimization",
             llm_prompt=(
                 "Assess regulatory timeline optimization and efficiency:"
@@ -546,7 +546,7 @@ def create_preferences() -> PreferenceWeights:
             max_score=6.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="manufacturing_timeline_efficiency",
             llm_prompt=(
                 "Evaluate manufacturing validation timeline efficiency:"
@@ -562,19 +562,19 @@ def create_preferences() -> PreferenceWeights:
     # COST
     # ---------------------------
     cost_rubrics = [
-        WorkflowRubric(
+        RubricCriteria(
             name="cost_efficiency",
             evaluator_function=cost_rubric,
             max_score=1.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="manufacturing_cost_management",
             evaluator_function=manufacturing_cost_efficiency,
             max_score=1.0,
             run_condition=RunCondition.EACH_TIMESTEP,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_cost_optimization",
             llm_prompt=(
                 "Assess regulatory and development cost optimization:"
@@ -586,76 +586,76 @@ def create_preferences() -> PreferenceWeights:
         ),
     ]
 
-    return PreferenceWeights(
+    return PreferenceSnapshot(
         preferences=[
             Preference(
                 name="regulatory_compliance",
                 weight=0.3,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="regulatory_compliance_eval",
                     description="regulatory compliance evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=regulatory_rubrics,
+                    criteria=regulatory_rubrics,
                 ),
             ),
             Preference(
                 name="manufacturing_quality",
                 weight=0.25,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="manufacturing_quality_eval",
                     description="manufacturing quality evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=manufacturing_rubrics,
+                    criteria=manufacturing_rubrics,
                 ),
             ),
             Preference(
                 name="patient_safety",
                 weight=0.2,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="patient_safety_eval",
                     description="patient safety evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=safety_rubrics,
+                    criteria=safety_rubrics,
                 ),
             ),
             Preference(
                 name="commercial_readiness",
                 weight=0.15,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="commercial_readiness_eval",
                     description="commercial readiness evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=commercial_rubrics,
+                    criteria=commercial_rubrics,
                 ),
             ),
             Preference(
                 name="governance",
                 weight=0.05,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="governance_eval",
                     description="governance evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=governance_rubrics,
+                    criteria=governance_rubrics,
                 ),
             ),
             Preference(
                 name="speed",
                 weight=0.03,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="speed_eval",
                     description="speed evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=speed_rubrics,
+                    criteria=speed_rubrics,
                 ),
             ),
             Preference(
                 name="cost",
                 weight=0.02,
-                evaluator=Evaluator(
+                evaluator=Rubric(
                     name="cost_eval",
                     description="cost evaluator",
                     aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-                    rubrics=cost_rubrics,
+                    criteria=cost_rubrics,
                 ),
             ),
         ]
@@ -670,7 +670,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     - Late: Commercial readiness and speed (launch execution)
     """
     timeline = {
-        10: PreferenceWeights(
+        10: PreferenceSnapshot(
             preferences=[
                 Preference(name="regulatory_compliance", weight=0.25),
                 Preference(name="manufacturing_quality", weight=0.35),
@@ -681,7 +681,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.01),
             ]
         ),
-        25: PreferenceWeights(
+        25: PreferenceSnapshot(
             preferences=[
                 Preference(name="regulatory_compliance", weight=0.4),
                 Preference(name="manufacturing_quality", weight=0.2),
@@ -692,7 +692,7 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
                 Preference(name="cost", weight=0.01),
             ]
         ),
-        40: PreferenceWeights(
+        40: PreferenceSnapshot(
             preferences=[
                 Preference(name="regulatory_compliance", weight=0.3),
                 Preference(name="manufacturing_quality", weight=0.15),
@@ -723,11 +723,11 @@ def create_preference_update_requests() -> list[PreferenceWeightUpdateRequest]:
     return requests
 
 
-def create_evaluator_to_measure_goal_achievement() -> Evaluator:
+def create_evaluator_to_measure_goal_achievement() -> Rubric:
     """Create goal achievement evaluator for pharmaceutical product launch with regulatory focus."""
     goal_achievement_rubrics = [
         # Critical regulatory deliverables (absolutely must have for drug approval)
-        WorkflowRubric(
+        RubricCriteria(
             name="ectd_regulatory_dossier_submitted",
             llm_prompt=(
                 "Does submitted eCTD regulatory dossier exist with: complete modules (quality, safety, nonclinical, clinical), "
@@ -742,7 +742,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=20.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="cgmp_manufacturing_validated",
             llm_prompt=(
                 "Does validated cGMP manufacturing exist with: external audit reports completed, "
@@ -757,7 +757,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=18.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="qbd_framework_documented",
             llm_prompt=(
                 "Does documented QbD (Quality by Design) framework exist with: critical quality attributes (CQAs) defined, "
@@ -772,7 +772,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=15.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="pharmacovigilance_system_operational",
             llm_prompt=(
                 "Does operational pharmacovigilance system exist with: safety management plan active, "
@@ -788,7 +788,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Major compliance and commercial deliverables (10-12 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="plair_commercial_authorization",
             llm_prompt=(
                 "Does PLAIR (Pre-Launch Activities Importation Request) authorization exist with: "
@@ -802,7 +802,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=12.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="market_access_strategy_approved",
             llm_prompt=(
                 "Does approved market access strategy exist with: payer dossiers completed, "
@@ -817,7 +817,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=12.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="supply_chain_readiness_validated",
             llm_prompt=(
                 "Does validated supply chain readiness exist with: logistics partners qualified, "
@@ -832,7 +832,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="governance_sign_offs_secured",
             llm_prompt=(
                 "Do secured governance sign-offs exist with: Regulatory Affairs approval, Quality approval, "
@@ -842,7 +842,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=10.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_correspondence_documented",
             llm_prompt=(
                 "Does documented regulatory correspondence exist with: FDA/EMA communication logs, "
@@ -853,7 +853,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Important supporting deliverables (6-8 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="clinical_data_package_complete",
             llm_prompt=(
                 "Does complete clinical data package exist with: efficacy endpoints met, "
@@ -863,7 +863,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="analytical_method_validation",
             llm_prompt=(
                 "Does analytical method validation exist with: assay validation completed, "
@@ -873,7 +873,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=8.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="lifecycle_monitoring_plan",
             llm_prompt=(
                 "Does lifecycle monitoring plan exist with: post-market surveillance strategy, "
@@ -884,7 +884,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             run_condition=RunCondition.ON_COMPLETION,
         ),
         # Supporting deliverables (3-5 points each)
-        WorkflowRubric(
+        RubricCriteria(
             name="decision_logs_maintained",
             llm_prompt=(
                 "Do maintained decision logs exist with: launch readiness reviews documented, "
@@ -894,7 +894,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=5.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="batch_release_procedures",
             llm_prompt=(
                 "Do batch release procedures exist with: release testing protocols validated, "
@@ -904,7 +904,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="launch_readiness_assessment",
             llm_prompt=(
                 "Does launch readiness assessment exist with: cross-functional readiness confirmed, "
@@ -914,7 +914,7 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
             max_score=4.0,
             run_condition=RunCondition.ON_COMPLETION,
         ),
-        WorkflowRubric(
+        RubricCriteria(
             name="regulatory_agency_feedback_incorporation",
             llm_prompt=(
                 "Does regulatory agency feedback incorporation exist with: FDA/EMA guidance integrated, "
@@ -926,9 +926,9 @@ def create_evaluator_to_measure_goal_achievement() -> Evaluator:
         ),
     ]
 
-    return Evaluator(
+    return Rubric(
         name="pharma_product_launch_goal_achievement_eval",
         description="Pharmaceutical product launch regulatory and commercial deliverable achievement measurement",
         aggregation=AggregationStrategy.WEIGHTED_AVERAGE,
-        rubrics=goal_achievement_rubrics,
+        criteria=goal_achievement_rubrics,
     )
