@@ -24,6 +24,8 @@ from manager_agent_gym.core.common.logging import logger
 from manager_agent_gym.core.common.llm_interface import (
     LLMInferenceTruncationError,
     generate_structured_response,
+    StructuredLLMResponse,
+    calculate_llm_cost,
 )
 from manager_agent_gym.core.agents.manager_agent.common.action_constraints import (
     build_context_constrained_action_schema,
@@ -59,7 +61,7 @@ class RubricDecompositionManagerAgent(ChainOfThoughtManagerAgent):
     def __init__(
         self,
         model_name: str = "gpt-4o",
-        max_clarification_budget: int = 5,
+        max_clarification_budget: int = 1,
         seed: int = 42,
     ):
         """Initialize rubric decomposition manager.
@@ -97,6 +99,10 @@ class RubricDecompositionManagerAgent(ChainOfThoughtManagerAgent):
         # Track processed messages to avoid duplication
         self._processed_message_ids: set[str] = set()
 
+        # Track LLM costs for rubric generation
+        self.accumulated_llm_cost_usd: float = 0.0
+        self.total_llm_calls: int = 0
+
         logger.info(
             f"Initialized RubricDecompositionManagerAgent (discovery mode), "
             f"budget={max_clarification_budget}, model={model_name}"
@@ -128,18 +134,6 @@ class RubricDecompositionManagerAgent(ChainOfThoughtManagerAgent):
         except Exception as e:
             logger.error(f"Failed to read messages: {e}")
             return {}
-
-    def _get_system_prompt(self, available_agent_metadata: list) -> str:
-        """Get decomposition-specific system prompt.
-
-        Overrides parent to use decomposition-focused prompt instead of
-        standard workflow execution prompt.
-
-        Args:
-            available_agent_metadata: Agent configs (unused in decomposition)
-        """
-        # Use decomposition-specific prompt instead of standard manager prompt
-        return RUBRIC_DECOMPOSITION_SYSTEM_PROMPT
 
     def _prepare_context(self, observation: "ManagerObservation") -> str:
         """Prepare context for decomposition manager with stakeholder messages."""
@@ -207,6 +201,9 @@ class RubricDecompositionManagerAgent(ChainOfThoughtManagerAgent):
         """Reset manager state for new decomposition phase."""
         super().reset()
         self._processed_message_ids.clear()
+        self.current_clarification_budget = 0
+        self.accumulated_llm_cost_usd = 0.0
+        self.total_llm_calls = 0
         logger.debug("RubricDecompositionManagerAgent reset")
 
     async def take_action(self, observation: ManagerObservation) -> BaseManagerAction:
@@ -235,19 +232,33 @@ class RubricDecompositionManagerAgent(ChainOfThoughtManagerAgent):
                 action_classes, observation
             )
             # Prepare context using prompt templates
-            system_prompt = self._get_system_prompt(
-                observation.available_agent_metadata
-            )
+            system_prompt = RUBRIC_DECOMPOSITION_SYSTEM_PROMPT
             user_prompt = self._prepare_context(observation)
 
             # Direct LLM call with structured output (validated by Pydantic)
-            parsed_action = await generate_structured_response(
+            response = await generate_structured_response(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 response_type=constrained_schema,
                 model=self.model_name,
                 seed=self._seed,
+                return_usage=True,  # Track token usage for cost calculation
             )
+
+            # Extract result and calculate cost
+            if isinstance(response, StructuredLLMResponse):
+                parsed_action = response.result
+                if response.usage:
+                    cost = calculate_llm_cost(response.usage, self.model_name)
+                    self.accumulated_llm_cost_usd += cost
+                    self.total_llm_calls += 1
+                    logger.debug(
+                        f"LLM call cost: ${cost:.4f} (total: ${self.accumulated_llm_cost_usd:.4f}, calls: {self.total_llm_calls})"
+                    )
+            else:
+                # Fallback if return_usage=False
+                parsed_action = response
+
             action = parsed_action.action  # type: ignore[attr-defined]
 
             # Increment budget by 1 per turn (not per question)

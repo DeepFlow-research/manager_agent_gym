@@ -46,3 +46,9 @@ Thumbs.db
 simulation_outputs*/
 analysis_outputs*/
 examples/analysis/*
+
+# GDPEval dataset curation data
+curation/gdpeval/data/raw/*
+curation/gdpeval/data/generated/*
+curation/gdpeval/data/feedback/*
+!curation/gdpeval/data/.gitkeep

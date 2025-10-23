@@ -8,7 +8,7 @@ system prompts and tools via the OpenAI Agents framework.
 import os
 import time
 import traceback
-from agents import Agent, Runner, Tool, RunResult
+from agents import Agent, Runner, Tool, RunResult, AgentOutputSchema
 from agents.extensions.models.litellm_model import LitellmModel
 
 
@@ -35,7 +35,6 @@ from manager_agent_gym.core.common.llm_interface import build_litellm_model_id
 
 from manager_agent_gym.core.agents.workflow_agents.prompts.ai_agent_prompts import (
     AI_AGENT_TASK_TEMPLATE,
-    NO_RESOURCES_MESSAGE,
 )
 
 
@@ -69,12 +68,16 @@ class AIAgent(AgentInterface[AIAgentConfig]):
         from manager_agent_gym.core.workflow.context import AgentExecutionContext
 
         self.tools = tools + COMMUNICATION_TOOLS
+
         self.openai_agent: Agent[AgentExecutionContext] = Agent(
             model=LitellmModel(model=build_litellm_model_id(config.model_name)),
             name=config.agent_id,
-            instructions=config.system_prompt,
+            instructions=AI_AGENT_TASK_TEMPLATE.format(
+                agent_description=config.agent_description,
+                agent_capabilities=config.agent_capabilities,
+            ),
             tools=self.tools,
-            output_type=AITaskOutput,
+            output_type=AgentOutputSchema(AITaskOutput, strict_json_schema=False),
         )
 
     async def execute_task(
@@ -119,16 +122,17 @@ class AIAgent(AgentInterface[AIAgentConfig]):
                     tool_event_sink=self.record_tool_use_event,
                 )
 
-            # Prepare the task prompt with context
-            task_prompt = self._create_task_prompt(
-                task, resources or [], context_messages=context_messages
+            # Build multimodal input with images/PDFs/Excel
+            user_message = await self._build_multimodal_input(
+                task, resources or [], context_messages
             )
 
-            # Execute using OpenAI Agent with DI context
-            result: RunResult = await Runner.run(
+            # Execute using OpenAI Agent with multimodal content
+            result = await Runner.run(
                 self.openai_agent,
-                task_prompt,
-                context=context,  # 🎯 DI magic happens here!
+                [user_message],
+                context=context,
+                max_turns=self.config.max_turns,
             )
 
             # Extract structured output
@@ -140,14 +144,49 @@ class AIAgent(AgentInterface[AIAgentConfig]):
             execution_time = time.time() - start_time
             output_resources = output.resources
 
-            # If no resources were created, create a default one
+            # Extract execution trace if enabled
+            execution_trace = None
+            if self.config.enable_execution_tracing:
+                try:
+                    from datetime import datetime
+                    from manager_agent_gym.core.agents.workflow_agents.utils.trace_extractor import (
+                        extract_execution_trace,
+                    )
+
+                    started_at = datetime.fromtimestamp(start_time)
+                    completed_at = datetime.now()
+                    execution_trace = extract_execution_trace(
+                        result=result,
+                        agent_id=self.config.agent_id,
+                        task_id=task.id,
+                        started_at=started_at,
+                        completed_at=completed_at,
+                    )
+                except Exception as trace_error:
+                    # Don't fail the task if tracing fails
+                    logger.warning(
+                        f"Failed to extract execution trace: {trace_error}",
+                        exc_info=True,
+                    )
+
+            # If no resources were created, create a default markdown file
             if not output_resources:
+                import tempfile
+                from pathlib import Path
+
+                # Save output as markdown file
+                temp_dir = Path(tempfile.mkdtemp(prefix="agent_output_"))
+                output_file = temp_dir / f"task_{task.id}_output.md"
+                output_content = f"# Task Output\n\n{str(result)}"
+                output_file.write_text(output_content, encoding="utf-8")
+
                 output_resources.append(
                     Resource(
                         name=f"Completed: {task.name}",
                         description=f"AI agent completed task: {task.description}",
-                        content=str(result),
-                        content_type="text/plain",
+                        file_path=str(output_file.absolute()),
+                        mime_type="text/markdown",
+                        size_bytes=output_file.stat().st_size,
                     )
                 )
 
@@ -161,6 +200,7 @@ class AIAgent(AgentInterface[AIAgentConfig]):
                 cost=self._calculate_accurate_cost(result),
                 execution_notes=output.execution_notes,
                 reasoning=output.reasoning,
+                execution_trace=execution_trace,
             )
 
         except Exception as e:
@@ -242,13 +282,32 @@ class AIAgent(AgentInterface[AIAgentConfig]):
 
         return rubric_text
 
-    def _create_task_prompt(
+    def _has_visual_resources(self, resources: list[Resource]) -> bool:
+        """Check if any resources contain visual content (images, PDFs, Excel).
+
+        Args:
+            resources: List of resources to check
+
+        Returns:
+            True if any resource is visual (not plain text)
+        """
+        for resource in resources:
+            if (
+                resource.is_image
+                or resource.is_document
+                or resource.is_spreadsheet
+                or not resource.is_text_format
+            ):
+                return True
+        return False
+
+    async def _build_multimodal_input(
         self,
         task: Task,
         resources: list[Resource],
         context_messages: dict[str, list[Message]] | None = None,
-    ) -> str:
-        """Create a detailed prompt for the AI agent.
+    ):
+        """Build multimodal input with images/PDFs/Excel for OpenAI Agents SDK.
 
         Args:
             task: The task to execute
@@ -256,40 +315,77 @@ class AIAgent(AgentInterface[AIAgentConfig]):
             context_messages: Optional context from messages (rubrics, etc.)
 
         Returns:
-            Formatted task prompt
+            Message object with multimodal content
         """
-        input_resources = (
-            self._format_resources(resources) if resources else NO_RESOURCES_MESSAGE
+        from manager_agent_gym.core.common.multimodal_resources import (
+            MultimodalResourceProcessor,
+            create_user_message,
+            create_text_content,
         )
 
-        # Build evaluation criteria section
+        # Create processor with agent's config
+        processor = MultimodalResourceProcessor(
+            max_tokens=self.config.max_resource_tokens,
+            default_image_detail=self.config.image_detail,
+        )
+
+        # Build task description text
+        task_text = "## Current Assignment\n\n"
+        task_text += f"**Task:** {task.name}\n\n"
+        task_text += f"**Objective:**\n{task.description}\n\n"
+
+        # Add evaluation criteria if present
         evaluation_criteria = ""
         if context_messages and context_messages.get("rubrics"):
             evaluation_criteria = self._format_rubric_messages(
                 context_messages["rubrics"]
             )
+            task_text += evaluation_criteria + "\n\n"
 
-        # Use template with all sections
-        return AI_AGENT_TASK_TEMPLATE.format(
-            task_name=task.name,
-            task_description=task.description,
-            input_resources=input_resources,
-            evaluation_criteria=evaluation_criteria,
+        task_text += "**Available Input Resources:**\n"
+
+        # Get resource content blocks (images, PDFs, Excel, text)
+        resource_blocks = await processor.format_resources_as_content(
+            resources,
+            include_metadata=True,
         )
 
+        # Combine task text with resource blocks
+        return create_user_message(create_text_content(task_text), *resource_blocks)
+
     def _format_resources(self, resources: list[Resource]) -> str:
-        """Format resources for inclusion in the prompt."""
+        """Format resources for inclusion in the prompt (text-only fallback)."""
         formatted = []
         for resource in resources:
-            content_preview = (
-                (resource.content[:200] + "...")
-                if resource.content and len(resource.content) > 200
-                else (resource.content or "")
-            )
-            formatted.append(
-                f"- {resource.name}: {resource.description}\n  Content: {content_preview}"
-            )
-        return "\n".join(formatted)
+            # Show file information instead of inline content
+            resource_info = [
+                f"- {resource.name}: {resource.description}",
+                f"  File: {resource.file_path}",
+                f"  Type: {resource.mime_type}",
+                f"  Size: {resource.size_bytes} bytes",
+            ]
+
+            # Add format-specific metadata if available (format as key=value to avoid braces)
+            if resource.file_format_metadata:
+                metadata_items = [
+                    f"{k}={v}" for k, v in resource.file_format_metadata.items()
+                ]
+                resource_info.append(f"  Metadata: {', '.join(metadata_items)}")
+
+            # Try to show text preview for text-based files
+            try:
+                if resource.is_text_format:
+                    text_preview = resource.load_text()[:200]
+                    if len(resource.load_text()) > 200:
+                        text_preview += "..."
+                    resource_info.append(f"  Preview: {text_preview}")
+            except Exception:
+                pass  # Skip preview if file can't be read
+
+            formatted.append("\n  ".join(resource_info))
+
+        # Escape all curly braces to prevent .format() from interpreting them as placeholders
+        return "\n".join(formatted).replace("{", "{{").replace("}", "}}")
 
     def _calculate_accurate_cost(self, result: RunResult) -> float:
         """Calculate accurate cost using LiteLLM's cost_per_token function."""

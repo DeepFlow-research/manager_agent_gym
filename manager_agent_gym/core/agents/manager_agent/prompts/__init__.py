@@ -9,9 +9,7 @@ Organized by function:
 """
 
 from manager_agent_gym.core.agents.manager_agent.prompts.rubric_generation import (
-    DEFAULT_DECOMPOSER_SYSTEM_PROMPT,
     CLARIFICATION_SYSTEM_PROMPT,
-    build_decomposer_system_prompt,
     build_decomposer_user_prompt,
     build_clarification_prompt,
 )
@@ -24,9 +22,7 @@ from manager_agent_gym.core.agents.manager_agent.prompts.task_decomposition.prom
 
 __all__ = [
     # Rubric generation
-    "DEFAULT_DECOMPOSER_SYSTEM_PROMPT",
     "CLARIFICATION_SYSTEM_PROMPT",
-    "build_decomposer_system_prompt",
     "build_decomposer_user_prompt",
     "build_clarification_prompt",
     # Rubric decomposition manager

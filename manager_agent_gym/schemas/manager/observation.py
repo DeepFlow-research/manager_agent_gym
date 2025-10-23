@@ -14,6 +14,24 @@ from manager_agent_gym.schemas.agents.stakeholder import (
 from manager_agent_gym.schemas.agents.base import AgentConfig
 
 
+class ResourcePreview(BaseModel):
+    """Lightweight preview of a resource for manager observation."""
+
+    resource_id: UUID = Field(..., description="Unique resource identifier")
+    task_id: UUID = Field(..., description="Task that created this resource")
+    name: str = Field(..., description="Resource name")
+    description: str = Field(..., description="Resource description")
+    mime_type: str = Field(..., description="MIME type")
+    size_bytes: int = Field(..., description="File size in bytes")
+    preview_text: str | None = Field(
+        default=None, description="Text preview or summary (for text resources)"
+    )
+    thumbnail_available: bool = Field(
+        default=False,
+        description="Whether full visual content available via inspection tool",
+    )
+
+
 class ManagerObservation(BaseModel):
     """Observation provided to manager agent at each timestep."""
 
@@ -83,4 +101,9 @@ class ManagerObservation(BaseModel):
     stakeholder_profile: StakeholderPublicProfile | None = Field(
         default=None,
         description="Public stakeholder profile",
+    )
+
+    # Multimodal resource previews
+    recent_resource_previews: list[ResourcePreview] = Field(
+        default_factory=list, description="Previews of recently created resources"
     )

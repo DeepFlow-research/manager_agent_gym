@@ -8,7 +8,9 @@ from manager_agent_gym.schemas.agents import AgentConfig
 from manager_agent_gym.schemas.domain import Task, Resource
 from manager_agent_gym.core.execution.schemas.results import ExecutionResult
 from manager_agent_gym.core.communication.service import COMMUNICATION_SERVICE_SINGLETON
-from manager_agent_gym.core.agents.workflow_agents.schemas.telemetry import AgentToolUseEvent
+from manager_agent_gym.core.agents.workflow_agents.schemas.telemetry import (
+    AgentToolUseEvent,
+)
 
 ConfigType = TypeVar("ConfigType", bound=AgentConfig)
 

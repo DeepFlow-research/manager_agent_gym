@@ -7,6 +7,16 @@ This module contains all prompts used by stakeholder agents for:
 - Preference elicitation
 """
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from manager_agent_gym.schemas.preferences.evaluator import (
+        PreferenceExemplar,
+        Rubric,
+        PairwiseExemplar,
+        PreferenceMeasure,
+    )
+
 # ============================================================================
 # STAKEHOLDER SYSTEM PROMPTS
 # ============================================================================
@@ -54,53 +64,35 @@ Guardrails:
 
 
 CLARIFICATION_STAKEHOLDER_SYSTEM_PROMPT = """## Role & Mission
-You are a stakeholder participating in a preference clarification dialogue. A manager agent is trying to understand your evaluation criteria so it can create precise rubrics for assessing workflow outcomes.
-
-## Context
-- You have specific preferences about how work should be done and evaluated
-- The manager needs to understand your expectations in detail
-- You should answer questions clearly, concisely, and consistently
-- Your answers help the manager create objective evaluation criteria
+You are a stakeholder participating in a preference clarification dialogue. A manager agent is trying to understand your evaluation criteria so it can create rubrics for assessing workflow outcomes.
 
 ## Communication Style
-- **Clear**: Provide specific, actionable criteria when possible
-- **Concise**: Answer directly without unnecessary elaboration
-- **Consistent**: Maintain consistency across related questions
-- **Realistic**: Base answers on practical, achievable standards
-- **Specific**: Use concrete examples when helpful
+Respond like a real person would in a work conversation:
+- **Keep it brief**: Answer in 1-3 sentences when possible
+- **Be natural**: Don't over-structure your responses or use formal lists
+- **Be a bit vague sometimes**: You don't always have every detail figured out
+- **Show personality**: It's okay to express opinions or preferences informally
+- **Be conversational**: Write how you'd actually speak to a manager
 
-## Answer Guidelines
+You don't need to be perfectly clear or comprehensive. Real people:
+- Sometimes miss details
+- May need follow-up questions
+- Have varying levels of certainty about their preferences
+- Don't always give perfectly structured answers
 
-### When asked about quality criteria:
-- Specify measurable standards when possible
-- Explain priority levels (critical vs. nice-to-have)
-- Mention any industry standards or benchmarks
-- Clarify acceptable vs. unacceptable outcomes
-
-### When asked about preferences:
-- Explain the underlying goal or concern
-- Provide context about why it matters
-- Indicate flexibility or rigidity of the preference
-- Mention trade-offs if relevant
-
-### If uncertain:
-- It's okay to say "flexible" or "use best judgment"
-- Prioritize what matters most
-- Acknowledge areas where standards may vary
-
-## Examples
+## Examples of Natural Responses
 
 Q: "What level of documentation detail is expected for risk assessments?"
-A: "Risk assessments should include: 1) Identified risks with severity ratings, 2) Mitigation strategies for high/medium risks, 3) Contingency plans for critical risks. Focus on completeness over formatting - aim for clarity and actionability."
+A: "Cover the main risks and what we'd do about them. Don't need tons of detail but should hit the important stuff."
 
 Q: "Should code follow specific style guides?"
-A: "Yes, follow PEP 8 for Python. Consistency matters more than perfect adherence. Key priorities: readable variable names, docstrings for public functions, and consistent indentation."
+A: "Yeah, stick to PEP 8 mostly. I'm more concerned about readability than perfect formatting though."
 
 Q: "How should stakeholder feedback be incorporated?"
-A: "Acknowledge feedback within 24 hours. Implement critical items immediately, discuss trade-offs for other suggestions. Document decisions in meeting notes."
+A: "Try to respond within a day or two. If something's critical obviously do it, otherwise we can discuss. Just don't ignore feedback."
 
 ## Your Task
-Answer the clarification question based on your role and the preference being discussed. Provide practical, specific guidance that will help create objective evaluation criteria.
+Answer the clarification question naturally based on your role. Give practical guidance but don't overthink it - respond how you'd actually talk to a manager asking you these questions.
 """
 
 
@@ -310,22 +302,21 @@ def build_rubric_context_from_criteria(criteria: list) -> str:
 # ============================================================================
 
 
-def build_exemplar_context(exemplar_output: str) -> str:
-    """Build exemplar context section for RL training clarification stakeholder.
+def build_text_exemplar_context(exemplar: "PreferenceExemplar") -> str:
+    """Build context for text exemplar.
 
     Args:
-        exemplar_output: Example of ideal task completion that represents
-                        what the stakeholder truly values
+        exemplar: Text exemplar with ideal output
 
     Returns:
-        Formatted exemplar context string
+        Formatted context string
     """
     return f"""
-## Exemplar Output Context
+## Text Exemplar
 You have access to an example of ideal work completion that represents what you truly value:
 
 ```
-{exemplar_output}
+{exemplar.exemplar_output}
 ```
 
 Use this exemplar to inform your answers. When the manager asks clarification questions,
@@ -334,25 +325,116 @@ explicitly revealing the exemplar. Answer based on what made this exemplar good.
 """
 
 
+def build_rubric_exemplar_context(rubric: "Rubric") -> str:
+    """Build context for rubric exemplar.
+
+    Args:
+        rubric: Ground-truth rubric representing true preferences
+
+    Returns:
+        Formatted context string
+    """
+    criteria_text = "\n".join(
+        [
+            f"  - {c.name}: {c.description or '(no description)'}"
+            for c in rubric.criteria
+        ]
+    )
+
+    return f"""
+## Rubric Exemplar: {rubric.name}
+**Description:** {rubric.description or "N/A"}
+
+**Your True Evaluation Criteria:**
+{criteria_text}
+
+These criteria represent your actual evaluation standards. When the manager asks
+clarification questions, guide them to discover these criteria naturally through dialogue.
+DO NOT reveal the exact rubric structure or criteria names explicitly. Instead, explain
+what matters and why, helping them arrive at similar evaluation standards organically.
+"""
+
+
+def build_pairwise_exemplar_context(pairwise: "PairwiseExemplar") -> str:
+    """Build context for pairwise exemplar.
+
+    Args:
+        pairwise: Pairwise comparison of preferred vs rejected outputs
+
+    Returns:
+        Formatted context string
+    """
+    return f"""
+## Pairwise Comparison: {pairwise.preference_name}
+
+**PREFERRED OUTPUT:**
+```
+{pairwise.preferred_output}
+```
+
+**REJECTED OUTPUT:**
+```
+{pairwise.rejected_output}
+```
+
+You have a concrete example showing what you prefer. When the manager asks questions,
+explain what makes the preferred output better for "{pairwise.preference_name}".
+Focus on:
+- Key differences between the two outputs
+- What quality attributes the preferred output demonstrates
+- What shortcomings the rejected output has
+
+Guide them through comparative reasoning without explicitly stating "output A is better because X".
+"""
+
+
+def build_preference_measure_context(preference_data: "PreferenceMeasure") -> str:
+    """Build context based on preference measure type (dispatcher).
+
+    Args:
+        preference_data: Any PreferenceMeasure (Rubric, PreferenceExemplar, PairwiseExemplar)
+
+    Returns:
+        Formatted context string
+
+    Raises:
+        ValueError: If preference_data type is not recognized
+    """
+    from manager_agent_gym.schemas.preferences.evaluator import (
+        PreferenceExemplar,
+        Rubric,
+        PairwiseExemplar,
+    )
+
+    if isinstance(preference_data, PreferenceExemplar):
+        return build_text_exemplar_context(preference_data)
+    elif isinstance(preference_data, Rubric):
+        return build_rubric_exemplar_context(preference_data)
+    elif isinstance(preference_data, PairwiseExemplar):
+        return build_pairwise_exemplar_context(preference_data)
+    else:
+        raise ValueError(f"Unknown preference measure type: {type(preference_data)}")
+
+
 def build_clarification_system_prompt_with_exemplar(
     role: str,
     persona_description: str,
-    exemplar_output: str,
+    preference_data: "PreferenceMeasure",
 ) -> str:
     """Build complete system prompt for RL training clarification stakeholder.
 
-    Combines base clarification prompt, persona context, and exemplar context.
+    Combines base clarification prompt, persona context, and preference measure context.
 
     Args:
         role: Stakeholder's role (e.g., "Chief Risk Officer")
         persona_description: Description of stakeholder's persona and priorities
-        exemplar_output: Example of ideal task completion
+        preference_data: PreferenceMeasure (Rubric, PreferenceExemplar, or PairwiseExemplar)
 
     Returns:
         Complete system prompt with all context
     """
     persona_context = build_persona_context_prompt(role, persona_description)
-    exemplar_context = build_exemplar_context(exemplar_output)
+    exemplar_context = build_preference_measure_context(preference_data)
 
     return (
         CLARIFICATION_STAKEHOLDER_SYSTEM_PROMPT

@@ -360,7 +360,9 @@ async def run_demo(
 
             end_time = datetime.now()
             # Create a dummy ExecutionResult for consistency with normal simulation
-            from manager_agent_gym.core.execution.schemas.results import create_timestep_result
+            from manager_agent_gym.core.execution.schemas.results import (
+                create_timestep_result,
+            )
 
             execution_result = create_timestep_result(
                 timestep=target_timestep,

@@ -14,6 +14,7 @@ from manager_agent_gym.schemas.preferences.evaluator import (
     Rubric,
     AggregationStrategy,
     PreferenceExemplar,
+    PairwiseExemplar,
 )
 from manager_agent_gym.schemas.preferences.evaluation import (
     RubricResult,
@@ -38,4 +39,5 @@ __all__ = [
     "Constraint",
     "PreferenceChangeEvent",
     "PreferenceExemplar",
+    "PairwiseExemplar",
 ]

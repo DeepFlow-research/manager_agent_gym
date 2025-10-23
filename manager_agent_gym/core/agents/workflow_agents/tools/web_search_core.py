@@ -2,12 +2,15 @@ import asyncio
 import functools
 from typing import Literal
 
-from manager_agent_gym.core.clients import COHERE_CLIENT, EXA_CLIENT
+import cohere
+
+from manager_agent_gym.core.clients import EXA_CLIENT
 from manager_agent_gym.core.agents.workflow_agents.schemas.tools.web_search import (
     SearchDomain,
     SearchItem,
     SearchResult,
 )
+from manager_agent_gym.config import settings
 
 
 async def search(
@@ -41,13 +44,19 @@ async def search(
     )
     items: list[SearchItem] = await fut
     if rerank_model:
-        reranked_indices = await COHERE_CLIENT.rerank(
-            model=rerank_model,
-            query=query,
-            documents=[item.truncated_contents for item in items],
-            top_n=num_results,
-        )
-        items = [items[i.index] for i in reranked_indices.results]
+        # Create a new Cohere client for each request to avoid event loop issues
+        # This ensures the client uses the current event loop and properly cleans up
+        async with cohere.AsyncClientV2(
+            api_key=settings.COHERE_API_KEY
+        ) as cohere_client:
+            reranked_indices = await cohere_client.rerank(
+                model=rerank_model,
+                query=query,
+                documents=[item.truncated_contents for item in items],
+                top_n=num_results,
+            )
+            # Explicitly cast to avoid type checker issue with list comprehension
+            items = [items[result.index] for result in reranked_indices.results]  # type: ignore[assignment]
 
     return SearchResult(results=items, original_query=query)
 

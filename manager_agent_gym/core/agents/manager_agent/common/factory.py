@@ -13,6 +13,9 @@ from manager_agent_gym.core.agents.manager_agent.implementations.random_manager 
 from manager_agent_gym.core.agents.manager_agent.implementations.one_shot_delegation import (
     OneShotDelegateManagerAgent,
 )
+from manager_agent_gym.core.agents.manager_agent.implementations.noop_manager import (
+    NoOpManagerAgent,
+)
 from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
 
 
@@ -20,10 +23,10 @@ def _normalize_mode(raw_mode: str | None) -> str:
     if not raw_mode:
         return "cot"
     mode = raw_mode.strip().lower()
-    allowed = {"cot", "random", "assign_all"}
+    allowed = {"cot", "random", "assign_all", "noop"}
     if mode not in allowed:
         raise ValueError(
-            f"Unsupported MAG_MANAGER_MODE='{raw_mode}'. Use one of: cot, random, assign_all"
+            f"Unsupported MAG_MANAGER_MODE='{raw_mode}'. Use one of: cot, random, assign_all, noop"
         )
     return mode
 
@@ -64,11 +67,14 @@ def create_manager_agent(
             preferences=preferences, model_name=resolved_model, seed=0
         ),
         "assign_all": lambda: OneShotDelegateManagerAgent(preferences=preferences),
+        "noop": lambda: NoOpManagerAgent(
+            agent_id="noop_manager", preferences=preferences
+        ),
     }
 
     if resolved_mode not in creators:
         raise ValueError(
-            f"Unknown MAG_MANAGER_MODE='{resolved_mode}'. Supported: cot, random, assign_all"
+            f"Unknown MAG_MANAGER_MODE='{resolved_mode}'. Supported: cot, random, assign_all, noop"
         )
 
     return creators[resolved_mode]()

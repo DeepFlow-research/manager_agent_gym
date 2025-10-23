@@ -4,7 +4,10 @@ from datetime import datetime
 
 from pydantic_settings import BaseSettings
 
-from manager_agent_gym.core.workflow.schemas.config import OutputConfig, SimulationConfig
+from manager_agent_gym.core.workflow.schemas.config import (
+    OutputConfig,
+    SimulationConfig,
+)
 from manager_agent_gym.core.common.logging import logger
 
 
@@ -14,6 +17,7 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = "na"
     EXA_API_KEY: str = "na"
     COHERE_API_KEY: str = "na"
+    E2B_API_KEY: str = "na"
 
     # Default simulation configuration
     default_output_dir: str = "./simulation_outputs"
@@ -82,6 +86,11 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
+def get_settings() -> Settings:
+    """Get the global settings instance."""
+    return settings
+
+
 if settings.OPENAI_API_KEY != "na":
     os.environ["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
 if settings.ANTHROPIC_API_KEY != "na":
@@ -90,6 +99,8 @@ if settings.EXA_API_KEY != "na":
     os.environ["EXA_API_KEY"] = settings.EXA_API_KEY
 if settings.COHERE_API_KEY != "na":
     os.environ["COHERE_API_KEY"] = settings.COHERE_API_KEY
+if settings.E2B_API_KEY != "na":
+    os.environ["E2B_API_KEY"] = settings.E2B_API_KEY
 
 # Soft validation: warn on missing env vars instead of erroring hard
 if settings.ENV == "local":

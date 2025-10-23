@@ -22,8 +22,13 @@ class MessageType(str, Enum):
     RESPONSE = "response"  # Response to a request
     ALERT = "alert"  # System alerts and notifications
     STATUS_UPDATE = "status_update"  # Progress and status updates
-    RUBRIC_UPDATE = "rubric_update"  # Rubric/evaluation criteria distribution
+    RUBRIC_UPDATE = "rubric_update"  # Rubric/evaluation criteria distribution (STICKY)
     GENERAL = "general"  # General communication (backward compatibility)
+
+
+# Sticky message types: delivered to ALL agents regardless of when they join
+# or whether they were in the original recipient list
+STICKY_MESSAGE_TYPES = {MessageType.RUBRIC_UPDATE}
 
 
 class CommunicationThread(BaseModel):
@@ -276,6 +281,9 @@ class CommunicationGraph(BaseModel):
         """
         Get messages sent to a specific agent with optional filtering.
 
+        Sticky message types (RUBRIC_UPDATE) are delivered to ALL agents regardless
+        of when they joined or whether they were in the original recipient list.
+
         Args:
             agent_id: The agent to get messages for
             since: Only return messages after this timestamp
@@ -288,8 +296,15 @@ class CommunicationGraph(BaseModel):
         relevant_messages = []
 
         for message in self.messages.values():
-            # Check if message is for this agent
-            if not (agent_id in message.get_all_recipients() or message.is_broadcast()):
+            # Check if message is for this agent:
+            # 1. Agent is explicitly in recipients OR it's a broadcast
+            # 2. OR it's a sticky message type (delivered to all agents)
+            is_addressed_to_agent = (
+                agent_id in message.get_all_recipients() or message.is_broadcast()
+            )
+            is_sticky_message = message.message_type in STICKY_MESSAGE_TYPES
+
+            if not (is_addressed_to_agent or is_sticky_message):
                 continue
 
             # Apply time filter

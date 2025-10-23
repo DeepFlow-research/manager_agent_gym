@@ -93,14 +93,19 @@ class StakeholderStub(StakeholderBase):
         self._replied_timesteps.add(current_timestep)
 
     def _build_public_profile(self):
-        from manager_agent_gym.schemas.agents.stakeholder import StakeholderPublicProfile
+        from manager_agent_gym.schemas.agents.stakeholder import (
+            StakeholderPublicProfile,
+        )
+
         return StakeholderPublicProfile(
             display_name="Stakeholder",
             role="Owner",
-            preference_summary="Test preferences"
+            preference_summary="Test preferences",
         )
 
-    async def evaluate_for_timestep(self, timestep, validation_engine, workflow, communications, manager_actions):
+    async def evaluate_for_timestep(
+        self, timestep, validation_engine, workflow, communications, manager_actions
+    ):
         """No-op evaluation for test stub."""
         pass
 

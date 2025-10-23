@@ -2,11 +2,18 @@
 Task data models for Manager Agent Gym.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 from pydantic import BaseModel, Field
 
 from manager_agent_gym.schemas.domain.base import TaskStatus
+
+if TYPE_CHECKING:
+    from manager_agent_gym.schemas.domain.workflow import Workflow
+    from manager_agent_gym.schemas.domain.task_execution import TaskExecution
 
 
 class Task(BaseModel):
@@ -56,8 +63,18 @@ class Task(BaseModel):
     status: TaskStatus = Field(
         default=TaskStatus.PENDING, description="Execution status of the task"
     )
-    assigned_agent_id: str | None = Field(
-        default=None, description="ID of the agent currently assigned to this task"
+
+    # Execution tracking (NEW MODEL)
+    execution_ids: list[UUID] = Field(
+        default_factory=list,
+        description="IDs of TaskExecutions for this task. Single-agent has 1, multi-agent has N.",
+    )
+
+    # Task-specific evaluation
+    completion_evaluators: list[Any] = Field(
+        default_factory=list,
+        description="Scorer callables to run on task completion for ranking outputs",
+        exclude=True,  # Exclude from serialization since callables can't be serialized
     )
 
     # Execution tracking
@@ -126,6 +143,66 @@ class Task(BaseModel):
     def is_atomic_task(self) -> bool:
         """Check if this task has no subtasks (atomic task)."""
         return len(self.subtasks) == 0
+
+    def is_multi_agent_task(self) -> bool:
+        """Check if task has multiple executions (multi-agent)."""
+        return len(self.execution_ids) > 1
+
+    def get_executions(self, workflow: "Workflow") -> list["TaskExecution"]:
+        """Get all TaskExecution objects for this task.
+
+        Args:
+            workflow: The workflow containing task executions
+
+        Returns:
+            List of TaskExecution objects
+        """
+
+        return [
+            workflow.task_executions[eid]
+            for eid in self.execution_ids
+            if eid in workflow.task_executions
+        ]
+
+    def get_successful_executions(self, workflow: "Workflow") -> list["TaskExecution"]:
+        """Get completed executions for this task.
+
+        Args:
+            workflow: The workflow containing task executions
+
+        Returns:
+            List of completed TaskExecution objects
+        """
+        from manager_agent_gym.schemas.domain.base import TaskStatus
+
+        return [
+            ex
+            for ex in self.get_executions(workflow)
+            if ex.status == TaskStatus.COMPLETED
+        ]
+
+    def get_best_execution(self, workflow: "Workflow") -> "TaskExecution | None":
+        """Get highest-ranked execution for this task.
+
+        Args:
+            workflow: The workflow containing task executions
+
+        Returns:
+            Best TaskExecution or None if no successful executions
+        """
+        executions = self.get_successful_executions(workflow)
+        if not executions:
+            return None
+
+        # Get executions with rank set
+        ranked = [ex for ex in executions if ex.rank is not None]
+        if ranked:
+            return min(
+                ranked, key=lambda e: e.rank if e.rank is not None else float("inf")
+            )
+
+        # Fallback to first successful if no ranks
+        return executions[0]
 
     def get_all_subtasks_flat(self) -> list["Task"]:
         """Get all subtasks in a flat list (recursive)."""
@@ -245,3 +322,7 @@ class SubtaskData(BaseModel):
     acceptance_criteria: str = Field(
         ..., description="Specific, measurable criteria to verify task completion"
     )
+
+
+# VariantExecutionState and RankedResourceOutput have been removed
+# They are replaced by TaskExecution schema (see task_execution.py)

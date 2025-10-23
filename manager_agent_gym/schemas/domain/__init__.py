@@ -16,6 +16,11 @@ from manager_agent_gym.schemas.domain.task import (
     SubtaskData,
 )
 
+# TaskExecution types
+from manager_agent_gym.schemas.domain.task_execution import (
+    TaskExecution,
+)
+
 # Resource types
 from manager_agent_gym.schemas.domain.resource import (
     Resource,
@@ -38,12 +43,17 @@ from manager_agent_gym.schemas.domain.communication import (
     ThreadMessagesView,
 )
 
+# Rebuild Workflow model now that TaskExecution is defined
+Workflow.model_rebuild()
+
 __all__ = [
     # Base types
     "TaskStatus",
     # Task types
     "Task",
     "SubtaskData",
+    # TaskExecution types
+    "TaskExecution",
     # Resource types
     "Resource",
     # Workflow types
@@ -58,4 +68,3 @@ __all__ = [
     "SenderMessagesView",
     "ThreadMessagesView",
 ]
-

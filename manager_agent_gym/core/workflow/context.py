@@ -11,7 +11,9 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from manager_agent_gym.core.communication.service import CommunicationService
-from manager_agent_gym.core.agents.workflow_agents.schemas.telemetry import AgentToolUseEvent
+from manager_agent_gym.core.agents.workflow_agents.schemas.telemetry import (
+    AgentToolUseEvent,
+)
 
 if TYPE_CHECKING:
     from manager_agent_gym.schemas.domain.workflow import Workflow
@@ -44,3 +46,19 @@ class AgentExecutionContext(BaseModel):
             except Exception:
                 # Best-effort; never raise from telemetry
                 pass
+
+
+# Rebuild model after all forward references are available
+# This resolves the Pydantic forward reference issue with Workflow
+def _rebuild_context_model():
+    """Rebuild AgentExecutionContext to resolve forward references."""
+    try:
+        from manager_agent_gym.schemas.domain.workflow import Workflow  # noqa: F401
+
+        AgentExecutionContext.model_rebuild()
+    except Exception:
+        # If rebuild fails, context will still work but without workflow field validation
+        pass
+
+
+_rebuild_context_model()

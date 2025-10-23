@@ -9,7 +9,9 @@ from datetime import datetime, timedelta
 from agents import function_tool, RunContextWrapper, Tool
 
 from manager_agent_gym.core.workflow.context import AgentExecutionContext
-from manager_agent_gym.core.agents.workflow_agents.schemas.telemetry import AgentToolUseEvent
+from manager_agent_gym.core.agents.workflow_agents.schemas.telemetry import (
+    AgentToolUseEvent,
+)
 from manager_agent_gym.schemas.domain.communication import MessageType
 from manager_agent_gym.core.common.logging import logger
 

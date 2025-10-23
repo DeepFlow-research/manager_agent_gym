@@ -2,14 +2,60 @@
 Centralized LLM interface using Instructor for structured outputs.
 """
 
-from typing import TypeVar, Type, Any
+from typing import TypeVar, Type, Any, NamedTuple
 import os
 from pydantic import BaseModel
 import traceback
 
 from manager_agent_gym.core.common.logging import logger
 
+from litellm.cost_calculator import cost_per_token
+
 T = TypeVar("T", bound=BaseModel)
+
+
+class LLMUsage(NamedTuple):
+    """Token usage information from LLM response."""
+
+    input_tokens: int
+    output_tokens: int
+    cached_tokens: int = 0
+    cache_creation_tokens: int = 0
+
+
+class StructuredLLMResponse(NamedTuple):
+    """Response from generate_structured_response including usage metadata."""
+
+    result: Any  # The validated Pydantic object
+    usage: LLMUsage | None  # Token usage (None if unavailable)
+
+
+def calculate_llm_cost(usage: LLMUsage, model: str) -> float:
+    """Calculate LLM cost in USD using litellm's cost_per_token.
+
+    Args:
+        usage: Token usage information
+        model: Model name (e.g., "gpt-4o", "gpt-4o-mini")
+
+    Returns:
+        Total cost in USD
+    """
+    if cost_per_token is None:
+        logger.warning("litellm not installed, cannot calculate cost")
+        return 0.0
+
+    try:
+        prompt_cost, completion_cost = cost_per_token(
+            model=model,
+            prompt_tokens=usage.input_tokens,
+            completion_tokens=usage.output_tokens,
+            cache_read_input_tokens=usage.cached_tokens,
+            cache_creation_input_tokens=usage.cache_creation_tokens,
+        )
+        return prompt_cost + completion_cost
+    except Exception as e:
+        logger.warning(f"Failed to calculate LLM cost for {model}: {e}")
+        return 0.0
 
 
 class LLMInferenceTruncationError(Exception):
@@ -122,7 +168,8 @@ async def generate_structured_response(
     max_completion_tokens: int = 0,
     max_retries: int = 0,
     retry_delay_seconds: float = 0.5,
-) -> T:
+    return_usage: bool = False,
+) -> T | StructuredLLMResponse:
     """
     Generate a structured response via Instructor with Pydantic validation and provider-agnostic handling.
 
@@ -136,9 +183,11 @@ async def generate_structured_response(
         max_completion_tokens: Maximum tokens to generate
         max_retries: Number of retry attempts on failure
         retry_delay_seconds: Base delay between retries (exponential backoff)
+        return_usage: If True, return StructuredLLMResponse with usage metadata
 
     Returns:
-        Instance of response_type populated with LLM response
+        If return_usage=False: Instance of response_type populated with LLM response
+        If return_usage=True: StructuredLLMResponse(result, usage)
 
     Raises:
         LLMInferenceTruncationError: If no valid response is received from LLM
@@ -161,7 +210,7 @@ async def generate_structured_response(
         }
         # Map "max_completion_tokens" if provided
         if max_completion_tokens and max_completion_tokens > 0:
-            kwargs["max_tokens"] = max_completion_tokens
+            kwargs["max_completion_tokens"] = max_completion_tokens
 
         # Delegate validation and retries to Instructor (patched method not typed)
         create_fn: Any = client.chat.completions.create
@@ -169,6 +218,48 @@ async def generate_structured_response(
             max_retries=max_retries,
             **kwargs,
         )
+
+        # Extract usage metadata if requested
+        if return_usage:
+            usage_data = None
+            try:
+                # Instructor preserves raw response in _raw_response attribute
+                if hasattr(result, "_raw_response"):
+                    raw_response = result._raw_response  # type: ignore[attr-defined]
+                    if hasattr(raw_response, "usage") and raw_response.usage:
+                        usage = raw_response.usage
+
+                        # Extract cache token info if available
+                        cached_tokens = 0
+                        cache_creation_tokens = 0
+                        try:
+                            if (
+                                hasattr(usage, "prompt_tokens_details")
+                                and usage.prompt_tokens_details
+                            ):
+                                cached_tokens = (
+                                    getattr(
+                                        usage.prompt_tokens_details, "cached_tokens", 0
+                                    )
+                                    or 0
+                                )
+                                cache_creation_tokens = (
+                                    usage.prompt_tokens - cached_tokens
+                                )
+                        except (AttributeError, TypeError):
+                            pass
+
+                        usage_data = LLMUsage(
+                            input_tokens=usage.prompt_tokens,
+                            output_tokens=usage.completion_tokens,
+                            cached_tokens=cached_tokens,
+                            cache_creation_tokens=cache_creation_tokens,
+                        )
+            except Exception as e:
+                logger.warning(f"Failed to extract usage metadata: {e}")
+
+            return StructuredLLMResponse(result=result, usage=usage_data)
+
         return result
 
     except Exception as e:

@@ -52,4 +52,3 @@ class AgentCoordinationEvent(BaseModel):
     error_message: str | None = Field(
         default=None, description="Error message if change failed"
     )
-

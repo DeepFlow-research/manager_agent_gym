@@ -68,7 +68,7 @@ async def decompose_task(
             seed=seed,
         )
 
-        for subtask_data in response.subtasks:
+        for subtask_data in response.subtasks:  # type: ignore
             description = f"""Executive Summary: {subtask_data.executive_summary}
 
 Implementation Plan: {subtask_data.implementation_plan}

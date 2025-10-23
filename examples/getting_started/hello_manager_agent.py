@@ -14,10 +14,12 @@ import asyncio
 # Import key components from manager_agent_gym
 # Many components are available at the top level for convenience
 from examples.end_to_end_examples.icap.workflow import create_workflow
-from manager_agent_gym import (
+from manager_agent_gym.core.agents.manager_agent.implementations.chain_of_thought import (
     ChainOfThoughtManagerAgent,
-    WorkflowExecutionEngine,
-    AgentRegistry,
+)
+from manager_agent_gym.core.workflow.engine import WorkflowExecutionEngine
+from manager_agent_gym.core.agents.workflow_agents.tools.registry import AgentRegistry
+from manager_agent_gym.schemas.preferences.preference import (
     PreferenceSnapshot,
     Preference,
 )

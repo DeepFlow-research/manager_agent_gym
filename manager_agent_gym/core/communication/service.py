@@ -19,6 +19,7 @@ from manager_agent_gym.schemas.domain.communication import (
     SenderMessagesView,
     ThreadMessagesView,
     MessageGrouping,
+    STICKY_MESSAGE_TYPES,
 )
 
 from manager_agent_gym.core.common.logging import logger
@@ -209,10 +210,18 @@ class CommunicationService:
             # Notify listeners
             await self._notify_listeners(message)
 
-            logger.info(
-                f"Multicast message sent: {from_agent} -> {to_agents} "
-                f"[{message_type.value}]: {content[:50]}..."
-            )
+            # Log with special note for sticky messages
+            if message_type in STICKY_MESSAGE_TYPES:
+                logger.info(
+                    f"Sticky multicast message sent: {from_agent} -> {to_agents} "
+                    f"[{message_type.value}]: {content[:50]}... "
+                    f"(will be delivered to ALL current and future agents)"
+                )
+            else:
+                logger.info(
+                    f"Multicast message sent: {from_agent} -> {to_agents} "
+                    f"[{message_type.value}]: {content[:50]}..."
+                )
 
             return message
 
@@ -326,6 +335,59 @@ class CommunicationService:
         """
         all_messages = list(self.graph.messages.values())
         return sorted(all_messages, key=lambda m: m.timestamp, reverse=True)
+
+    def get_communication_summary(self) -> dict[str, Any]:
+        """
+        Get a summary of all communication for debugging.
+
+        Returns:
+            Dictionary with message counts, agent participation, and recent messages
+        """
+        all_messages = self.get_all_messages()
+
+        # Count messages by type
+        message_types: dict[str, int] = {}
+        for msg in all_messages:
+            msg_type = (
+                msg.message_type.value
+                if hasattr(msg.message_type, "value")
+                else str(msg.message_type)
+            )
+            message_types[msg_type] = message_types.get(msg_type, 0) + 1
+
+        # Track agent participation
+        agents_sent: set[str] = set()
+        agents_received: set[str] = set()
+        for msg in all_messages:
+            agents_sent.add(msg.sender_id)
+            if msg.receiver_id:
+                agents_received.add(msg.receiver_id)
+            # Also count recipients in multicast
+            agents_received.update(msg.recipients)
+
+        return {
+            "total_messages": len(all_messages),
+            "message_types": message_types,
+            "unique_senders": len(agents_sent),
+            "unique_recipients": len(agents_received),
+            "agents_who_sent": sorted(list(agents_sent)),
+            "agents_who_received": sorted(list(agents_received)),
+            "recent_messages": [
+                {
+                    "from": msg.sender_id,
+                    "to": msg.receiver_id or "broadcast",
+                    "recipients": msg.recipients,
+                    "type": msg.message_type.value
+                    if hasattr(msg.message_type, "value")
+                    else str(msg.message_type),
+                    "timestamp": msg.timestamp.isoformat(),
+                    "content_preview": msg.content[:100] + "..."
+                    if len(msg.content) > 100
+                    else msg.content,
+                }
+                for msg in all_messages[:10]  # Last 10 messages
+            ],
+        }
 
     def get_all_messages_grouped(
         self,

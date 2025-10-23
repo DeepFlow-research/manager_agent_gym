@@ -22,6 +22,10 @@ from manager_agent_gym.schemas.agents.stakeholder import (
     StakeholderPublicProfile,
 )
 from manager_agent_gym.schemas.preferences.rubric import RunCondition
+from manager_agent_gym.schemas.preferences.evaluator import (
+    Rubric,
+    PairwiseExemplar,
+)
 
 if TYPE_CHECKING:
     from manager_agent_gym.core.communication.service import CommunicationService
@@ -55,22 +59,23 @@ class ClarificationStakeholderAgent(StakeholderBase):
 
         Args:
             config: Stakeholder configuration (role, persona, preferences)
-            exemplar_output: Example of ideal task completion that encapsulates
-                           the stakeholder's utility function. Used to inform
-                           realistic answers to clarification questions.
             seed: Random seed for reproducibility
         """
+
         # Validate preference data type before calling super
-        if not isinstance(config.preference_data, PreferenceExemplar):
+        if not isinstance(
+            config.preference_data, (PreferenceExemplar, Rubric, PairwiseExemplar)
+        ):
             raise ValueError(
-                "ClarificationStakeholderAgent requires PreferenceExemplar preference data"
+                "ClarificationStakeholderAgent requires PreferenceMeasure "
+                "(PreferenceExemplar, Rubric, or PairwiseExemplar) preference data"
             )
 
         self._preference_data = config.preference_data
         super().__init__(config)
 
-        # Store exemplar output (ground truth for "good" work)
-        self.exemplar_output = self._preference_data.exemplar_output
+        # Store preference measure (ground truth for "good" work)
+        self.preference_measure = self._preference_data
 
         # Track messages we've already responded to (avoid duplicates)
         self._responded_message_ids: set[UUID] = set()
@@ -85,7 +90,7 @@ class ClarificationStakeholderAgent(StakeholderBase):
             instructions=build_clarification_system_prompt_with_exemplar(
                 role=self.config.role,
                 persona_description=self.config.persona_description,
-                exemplar_output=self.exemplar_output,
+                preference_data=self.preference_measure,
             ),
         )
 
@@ -239,13 +244,11 @@ class ClarificationStakeholderAgent(StakeholderBase):
         )
 
     def get_serializable_state(self, timestep: int) -> dict:
-        """Serialize exemplar state for logging."""
+        """Serialize preference measure state for logging."""
         return {
-            "type": "exemplar",
+            "type": "clarification",
             "timestep": timestep,
-            "exemplar_output_preview": self.exemplar_output[:200] + "..."
-            if len(self.exemplar_output) > 200
-            else self.exemplar_output,
+            "preference_measure_summary": self.preference_measure.get_preference_summary(),
             "rubric_count": len(self.generated_rubrics),
             "rubric_names": [r.name for r in self.generated_rubrics],
         }

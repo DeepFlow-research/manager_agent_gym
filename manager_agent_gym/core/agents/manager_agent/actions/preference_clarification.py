@@ -14,6 +14,10 @@ from manager_agent_gym.core.agents.manager_agent.reward_shaping.service import (
 from manager_agent_gym.core.agents.stakeholder_agent.rubric_stakeholder import (
     ClarificationStakeholderAgent,
 )
+from manager_agent_gym.core.agents.manager_agent.utils.rubric_formatting import (
+    format_staged_rubric_for_worker,
+    format_staged_rubric_summary,
+)
 
 if TYPE_CHECKING:
     from manager_agent_gym.schemas.domain.workflow import Workflow
@@ -55,7 +59,9 @@ class AskClarificationQuestionsAction(BaseManagerAction):
 
         # Get stakeholder and manager from workflow
         stakeholder = workflow.stakeholder_agent
-        if not stakeholder or not isinstance(stakeholder, ClarificationStakeholderAgent):
+        if not stakeholder or not isinstance(
+            stakeholder, ClarificationStakeholderAgent
+        ):
             return ActionResult(
                 action_type=self.action_type,
                 summary="No clarification stakeholder found on workflow",
@@ -135,7 +141,9 @@ class GeneratePreferenceRubricAction(BaseManagerAction):
 
         # Get stakeholder and manager from workflow
         stakeholder = workflow.stakeholder_agent
-        if not stakeholder or not isinstance(stakeholder, ClarificationStakeholderAgent):
+        if not stakeholder or not isinstance(
+            stakeholder, ClarificationStakeholderAgent
+        ):
             return ActionResult(
                 action_type=self.action_type,
                 summary="No clarification stakeholder found on workflow",
@@ -156,43 +164,54 @@ class GeneratePreferenceRubricAction(BaseManagerAction):
             limit=1000,
         )
 
-        # Generate rubric
-        evaluator, rubric_spec = await decompose_preference_to_evaluator(
+        # Generate STAGED rubric (now compatible with gold GDPEval rubrics)
+        # Note: Returns executable StagedRubric + raw spec for logging
+        staged_rubric, rubric_spec = await decompose_preference_to_evaluator(
             workflow=workflow,
             stakeholder_manager_messages=communication_history,
             model_name="gpt-5",  # TODO: make this configurable
             seed=workflow.seed,
         )
 
-        # Store rubric on clarification stakeholder for evaluation
-        stakeholder.generated_rubrics.append(evaluator)
+        # Store staged rubric on clarification stakeholder for evaluation
+        stakeholder.generated_rubrics.append(staged_rubric)
         logger.info(
-            f"Added rubric '{evaluator.name}' to stakeholder.generated_rubrics "
-            f"(total: {len(stakeholder.generated_rubrics)})"
+            f"Added staged rubric '{staged_rubric.category_name}' to stakeholder.generated_rubrics "
+            f"(total: {len(stakeholder.generated_rubrics)}, stages: {len(staged_rubric.stages)})"
         )
 
-        # Broadcast rubric to all agents
+        # Broadcast rubric to all agents (formatted as readable markdown)
         agent_ids = list(workflow.agents.keys())
         manager_id = workflow.metadata.get("decomposition_state", {}).get(
             "manager_id", "decomposition_manager"
         )
 
+        # Format STAGED rubric as clean markdown for workers
+        formatted_rubric = format_staged_rubric_for_worker(rubric_spec)
+
         await communication_service.send_multicast_message(
             from_agent=manager_id,
             to_agents=agent_ids,
-            content=f"Rubric generated for the task. Here is the rubric: {rubric_spec.model_dump_json()}",
+            content=formatted_rubric,
             message_type=MessageType.RUBRIC_UPDATE,
         )
-        logger.info(f"Broadcast rubric to {len(agent_ids)} agents")
+
+        summary = format_staged_rubric_summary(rubric_spec)
+        logger.info(f"Broadcast staged rubric to {len(agent_ids)} agents: {summary}")
+
+        # Count total rules across all stages
+        total_rules = sum(len(stage.rules) for stage in rubric_spec.stages)
 
         return ActionResult(
             action_type=self.action_type,
-            summary=f"Generated and broadcast rubric with {len(evaluator.criteria)} rules",
+            summary=f"Generated and broadcast staged rubric with {len(rubric_spec.stages)} stages, {total_rules} rules",
             kind="mutation",
             data={
                 "preference_name": self.preference_name,
-                "rules_count": len(evaluator.criteria),
-                "rule_names": [r.name for r in evaluator.criteria],
+                "category_name": rubric_spec.category_name,
+                "stages_count": len(rubric_spec.stages),
+                "total_rules": total_rules,
+                "max_score": rubric_spec.max_total_score,
                 "rubric_spec": rubric_spec.model_dump(mode="json"),
             },
             success=True,

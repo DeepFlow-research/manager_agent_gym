@@ -2,10 +2,9 @@
 Agent configuration data models.
 """
 
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator
-from manager_agent_gym.core.agents.workflow_agents.prompts.persona_prompts_from_schemas import (
-    PERSONA_ROLEPLAY_TEMPLATE,
-)
 
 
 class AgentConfig(BaseModel):
@@ -24,6 +23,29 @@ class AgentConfig(BaseModel):
     agent_description: str = Field(..., description="Description of the agent")
     agent_capabilities: list[str] = Field(..., description="Capabilities of the agent")
 
+    # Multimodal configuration
+    use_multimodal_resources: bool = Field(
+        default=True,
+        description="Whether to pass full multimodal resource content to agent",
+    )
+    max_resource_tokens: int | None = Field(
+        default=100000, description="Max tokens for resource content (None = unlimited)"
+    )
+    image_detail: Literal["auto", "low", "high"] = Field(
+        default="high",
+        description="Detail level for image analysis (high=detailed, low=faster/cheaper)",
+    )
+
+    # Execution configuration
+    max_turns: int = Field(
+        default=15,
+        description="Maximum number of conversation turns for agent execution",
+    )
+    enable_execution_tracing: bool = Field(
+        default=True,
+        description="If True, stores detailed execution traces (all LLM calls, tool uses, tokens) for debugging",
+    )
+
     def get_agent_capability_summary(self) -> str:
         """Print a summary of the agent's configuration."""
         return f"Agent {self.agent_id} [{self.agent_type}] | Description: {self.agent_description} | Capabilities: {self.agent_capabilities}"
@@ -38,19 +60,30 @@ class AgentConfig(BaseModel):
 
     @field_validator("system_prompt")
     @classmethod
-    def validate_system_prompt(cls, v: str) -> str:
-        """Validate system_prompt is not empty."""
-        if not v or not v.strip():
-            raise ValueError("system_prompt cannot be empty")
+    def validate_system_prompt(cls, v: str | None) -> str | None:
+        """Validate system_prompt is not empty (if provided)."""
+        if v is None:
+            return None
+        if not v.strip():
+            raise ValueError("system_prompt cannot be empty string (use None instead)")
         if len(v) < 10:
             raise ValueError("system_prompt must be at least 10 characters")
         return v.strip()
 
 
 class AIAgentConfig(AgentConfig):
-    """Configuration specific to AI agents."""
+    """Configuration specific to AI agents.
+
+    Note: For AI agents, system_prompt should be set to None (or a brief specialization).
+    The full system prompt is built from a template + agent_description.
+    Do not override with custom system prompts as this bypasses execution guidelines.
+    """
 
     agent_type: str = Field(default="ai", description="Type of agent")
+    system_prompt: str | None = Field(
+        default=None,
+        description="DEPRECATED: Use agent_description instead. If set, overrides the standard prompt template (not recommended).",
+    )
 
 
 class HumanAgentConfig(AgentConfig):
@@ -123,6 +156,10 @@ class HumanAgentConfig(AgentConfig):
 
     def generate_roleplay_prompt(self) -> str:
         """Generate a roleplay prompt for the AI to embody this persona."""
+        # Lazy import to avoid circular dependency
+        from manager_agent_gym.core.agents.workflow_agents.prompts.persona_prompts_from_schemas import (
+            PERSONA_ROLEPLAY_TEMPLATE,
+        )
 
         expertise_str = (
             ", ".join(self.expertise_areas)

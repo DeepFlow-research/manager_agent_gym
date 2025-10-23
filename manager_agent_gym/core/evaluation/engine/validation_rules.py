@@ -222,7 +222,7 @@ OUTPUT REQUIREMENTS (JSON only, no prose outside JSON):
             )
 
             # Interpret union score (bool | level | numeric)
-            raw_score = llm_response.score
+            raw_score = llm_response.score  # type: ignore
             final_score: float
             if isinstance(raw_score, bool):
                 passed = raw_score
@@ -265,7 +265,7 @@ OUTPUT REQUIREMENTS (JSON only, no prose outside JSON):
                 except Exception:
                     raise ValueError(f"Invalid score type: {type(raw_score)}")
 
-            message = f"LLM workflow validation '{self.name}': {'PASSED' if passed else 'FAILED'} REASONING: {llm_response.reasoning} ({final_score:.2f}/{self.max_score}, level={level_for_msg})"
+            message = f"LLM workflow validation '{self.name}': {'PASSED' if passed else 'FAILED'} REASONING: {llm_response.reasoning} ({final_score:.2f}/{self.max_score}, level={level_for_msg})"  # type: ignore
 
             return self._create_result(
                 score=final_score,
@@ -274,7 +274,7 @@ OUTPUT REQUIREMENTS (JSON only, no prose outside JSON):
                 passed=passed,
                 details={
                     "validation_type": "llm",
-                    "reasoning": llm_response.reasoning,
+                    "reasoning": llm_response.reasoning,  # type: ignore
                     "model": self.model,
                     "prompt": self.llm_prompt,
                 },
@@ -358,7 +358,7 @@ OUTPUT REQUIREMENTS (JSON only, no prose outside JSON):
             for r in workflow.resources.values():
                 if scope.resource_ids and r.id not in scope.resource_ids:
                     continue
-                if scope.resource_types and r.content_type not in scope.resource_types:
+                if scope.resource_types and r.mime_type not in scope.resource_types:
                     continue
                 try:
                     lines.append(r.pretty_print())

@@ -7,10 +7,14 @@ private to the simulator and is not exposed via these schemas.
 """
 
 from pydantic import BaseModel, Field
-from manager_agent_gym.schemas.agents.base import AgentConfig
+from .base import AgentConfig  # Use relative import to avoid package re-initialization
 from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
 from manager_agent_gym.schemas.preferences.preference import PreferenceChangeEvent
-from manager_agent_gym.schemas.preferences.evaluator import PreferenceExemplar
+from manager_agent_gym.schemas.preferences.evaluator import (
+    PreferenceExemplar,
+    Rubric,
+    PairwiseExemplar,
+)
 
 
 class StakeholderPublicProfile(BaseModel):
@@ -28,10 +32,17 @@ class StakeholderConfig(AgentConfig):
     """Configuration for the stakeholder agent persona and messaging behavior.
 
     Inherits from AgentConfig to align with AgentInterface typing and provide
-    standard fields like model_name and system_prompt.
+    standard fields like model_name and agent_description.
+
+    Note: system_prompt is ignored for stakeholders - the prompt is always built
+    from STAKEHOLDER_SYSTEM_PROMPT_TEMPLATE + persona_description.
     """
 
     agent_type: str = Field(default="stakeholder", description="Type identifier")
+    system_prompt: str | None = Field(
+        default=None,
+        description="DEPRECATED: Ignored for stakeholders. Use persona_description instead.",
+    )
 
     # Persona
     name: str = Field(..., description="Stakeholder name")
@@ -43,9 +54,11 @@ class StakeholderConfig(AgentConfig):
     model_name: str = Field(
         description="Model name to use for stakeholder agent", default="o3"
     )
-    preference_data: PreferenceSnapshot | PreferenceExemplar = Field(
+    preference_data: (
+        PreferenceSnapshot | Rubric | PreferenceExemplar | PairwiseExemplar
+    ) = Field(
         ...,
-        description="Initial preference data (snapshot with weights or exemplar with example output)",
+        description="Initial preference data (snapshot with weights, rubric criteria, text exemplar, or pairwise comparison)",
     )
 
     # Messaging behavior

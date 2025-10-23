@@ -67,8 +67,22 @@ class AssignTaskAction(BaseManagerAction):
                 success=False,
             )
 
-        # Execute assignment
-        workflow.tasks[task_uuid].assigned_agent_id = self.agent_id
+        # Execute assignment by creating a TaskExecution
+        from manager_agent_gym.schemas.domain.task_execution import TaskExecution
+        from manager_agent_gym.schemas.domain.base import TaskStatus as TS
+
+        task = workflow.tasks[task_uuid]
+
+        # Create execution if it doesn't exist
+        if not task.execution_ids:
+            execution = TaskExecution(
+                task_id=task.id,
+                agent_id=self.agent_id,
+                status=TS.PENDING,
+            )
+            workflow.task_executions[execution.id] = execution
+            task.execution_ids.append(execution.id)
+
         logger.info(f"Task {self.task_id} assigned to agent {self.agent_id}")
         summary = f"Assigned task {self.task_id} to {self.agent_id}"
         data = {"task_id": str(task_uuid), "agent_id": self.agent_id}
@@ -112,16 +126,28 @@ class AssignAllPendingTasksAction(BaseManagerAction):
             # Pick any agent deterministically for reproducibility
             target_agent_id = next(iter(workflow.agents.keys()))
 
+        from manager_agent_gym.schemas.domain.task_execution import TaskExecution
+        from manager_agent_gym.schemas.domain.base import TaskStatus as TS
+
         assigned_count = 0
         for task in workflow.tasks.values():
-            if task.assigned_agent_id:
+            # Skip if already has executions (already assigned)
+            if task.execution_ids:
                 continue
             if task.status in (
                 TaskStatus.COMPLETED,
                 TaskStatus.FAILED,
             ):
                 continue
-            task.assigned_agent_id = target_agent_id
+
+            # Create execution for this task
+            execution = TaskExecution(
+                task_id=task.id,
+                agent_id=target_agent_id,
+                status=TS.PENDING,
+            )
+            workflow.task_executions[execution.id] = execution
+            task.execution_ids.append(execution.id)
             assigned_count += 1
 
         logger.info(
@@ -174,8 +200,25 @@ class AssignTasksToAgentsAction(BaseManagerAction):
             if pair.agent_id not in workflow.agents:
                 skipped.append(f"no_agent:{pair.agent_id}")
                 continue
-            task.assigned_agent_id = pair.agent_id
-            assigned += 1
+
+            # Create execution for this task if not already exists
+            from manager_agent_gym.schemas.domain.task_execution import TaskExecution
+            from manager_agent_gym.schemas.domain.base import TaskStatus as TS
+
+            if not task.execution_ids:
+                execution = TaskExecution(
+                    task_id=task.id,
+                    agent_id=pair.agent_id,
+                    status=TS.PENDING,
+                )
+                workflow.task_executions[execution.id] = execution
+                task.execution_ids.append(execution.id)
+                assigned += 1
+            else:
+                # Update existing execution's agent
+                execution = workflow.task_executions[task.execution_ids[0]]
+                execution.agent_id = pair.agent_id
+                assigned += 1
 
         summary = f"Applied {assigned} assignment(s)" + (
             f"; skipped {len(skipped)}" if skipped else ""

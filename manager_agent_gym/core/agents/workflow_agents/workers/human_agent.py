@@ -133,11 +133,6 @@ class MockHumanAgent(AgentInterface[HumanAgentConfig]):
                     task, resources, start_time, started_at
                 )
 
-            # Create human-realistic task prompt with context
-            task_prompt = self._create_human_task_prompt(
-                task, resources, current_quality_modifier, context_messages
-            )
-
             # Execute with realistic human timing
             base_duration = await self._estimate_human_duration(task)
             simulated_duration_hours = base_duration * speed_modifier
@@ -151,8 +146,29 @@ class MockHumanAgent(AgentInterface[HumanAgentConfig]):
                 tool_event_sink=self.record_tool_use_event,
             )
 
-            # Execute using roleplay agent with DI context
-            result = await Runner.run(self.roleplay_agent, task_prompt, context=context)
+            # Check if we should use multimodal approach
+            if self.config.use_multimodal_resources and self._has_visual_resources(
+                resources
+            ):
+                # Build multimodal input with images/PDFs/Excel
+                user_message = await self._build_multimodal_human_input(
+                    task, resources, current_quality_modifier, context_messages
+                )
+
+                # Execute using roleplay agent with multimodal content
+                result = await Runner.run(
+                    self.roleplay_agent, [user_message], context=context
+                )
+            else:
+                # Fallback to text-only approach (backward compatible)
+                task_prompt = self._create_human_task_prompt(
+                    task, resources, current_quality_modifier, context_messages
+                )
+
+                # Execute using roleplay agent with DI context
+                result = await Runner.run(
+                    self.roleplay_agent, task_prompt, context=context
+                )
 
             # Extract structured output
             output = result.final_output
@@ -174,6 +190,29 @@ class MockHumanAgent(AgentInterface[HumanAgentConfig]):
             self.hours_worked_today += simulated_duration_hours
             self.tasks_completed += 1
 
+            # Extract execution trace if enabled
+            execution_trace = None
+            if self.config.enable_execution_tracing:
+                try:
+                    from manager_agent_gym.core.agents.workflow_agents.utils.trace_extractor import (
+                        extract_execution_trace,
+                    )
+
+                    completed_at = datetime.now()
+                    execution_trace = extract_execution_trace(
+                        result=result,
+                        agent_id=self.config.agent_id,
+                        task_id=task.id,
+                        started_at=started_at,
+                        completed_at=completed_at,
+                    )
+                except Exception as trace_error:
+                    # Don't fail the task if tracing fails
+                    logger.warning(
+                        f"Failed to extract execution trace: {trace_error}",
+                        exc_info=True,
+                    )
+
             return create_task_result(
                 task_id=task.id,
                 agent_id=self.config.agent_id,
@@ -181,6 +220,7 @@ class MockHumanAgent(AgentInterface[HumanAgentConfig]):
                 resources=output_resources,
                 execution_time=execution_time,
                 cost=actual_cost,
+                execution_trace=execution_trace,
                 simulated_duration_hours=simulated_duration_hours,
                 execution_notes=self._create_execution_notes(
                     output, current_quality_modifier
@@ -306,8 +346,21 @@ class MockHumanAgent(AgentInterface[HumanAgentConfig]):
             )
 
         # Build misunderstanding-oriented prompt and run the roleplay agent
-        task_prompt = self._create_misunderstood_task_prompt(task, resources)
-        result = await Runner.run(self.roleplay_agent, task_prompt, context=context)
+        # Check if we should use multimodal approach
+        if self.config.use_multimodal_resources and self._has_visual_resources(
+            resources
+        ):
+            # Build multimodal misunderstood input
+            user_message = await self._build_multimodal_misunderstood_input(
+                task, resources
+            )
+            result = await Runner.run(
+                self.roleplay_agent, [user_message], context=context
+            )
+        else:
+            # Text-only fallback
+            task_prompt = self._create_misunderstood_task_prompt(task, resources)
+            result = await Runner.run(self.roleplay_agent, task_prompt, context=context)
 
         output = result.final_output
         if not isinstance(output, HumanWorkOutput):
@@ -511,16 +564,181 @@ Deliver the output as you normally would for this task, fully believing it satis
         notes.extend(output.challenges_encountered)
         return notes
 
+    def _has_visual_resources(self, resources: list[Resource]) -> bool:
+        """Check if any resources contain visual content (images, PDFs, Excel).
+
+        Args:
+            resources: List of resources to check
+
+        Returns:
+            True if any resource is visual (not plain text)
+        """
+        for resource in resources:
+            if (
+                resource.is_image
+                or resource.is_document
+                or resource.is_spreadsheet
+                or not resource.is_text_format
+            ):
+                return True
+        return False
+
+    async def _build_multimodal_human_input(
+        self,
+        task: Task,
+        resources: list[Resource],
+        quality_modifier: float,
+        context_messages: dict[str, list[Message]] | None = None,
+    ):
+        """Build multimodal input for human agent with images/PDFs/Excel.
+
+        Args:
+            task: The task to execute
+            resources: Available input resources
+            quality_modifier: Current quality level
+            context_messages: Optional context from messages (rubrics, etc.)
+
+        Returns:
+            Message object with multimodal content
+        """
+        from manager_agent_gym.core.common.multimodal_resources import (
+            MultimodalResourceProcessor,
+            create_user_message,
+            create_text_content,
+        )
+
+        # Create processor with agent's config
+        processor = MultimodalResourceProcessor(
+            max_tokens=self.config.max_resource_tokens,
+            default_image_detail=self.config.image_detail,
+        )
+
+        # Build evaluation criteria section
+        evaluation_criteria = ""
+        if context_messages and context_messages.get("rubrics"):
+            evaluation_criteria = self._format_rubric_messages(
+                context_messages["rubrics"]
+            )
+
+        # Build task text using human template style
+        task_text = f"### Task Assignment for {self.config.name}\n\n"
+        task_text += f"**Task:** {task.name}\n\n"
+        task_text += f"**Description:**\n{task.description}\n\n"
+
+        if evaluation_criteria:
+            task_text += evaluation_criteria + "\n\n"
+
+        task_text += "**Resources Available:**\n"
+
+        # Add context about current state
+        if quality_modifier < 0.7:
+            task_text += "\n*Note: You're feeling a bit tired/stressed today - be mindful of this as you work.*\n\n"
+        elif quality_modifier > 0.9:
+            task_text += "\n*Note: You're feeling sharp and focused today - great conditions for quality work.*\n\n"
+
+        # Get resource content blocks (images, PDFs, Excel, text)
+        resource_blocks = await processor.format_resources_as_content(
+            resources,
+            include_metadata=True,
+        )
+
+        # Add expertise reminder at the end
+        expertise_note = "\n\n### Your Background\n"
+        expertise_note += f"- **Expertise**: {', '.join(self.config.expertise_areas)}\n"
+        expertise_note += f"- **Work Style**: {self.config.work_style}\n"
+        expertise_note += f"- **Experience**: {self.config.experience_years} years\n\n"
+        expertise_note += "Use these strengths as you approach this work. Take breaks as needed and work at a sustainable pace."
+
+        # Combine task text with resource blocks
+        return create_user_message(
+            create_text_content(task_text),
+            *resource_blocks,
+            create_text_content(expertise_note),
+        )
+
+    async def _build_multimodal_misunderstood_input(
+        self,
+        task: Task,
+        resources: list[Resource],
+    ):
+        """Build multimodal input for misunderstanding scenario.
+
+        Args:
+            task: The task to execute
+            resources: Available input resources
+
+        Returns:
+            Message object with multimodal content
+        """
+        from manager_agent_gym.core.common.multimodal_resources import (
+            MultimodalResourceProcessor,
+            create_user_message,
+            create_text_content,
+        )
+
+        # Create processor with agent's config
+        processor = MultimodalResourceProcessor(
+            max_tokens=self.config.max_resource_tokens,
+            default_image_detail=self.config.image_detail,
+        )
+
+        # Build task text
+        task_text = f"### Task Assignment for {self.config.name}\n\n"
+        task_text += f"**Task:** {task.name}\n\n"
+        task_text += f"**Description:**\n{task.description}\n\n"
+        task_text += "**Resources Available:**\n"
+
+        # Get resource content blocks
+        resource_blocks = await processor.format_resources_as_content(
+            resources,
+            include_metadata=True,
+        )
+
+        # Add misunderstanding instruction
+        misunderstanding_note = "\n\nImportant twist: You slightly misunderstand the task in a realistic, plausible way a human might.\n"
+        misunderstanding_note += "- Pick one reasonable misinterpretation (e.g., focusing on format over substance, optimizing the wrong KPI, solving a related-but-different problem, or assuming a different audience).\n"
+        misunderstanding_note += "- Proceed confidently without flagging confusion. Do not state that you misunderstood.\n"
+        misunderstanding_note += (
+            "- Produce a complete work product consistent with that misunderstanding.\n"
+        )
+        misunderstanding_note += "- Demonstrate craftsmanship appropriate to your background and work style.\n\n"
+        misunderstanding_note += "Deliver the output as you normally would for this task, fully believing it satisfies the request."
+
+        # Combine
+        return create_user_message(
+            create_text_content(task_text),
+            *resource_blocks,
+            create_text_content(misunderstanding_note),
+        )
+
     def _format_resources(self, resources: list[Resource]) -> str:
-        """Format resources for inclusion in the prompt."""
+        """Format resources for inclusion in the prompt (text-only fallback)."""
         formatted = []
         for resource in resources:
-            content_preview = (
-                (resource.content[:200] + "...")
-                if resource.content and len(resource.content) > 200
-                else (resource.content or "")
-            )
-            formatted.append(
-                f"- {resource.name}: {resource.description}\n  Content: {content_preview}"
-            )
+            # Show file information instead of inline content
+            resource_info = [
+                f"- {resource.name}: {resource.description}",
+                f"  File: {resource.file_path}",
+                f"  Type: {resource.mime_type}",
+                f"  Size: {resource.size_bytes} bytes",
+            ]
+
+            # Add format-specific metadata if available (format as key=value)
+            if resource.file_format_metadata:
+                metadata_items = [
+                    f"{k}={v}" for k, v in resource.file_format_metadata.items()
+                ]
+                resource_info.append(f"  Metadata: {', '.join(metadata_items)}")
+
+            # Try to show text preview for text-based files
+            try:
+                if resource.is_text_format:
+                    text_preview = resource.load_text()[:200]
+                    if len(resource.load_text()) > 200:
+                        text_preview += "..."
+                    resource_info.append(f"  Preview: {text_preview}")
+            except Exception:
+                pass  # Skip preview if file can't be read
+
+            formatted.append("\n  ".join(resource_info))
         return "\n".join(formatted)

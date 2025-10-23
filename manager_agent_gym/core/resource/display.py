@@ -15,27 +15,35 @@ class ResourceDisplay:
     def pretty_print(resource: "Resource", max_preview_chars: int = 5000) -> str:
         """Return a human-readable summary of the resource."""
         lines = [
-            f"Resource: {resource.name} (ID: {resource.id}, type={resource.content_type})",
+            f"Resource: {resource.name} (ID: {resource.id}, type={resource.mime_type})",
         ]
 
         if resource.description:
             lines.append(f"  Description: {resource.description}")
 
-        # Preview content if present
-        if resource.content:
-            try:
-                word_count = len(resource.content.split())
-            except Exception:
-                word_count = 0
-            char_len = len(resource.content)
-            lines.append(f"  Content stats: words={word_count}, chars={char_len}")
-            preview = resource.content[:max_preview_chars]
-            if len(resource.content) > max_preview_chars:
-                preview += "... (truncated)"
-            lines.append("  Content preview:")
-            for line in preview.splitlines()[:60]:
-                lines.append(f"    {line}")
-        else:
-            lines.append("  Content: <empty>")
+        # File information
+        lines.append(f"  File: {resource.file_path}")
+        lines.append(f"  Size: {resource.size_bytes:,} bytes")
+
+        if resource.file_format_metadata:
+            lines.append(f"  Metadata: {resource.file_format_metadata}")
+
+        # Preview content if text-based
+        try:
+            if resource.is_text_format:
+                content = resource.load_text()
+                word_count = len(content.split())
+                char_len = len(content)
+                lines.append(f"  Content stats: words={word_count}, chars={char_len}")
+                preview = content[:max_preview_chars]
+                if len(content) > max_preview_chars:
+                    preview += "... (truncated)"
+                lines.append("  Content preview:")
+                for line in preview.splitlines()[:60]:
+                    lines.append(f"    {line}")
+            else:
+                lines.append(f"  Content: <binary file, {resource.size_bytes} bytes>")
+        except Exception as e:
+            lines.append(f"  Content: <unable to load: {e}>")
 
         return "\n".join(lines)

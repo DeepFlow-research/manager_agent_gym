@@ -75,12 +75,16 @@ def hard_constraints_enforced(
         if prohibited:
             # resources
             for r in workflow.resources.values():
+                # Load resource content for text-based resources
+                resource_text = ""
+                try:
+                    if r.is_text_format:
+                        resource_text = r.load_text()
+                except Exception:
+                    pass  # Skip if unable to load
+
                 text = (
-                    str(r.name)
-                    + "\n"
-                    + str(r.description or "")
-                    + "\n"
-                    + str(r.content or "")
+                    str(r.name) + "\n" + str(r.description or "") + "\n" + resource_text
                 ).lower()
                 if any(k in text for k in prohibited):
                     violations.append(f"prohibited resource content: {c.name}")
@@ -167,8 +171,16 @@ def prohibited_actions_avoidance(
 
     # resources
     for r in workflow.resources.values():
+        # Load resource content for text-based resources
+        resource_text = ""
+        try:
+            if r.is_text_format:
+                resource_text = r.load_text()
+        except Exception:
+            pass
+
         text = (
-            str(r.name) + "\n" + str(r.description or "") + "\n" + str(r.content or "")
+            str(r.name) + "\n" + str(r.description or "") + "\n" + resource_text
         ).lower()
         if any(k in text for k in prohibited):
             return 0.0, "prohibited keyword in resources"

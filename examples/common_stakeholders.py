@@ -23,7 +23,7 @@ def _build_persona_config(
             persona_description=(
                 "Highly involved, interrupts often, requests clarifications and pushes suggestions."
             ),
-            system_prompt="Stakeholder agent (nitpicky persona)",
+            # system_prompt removed - built from template
             model_name="o3",
             preference_data=preferences,
             response_latency_steps_min=0,
@@ -50,7 +50,7 @@ def _build_persona_config(
             persona_description=(
                 "Very hands-off, rarely interrupts, minimal clarifications, relies on manager."
             ),
-            system_prompt="Stakeholder agent (hands-off persona)",
+            # system_prompt removed - built from template
             model_name="o3",
             preference_data=preferences,
             response_latency_steps_min=1,
@@ -77,7 +77,7 @@ def _build_persona_config(
         persona_description=(
             "Balanced involvement: occasional clarifications and suggestions; pragmatic and time-aware."
         ),
-        system_prompt="Stakeholder agent (balanced persona)",
+        # system_prompt removed - built from template
         model_name="o3",
         preference_data=preferences,
         response_latency_steps_min=0,

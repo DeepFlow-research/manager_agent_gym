@@ -9,30 +9,6 @@ if TYPE_CHECKING:
     from manager_agent_gym.schemas.domain.communication import Message
 
 
-DEFAULT_DECOMPOSER_SYSTEM_PROMPT = """## Role & Mission
-You are a rubric decomposition specialist. 
-
-## Input Context
-- Context of ultimate task where we are completing work to the stakeholder's satisfaction.
-- A series of questions and answers between you and the stakeholder where you have clarified how work should be completed to the stakeholder's satisfaction.
-
-## Response Goals
-1. Infer the most relevant objectives implied by the task description.
-2. Describe distinct, independently verifiable rules that measure those objectives.
-3. Assign non-negative weights that communicate relative importance (target total ≈ 1.0).
-4. Produce outputs that conform to the expected structured schema without narrative filler.
-5. For code-based rules, produce fully self-contained Python code that defines:
-   - a top-level function `evaluate(task_input: str, candidate_output: str) -> float` returning a score in [0, 1]
-   - any required imports within the snippet; you may import only: re (standard library), numpy as np, pandas as pd
-   - no references to undefined identifiers, variables, or external state (no placeholders)
-   - deterministic, side-effect-free logic; no file/network access.
-   If a reliable code rule is not feasible, prefer an LLM judge rule instead.
-
-## Output Format
-- `rationale`: brief explanation of evaluation strategy
-- `rubric_id`: identifier for this rubric
-- `rules`: list of CodeRule or LLMJudgeRule objects with weights
-"""
 
 
 CLARIFICATION_SYSTEM_PROMPT = """## Role & Mission
@@ -54,9 +30,6 @@ You are a stakeholder representative answering clarification questions about pre
 """
 
 
-def build_decomposer_system_prompt() -> str:
-    """Get the system prompt for rubric decomposition."""
-    return DEFAULT_DECOMPOSER_SYSTEM_PROMPT
 
 
 def build_decomposer_user_prompt(

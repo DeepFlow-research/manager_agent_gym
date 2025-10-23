@@ -7,6 +7,7 @@ to interact with the workflow execution system.
 
 from manager_agent_gym.schemas.manager.observation import (
     ManagerObservation,
+    ResourcePreview,
 )
 
 # Re-export all actions
@@ -35,6 +36,7 @@ from manager_agent_gym.schemas.manager.actions import (
 
 __all__ = [
     "ManagerObservation",
+    "ResourcePreview",
     "ActionResult",
     "BaseManagerAction",
     "AssignTaskAction",
@@ -56,4 +58,3 @@ __all__ = [
     "RequestEndWorkflowAction",
     "FailedAction",
 ]
-

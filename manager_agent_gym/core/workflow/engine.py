@@ -5,7 +5,7 @@ Manages the core execution loop with discrete timesteps where the manager
 agent can observe state and take actions between task executions.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 import asyncio
 import json
 import traceback
@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import cast
 from typing import Awaitable, Callable, Sequence
 from uuid import UUID
+from pydantic import BaseModel, Field
 
 from manager_agent_gym.schemas.domain.communication import SenderMessagesView
 from manager_agent_gym.core.workflow.state.state_restorer import WorkflowStateRestorer
@@ -26,6 +27,7 @@ from manager_agent_gym.schemas.domain.base import TaskStatus
 from manager_agent_gym.schemas.domain.resource import Resource
 from manager_agent_gym.schemas.domain.task import Task
 from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.domain.task_execution import TaskExecution
 from manager_agent_gym.core.execution.schemas.state import ExecutionState
 
 from manager_agent_gym.core.execution.schemas.callbacks import TimestepEndContext
@@ -58,6 +60,25 @@ from manager_agent_gym.core.agents.manager_agent.actions import ActionResult
 if TYPE_CHECKING:
     from manager_agent_gym.core.workflow.phases.interface import (
         PreExecutionPhase,
+    )
+    from manager_agent_gym.schemas.preferences.evaluation import (
+        StagedRubric,
+        StagedRubricResult,
+    )
+
+
+class TaskExecutionEvaluationResult(BaseModel):
+    """Result from evaluating and ranking multi-agent task execution outputs.
+
+    Used by task evaluators to return both a score and metadata when
+    comparing different agent outputs for the same task. This is an internal
+    helper class, distinct from the public WorkflowEvaluationResult.
+    """
+
+    score: float
+    evaluation_metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Flexible metadata (reasoning, error, criteria details, etc.)",
     )
 
 
@@ -135,12 +156,15 @@ class WorkflowExecutionEngine:
         reward_projection: RewardProjection[object] | None = None,
         # Pre-execution phases
         pre_execution_phases: "list[PreExecutionPhase] | None" = None,
+        # Gold standard evaluation rubrics (GDPEval)
+        gold_rubrics: "list[StagedRubric] | None" = None,
     ):
         self.workflow = workflow
         self.agent_registry = agent_registry
         self.evaluations = list(evaluations or [])
         self.manager_agent = manager_agent
         self.stakeholder_agent: StakeholderBase = stakeholder_agent
+        self.gold_rubrics = gold_rubrics or []
 
         # Set agent IDs on workflow for easy lookup from actions
         self.workflow.stakeholder_agent_id = stakeholder_agent.config.agent_id
@@ -253,7 +277,7 @@ class WorkflowExecutionEngine:
                 task = self.workflow.tasks[task_id]
                 # Update key state information
                 task.status = TaskStatus(task_data["status"])
-                task.assigned_agent_id = task_data.get("assigned_agent_id")
+                # Note: assigned_agent_id is now tracked in TaskExecution, not Task
                 task.actual_duration_hours = task_data.get("actual_duration_hours")
                 task.actual_cost = task_data.get("actual_cost")
                 task.quality_score = task_data.get("quality_score")
@@ -355,7 +379,7 @@ class WorkflowExecutionEngine:
         # Exiting TaskGroup ensures all scheduled validations completed
         self._task_group = None
 
-        # Run final evaluation set (stakeholder handles its own evaluation)
+        # Run final evaluation
         communications_sender = (
             self.communication_service.get_messages_grouped_by_sender(
                 sort_within_group="time",
@@ -367,14 +391,40 @@ class WorkflowExecutionEngine:
         )
         manager_actions = self.manager_agent.get_action_buffer()
 
-        # Let stakeholder trigger final evaluation
-        await self.stakeholder_agent.evaluate_for_timestep(
-            timestep=self.current_timestep,
-            validation_engine=self.validation_engine,
-            workflow=self.workflow,
-            communications=comms_by_sender,
-            manager_actions=manager_actions,
-        )
+        # PRIORITY 1: Evaluate with gold standard rubrics if provided (GDPEval)
+        if self.gold_rubrics:
+            logger.info(f"Evaluating with {len(self.gold_rubrics)} gold standard rubric(s)...")
+            gold_results = await self.evaluate_with_staged_rubrics(
+                timestep=self.current_timestep,
+                staged_rubrics=self.gold_rubrics,
+            )
+            
+            # Store gold evaluation results in workflow metadata for reward calculation
+            if not hasattr(self.workflow, "metadata") or self.workflow.metadata is None:
+                self.workflow.metadata = {}
+            self.workflow.metadata["gold_evaluation_results"] = {
+                category: {
+                    "total_score": result.total_score,
+                    "max_score": result.max_score,
+                    "normalized_score": result.normalized_score,
+                    "stages_passed": result.stages_passed,
+                    "stages_evaluated": result.stages_evaluated,
+                    "failed_gate": result.failed_gate,
+                    "stopped_at": result.stopped_at,
+                }
+                for category, result in gold_results.items()
+            }
+            logger.info("Gold standard evaluation complete")
+        
+        # PRIORITY 2: Let stakeholder run its own evaluation (if needed for legacy)
+        else:
+            await self.stakeholder_agent.evaluate_for_timestep(
+                timestep=self.current_timestep,
+                validation_engine=self.validation_engine,
+                workflow=self.workflow,
+                communications=comms_by_sender,
+                manager_actions=manager_actions,
+            )
 
         # TODO: Compute utility gap if proxy rubrics were generated
         # If workflow.metadata contains both "true_preferences" and "decomposition_state"
@@ -626,70 +676,123 @@ class WorkflowExecutionEngine:
                         break
 
                 if task_id:
+                    # Get the task to check if it's multi-agent
+                    task_obj = self.workflow.tasks.get(task_id)
+
                     try:
-                        result = await done_task
-                        if result.success:
+                        # Check if this is a multi-agent task
+                        if task_obj and task_obj.is_multi_agent_task():
+                            # Handle multi-agent completion
+                            await self._handle_multi_agent_completion(
+                                task_obj, done_task
+                            )
                             tasks_completed.append(task_id)
-                            self.completed_task_ids.add(task_id)
-
-                            resource_ids = []
-                            new_resources = []
-                            for resource in result.output_resources:
-                                WorkflowMutations.add_resource(self.workflow, resource)
-                                resource_ids.append(resource.id)
-                                new_resources.append(resource)
-
-                            # Validation system removed; skip resource validations
-
-                            existing_task = self.workflow.tasks.get(task_id)
-                            if existing_task is not None:
-                                completed_task = existing_task.model_copy(
-                                    update={
-                                        "status": TaskStatus.COMPLETED,
-                                        "completed_at": result.completed_at,
-                                        "actual_duration_hours": float(
-                                            result.simulated_duration_hours
-                                        ),
-                                        "actual_cost": result.actual_cost,
-                                        "output_resource_ids": existing_task.output_resource_ids
-                                        + resource_ids,
-                                    }
-                                )
-                                self.workflow.tasks[task_id] = completed_task
-                                # Synchronize embedded subtasks with updated registry to fix inconsistencies
-                                for sync_task in self.workflow.tasks.values():
-                                    sync_task.sync_embedded_tasks_with_registry(
-                                        self.workflow.tasks
-                                    )
-                                self.workflow.total_simulated_hours += float(
-                                    result.simulated_duration_hours
-                                )
-                                self.workflow.total_cost += float(result.actual_cost)
-
-                            else:
-                                logger.warning(
-                                    f"Completed task {task_id} no longer exists in workflow (possibly removed). Skipping state update."
-                                )
-
                         else:
-                            tasks_failed.append(task_id)
-                            self.failed_task_ids.add(task_id)
+                            # Standard single-agent completion
+                            result = await done_task
 
-                            task = self.workflow.tasks.get(task_id)
-                            if task is not None:
-                                task.status = TaskStatus.FAILED
-                                task.execution_notes.append(
-                                    f"Failed: {result.error_message}"
+                            # Get the single execution for this task
+                            existing_task = self.workflow.tasks.get(task_id)
+                            if existing_task and existing_task.execution_ids:
+                                execution: TaskExecution = (
+                                    self.workflow.task_executions[
+                                        existing_task.execution_ids[0]
+                                    ]
                                 )
-                                # Synchronize embedded subtasks with updated registry to fix inconsistencies
-                                for sync_task in self.workflow.tasks.values():
-                                    sync_task.sync_embedded_tasks_with_registry(
-                                        self.workflow.tasks
+
+                                if result.success:
+                                    tasks_completed.append(task_id)
+                                    self.completed_task_ids.add(task_id)
+
+                                    resource_ids = []
+                                    new_resources = []
+                                    for resource in result.output_resources:
+                                        WorkflowMutations.add_resource(
+                                            self.workflow, resource
+                                        )
+                                        resource_ids.append(resource.id)
+                                        new_resources.append(resource)
+
+                                    # Update execution
+                                    execution.status = TaskStatus.COMPLETED
+                                    execution.completed_at = result.completed_at
+                                    execution.output_resource_ids = resource_ids
+                                    execution.actual_duration_hours = (
+                                        result.simulated_duration_hours
                                     )
-                            else:
-                                logger.warning(
-                                    f"Failed task {task_id} no longer exists in workflow (possibly removed). Skipping state update."
+                                    execution.actual_cost = result.actual_cost
+                                    execution.execution_result = result
+
+                                    # Update task
+                                    completed_task = existing_task.model_copy(
+                                        update={
+                                            "status": TaskStatus.COMPLETED,
+                                            "completed_at": result.completed_at,
+                                            "actual_duration_hours": float(
+                                                result.simulated_duration_hours
+                                            ),
+                                            "actual_cost": result.actual_cost,
+                                            "output_resource_ids": existing_task.output_resource_ids
+                                            + resource_ids,
+                                        }
+                                    )
+                                    self.workflow.tasks[task_id] = completed_task
+                                    # Synchronize embedded subtasks with updated registry to fix inconsistencies
+                                    for sync_task in self.workflow.tasks.values():
+                                        sync_task.sync_embedded_tasks_with_registry(
+                                            self.workflow.tasks
+                                        )
+                                    self.workflow.total_simulated_hours += float(
+                                        result.simulated_duration_hours
+                                    )
+                                    self.workflow.total_cost += float(
+                                        result.actual_cost
+                                    )
+
+                                else:
+                                    logger.warning(
+                                        f"Completed task {task_id} no longer exists in workflow (possibly removed). Skipping state update."
+                                    )
+
+                            elif existing_task and existing_task.execution_ids:
+                                # Handle failure
+                                execution = self.workflow.task_executions[
+                                    existing_task.execution_ids[0]
+                                ]
+
+                                tasks_failed.append(task_id)
+                                self.failed_task_ids.add(task_id)
+
+                                # Update execution
+                                execution.status = TaskStatus.FAILED
+                                execution.completed_at = (
+                                    result.completed_at
+                                    if hasattr(result, "completed_at")
+                                    else datetime.now()
                                 )
+                                execution.error_message = (
+                                    result.error_message
+                                    if hasattr(result, "error_message")
+                                    else "Unknown error"
+                                )
+                                execution.execution_result = result
+
+                                # Update task
+                                task = self.workflow.tasks.get(task_id)
+                                if task is not None:
+                                    task.status = TaskStatus.FAILED
+                                    task.execution_notes.append(
+                                        f"Failed: {result.error_message}"
+                                    )
+                                    # Synchronize embedded subtasks with updated registry to fix inconsistencies
+                                    for sync_task in self.workflow.tasks.values():
+                                        sync_task.sync_embedded_tasks_with_registry(
+                                            self.workflow.tasks
+                                        )
+                                else:
+                                    logger.warning(
+                                        f"Failed task {task_id} no longer exists in workflow (possibly removed). Skipping state update."
+                                    )
 
                     except Exception as e:
                         logger.error(
@@ -722,31 +825,63 @@ class WorkflowExecutionEngine:
                 if task.deps_ready_at is None:
                     task.deps_ready_at = datetime.now()
 
-                # Get assigned agent
-                agent = None
-                if task.assigned_agent_id:
-                    agent = self.workflow.agents.get(task.assigned_agent_id)
-
-                if agent:
-                    # Get task resources
-                    resources = self._get_task_resources(task)
-
-                    # Add task to agent's current workload
-                    if task.id not in agent.current_task_ids:
-                        agent.current_task_ids.append(task.id)
-
-                    # Start task execution
-                    execution_task = asyncio.create_task(
-                        agent.execute_task(task, resources)
-                    )
-                    self.running_tasks[task.id] = execution_task
-
-                    # Update task status and timing
-                    # READY -> RUNNING when the engine actually starts execution
-                    task.status = TaskStatus.RUNNING
-                    task.started_at = datetime.now()
-
+                # Check if this is a multi-agent task
+                if task.is_multi_agent_task():
+                    # Handle multi-agent execution
+                    await self._start_multi_agent_task(task)
                     tasks_started.append(task.id)
+                else:
+                    # Standard single-agent execution
+                    # If no execution exists, create one
+                    if not task.execution_ids:
+                        # Create a single execution for this task
+                        # Try to find an agent from agents dict or use a default
+                        agent_id = None
+                        for aid in self.workflow.agents.keys():
+                            # Simple heuristic: use first available agent
+                            agent_id = aid
+                            break
+
+                        if not agent_id:
+                            logger.warning(
+                                f"No agent available for single-agent task '{task.name}'"
+                            )
+                            continue
+
+                        execution = TaskExecution(
+                            task_id=task.id,
+                            agent_id=agent_id,
+                            status=TaskStatus.PENDING,
+                        )
+                        self.workflow.task_executions[execution.id] = execution
+                        task.execution_ids.append(execution.id)
+
+                    execution = self.workflow.task_executions[task.execution_ids[0]]
+                    agent = self.workflow.agents.get(execution.agent_id)
+
+                    if agent:
+                        # Get task resources
+                        resources = self._get_task_resources(task)
+
+                        # Add task to agent's current workload
+                        if task.id not in agent.current_task_ids:
+                            agent.current_task_ids.append(task.id)
+
+                        # Update execution status
+                        execution.status = TaskStatus.RUNNING
+                        execution.started_at = datetime.now()
+
+                        # Start task execution
+                        execution_task = asyncio.create_task(
+                            agent.execute_task(task, resources)
+                        )
+                        self.running_tasks[task.id] = execution_task
+
+                        # Update task status and timing
+                        task.status = TaskStatus.RUNNING
+                        task.started_at = datetime.now()
+
+                        tasks_started.append(task.id)
 
         return tasks_started, tasks_completed, tasks_failed
 
@@ -1065,3 +1200,408 @@ class WorkflowExecutionEngine:
             )
 
         return changes
+
+    async def _start_multi_agent_task(self, task: Task) -> None:
+        """Start parallel execution by all assigned executions."""
+
+        # Get all executions for this task
+        executions = [
+            self.workflow.task_executions[eid]
+            for eid in task.execution_ids
+            if eid in self.workflow.task_executions
+        ]
+
+        if not executions:
+            logger.warning(f"No executions found for multi-agent task '{task.name}'")
+            return
+
+        resources = self._get_task_resources(task)
+
+        task.status = TaskStatus.RUNNING
+        task.started_at = datetime.now()
+
+        logger.info(f"Starting {len(executions)} executions for task '{task.name}'")
+
+        # Create futures for all executions
+        variant_futures = []
+        for execution in executions:
+            agent = self.workflow.agents.get(execution.agent_id)
+            if not agent:
+                logger.warning(f"Agent {execution.agent_id} not found")
+                continue
+
+            # Mark execution as running
+            execution.status = TaskStatus.RUNNING
+            execution.started_at = datetime.now()
+
+            # Add task to agent's workload
+            if task.id not in agent.current_task_ids:
+                agent.current_task_ids.append(task.id)
+
+            # Start execution
+            future = asyncio.create_task(
+                self._execute_single_variant(task, execution, agent, resources)
+            )
+            variant_futures.append(future)
+
+        # Store as group (gather all)
+        # asyncio.gather returns a Future which is compatible with Task for awaiting
+        multi_future: asyncio.Task[Any] = asyncio.gather(
+            *variant_futures, return_exceptions=True
+        )  # type: ignore
+        self.running_tasks[task.id] = multi_future
+
+    async def _execute_single_variant(
+        self,
+        task: Task,
+        execution: "TaskExecution",
+        agent: "AgentInterface",
+        resources: list[Resource],
+    ) -> tuple[UUID, Any]:
+        """Execute single variant and track result.
+
+        Args:
+            task: The task being executed
+            execution: The TaskExecution object tracking this attempt
+            agent: The agent performing the execution
+            resources: Input resources for the task
+
+        Returns:
+            Tuple of (execution_id, result)
+        """
+        try:
+            # Execute task
+            result = await agent.execute_task(task, resources)
+
+            # Update execution state
+            execution.status = (
+                TaskStatus.COMPLETED if result.success else TaskStatus.FAILED
+            )
+            execution.completed_at = datetime.now()
+            execution.execution_result = result
+            execution.output_resource_ids = [r.id for r in result.output_resources]
+            execution.actual_duration_hours = result.simulated_duration_hours
+            execution.actual_cost = result.actual_cost
+
+            if not result.success:
+                execution.error_message = result.error_message
+
+            # Add resources to workflow
+            for resource in result.output_resources:
+                WorkflowMutations.add_resource(self.workflow, resource)
+
+            logger.info(
+                f"Execution {execution.id} (agent {execution.agent_id}) completed for '{task.name}'"
+            )
+            return execution.id, result
+
+        except Exception as e:
+            logger.error(
+                f"Execution {execution.id} (agent {execution.agent_id}) failed: {e}",
+                exc_info=True,
+            )
+
+            execution.status = TaskStatus.FAILED
+            execution.completed_at = datetime.now()
+            execution.error_message = str(e)
+
+            raise
+
+    async def _handle_multi_agent_completion(
+        self, task: Task, future: asyncio.Future
+    ) -> None:
+        """Handle completion of multi-agent task."""
+
+        # Wait for all execution results
+        await future  # List of (execution_id, result) or exceptions
+
+        # Get all executions for this task
+        executions = [
+            self.workflow.task_executions[eid]
+            for eid in task.execution_ids
+            if eid in self.workflow.task_executions
+        ]
+
+        # Count successes and failures
+        successful_executions = [
+            e for e in executions if e.status == TaskStatus.COMPLETED
+        ]
+        failed_executions = [e for e in executions if e.status == TaskStatus.FAILED]
+
+        logger.info(
+            f"All executions finished for '{task.name}': "
+            f"{len(successful_executions)} succeeded, {len(failed_executions)} failed"
+        )
+
+        # If all executions failed, mark task as failed
+        if not successful_executions:
+            task.status = TaskStatus.FAILED
+            task.completed_at = datetime.now()
+            self.failed_task_ids.add(task.id)
+            logger.error(
+                f"Multi-agent task '{task.name}' FAILED: all {len(failed_executions)} executions failed"
+            )
+            return
+
+        # At least one execution succeeded - evaluate and rank
+        if task.completion_evaluators:
+            await self._evaluate_and_rank_executions(task, successful_executions)
+
+        else:
+            # No evaluators: propagate all successful outputs without ranking
+            task.output_resource_ids = [
+                rid for ex in successful_executions for rid in ex.output_resource_ids
+            ]
+
+        # Mark task complete
+        task.status = TaskStatus.COMPLETED
+        task.completed_at = datetime.now()
+        self.completed_task_ids.add(task.id)
+
+        logger.info(
+            f"Multi-agent task '{task.name}' COMPLETED. "
+            f"{len(successful_executions)}/{len(executions)} executions succeeded. "
+            f"Propagating {len(task.output_resource_ids)} resources"
+        )
+
+    async def _evaluate_and_rank_executions(
+        self, task: Task, executions: list["TaskExecution"]
+    ) -> None:
+        """Evaluate and rank TaskExecutions by their resource bundles.
+
+        Each execution's full resource bundle is evaluated as a unit.
+
+        Args:
+            task: The task being evaluated
+            executions: List of successful TaskExecution objects to evaluate
+        """
+        import inspect
+
+        if not task.completion_evaluators or not executions:
+            return
+
+        logger.info(f"Evaluating {len(executions)} executions for task '{task.name}'")
+
+        # Evaluate each execution
+        for execution in executions:
+            # Get execution's resource bundle
+            resources = [
+                self.workflow.resources[rid]
+                for rid in execution.output_resource_ids
+                if rid in self.workflow.resources
+            ]
+
+            if not resources:
+                logger.warning(f"No resources found for execution {execution.id}")
+                continue
+
+            evaluation_scores = {}
+            evaluation_details = {}
+
+            # Run each evaluator on the full resource bundle
+            for evaluator in task.completion_evaluators:
+                try:
+                    # === Handle Rubric objects ===
+                    if isinstance(evaluator, Rubric):
+                        from manager_agent_gym.core.evaluation.schemas.success_criteria import (
+                            ValidationContext,
+                        )
+                        
+                        # Create context for these specific resources
+                        context = ValidationContext(
+                            workflow=self.workflow,
+                            timestep=0  # Task completion context
+                        )
+                        context.set_evaluable_resources(resources) 
+                        
+                        # Use existing ValidationEngine to evaluate each criterion
+                        criterion_results: dict[str, dict[str, float | str]] = {}
+                        for criterion in evaluator.criteria:
+                            score_result, _, _ = await self.validation_engine._evaluate_single_rubric(
+                                workflow=self.workflow,
+                                rubric_criteria=criterion,
+                                context=context,
+                            )
+                            criterion_results[criterion.name] = {
+                                "score": score_result.score,
+                                "reasoning": score_result.reasoning,
+                                "max_score": float(criterion.max_score),
+                            }
+                        
+                        # Aggregate using rubric's weighted average
+                        total_weighted = sum(
+                            float(r["score"]) * float(r["max_score"])  # type: ignore[arg-type]
+                            for r in criterion_results.values()
+                        )
+                        total_weight = sum(
+                            float(r["max_score"])  # type: ignore[arg-type]
+                            for r in criterion_results.values()
+                        )
+                        aggregate_score = total_weighted / total_weight if total_weight > 0 else 0.0
+                        
+                        evaluator_name = evaluator.name
+                        evaluation_scores[evaluator_name] = aggregate_score
+                        evaluation_details[evaluator_name] = {
+                            "score": aggregate_score,
+                            "criteria": criterion_results,
+                        }
+                        
+                        logger.info(
+                            f"Rubric '{evaluator_name}' evaluated: {aggregate_score:.2f} "
+                            f"({len(criterion_results)} criteria)"
+                        )
+                    
+                    # === Handle callable functions ===
+                    else:
+                        # Call the scorer function with the resource bundle
+                        result = evaluator(resources, task, self.workflow)
+
+                        # Handle async callables
+                        if inspect.iscoroutine(result):
+                            result = await result
+
+                        # Normalize result to TaskExecutionEvaluationResult
+                        if isinstance(result, (int, float)):
+                            score = float(result)
+                            metadata: dict[str, Any] = {}
+                        elif isinstance(result, tuple) and len(result) == 2:
+                            score, metadata = result
+                        elif isinstance(result, TaskExecutionEvaluationResult):
+                            score = result.score
+                            metadata = result.evaluation_metadata
+                        else:
+                            logger.warning(f"Unexpected scorer result type: {type(result)}")
+                            score = 0.0
+                            metadata = {}
+
+                        evaluator_name = getattr(
+                            evaluator, "__name__", str(evaluator)
+                        )
+                        evaluation_scores[evaluator_name] = score
+                        evaluation_details[evaluator_name] = {"score": score, **metadata}
+
+                except Exception as e:
+                    logger.error(f"Evaluator failed: {e}", exc_info=True)
+                    evaluator_name = getattr(
+                        evaluator, "name", getattr(evaluator, "__name__", str(evaluator))
+                    )
+                    evaluation_scores[evaluator_name] = 0.0
+                    evaluation_details[evaluator_name] = {"error": str(e)}
+
+            # Store evaluation results in execution
+            execution.evaluation_scores = evaluation_scores
+            execution.evaluation_details = evaluation_details
+            execution.aggregate_score = (
+                sum(evaluation_scores.values()) / len(evaluation_scores)
+                if evaluation_scores
+                else 0.0
+            )
+
+        # Rank executions by aggregate score
+        ranked = sorted(
+            executions, key=lambda e: e.aggregate_score or 0.0, reverse=True
+        )
+        for idx, execution in enumerate(ranked):
+            execution.rank = idx + 1
+
+        # Apply output selection strategy
+        output_selection = task.__dict__.get("metadata", {}).get(
+            "output_selection", "all"
+        )
+        k_outputs = task.__dict__.get("metadata", {}).get("k_outputs")
+
+        if output_selection == "best":
+            selected = ranked[:1]
+        elif output_selection == "top_k" and k_outputs:
+            selected = ranked[:k_outputs]
+        else:  # "all"
+            selected = ranked
+
+        # Propagate selected resources to task
+        task.output_resource_ids = [
+            rid for ex in selected for rid in ex.output_resource_ids
+        ]
+
+        logger.info(
+            f"Ranked {len(ranked)} executions. "
+            f"Selected {len(selected)} (output_selection={output_selection}). "
+            f"Best score: {ranked[0].aggregate_score:.3f}"
+            if ranked
+            else "No executions to rank"
+        )
+    
+    async def evaluate_with_staged_rubrics(
+        self,
+        timestep: int,
+        staged_rubrics: list["StagedRubric"],
+    ) -> dict[str, "StagedRubricResult"]:
+        """Evaluate workflow using staged rubrics (NEW evaluation path).
+        
+        This method evaluates the workflow using the new staged rubric system,
+        which supports sequential evaluation with gates and failure actions.
+        
+        Args:
+            timestep: Current timestep
+            staged_rubrics: List of staged rubrics to evaluate
+            
+        Returns:
+            Dict mapping rubric category_name to evaluation result
+            
+        Example:
+            >>> gold_rubric = convert_staged_rubric_to_executable(gdpeval_spec)
+            >>> results = await engine.evaluate_with_staged_rubrics(
+            ...     timestep=engine.current_timestep,
+            ...     staged_rubrics=[gold_rubric],
+            ... )
+            >>> print(f"Score: {results['Quality'].total_score}/{results['Quality'].max_score}")
+        """
+        from manager_agent_gym.schemas.preferences.evaluation import StagedRubric, StagedRubricResult
+        
+        # Get communications and manager actions for context
+        communications_sender = (
+            self.communication_service.get_messages_grouped_by_sender(
+                sort_within_group="time",
+                include_broadcasts=True,
+            )
+            if self.communication_service
+            else []
+        )
+        comms_by_sender: list[SenderMessagesView] = cast(
+            list[SenderMessagesView], communications_sender
+        )
+        manager_actions = self.manager_agent.get_action_buffer()
+        
+        # Evaluate using staged rubrics
+        results = await self.validation_engine.evaluate_timestep_staged(
+            workflow=self.workflow,
+            timestep=timestep,
+            staged_rubrics=staged_rubrics,
+            communications=comms_by_sender,
+            manager_actions=manager_actions,
+        )
+        
+        # Store results in workflow for reward calculation
+        for category_name, result in results.items():
+            # Update task executions with evaluation results
+            for task in self.workflow.tasks.values():
+                for execution in task.get_executions(self.workflow):
+                    if execution.is_completed():
+                        # Store normalized score (0-1) as aggregate_score for compatibility
+                        execution.aggregate_score = result.normalized_score * 10  # Scale to 0-10
+                        execution.evaluation_details = {
+                            "category": category_name,
+                            "total_score": result.total_score,
+                            "max_score": result.max_score,
+                            "normalized_score": result.normalized_score,
+                            "stages_passed": result.stages_passed,
+                            "stages_evaluated": result.stages_evaluated,
+                            "failed_gate": result.failed_gate,
+                            "stopped_at": result.stopped_at,
+                            "stage_results": result.stage_results,
+                        }
+        
+        logger.info(
+            f"Staged evaluation complete: {len(results)} categories evaluated"
+        )
+        
+        return results

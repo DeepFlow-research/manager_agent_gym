@@ -14,8 +14,11 @@ from pydantic import ConfigDict
 
 from manager_agent_gym.schemas.domain.task import Task
 from manager_agent_gym.schemas.domain.resource import Resource
-
 from manager_agent_gym.schemas.domain.communication import Message
+
+# Forward reference for TaskExecution (imported at runtime)
+if TYPE_CHECKING:
+    from manager_agent_gym.schemas.domain.task_execution import TaskExecution
 from manager_agent_gym.schemas.preferences import Constraint
 
 if TYPE_CHECKING:
@@ -61,6 +64,10 @@ class Workflow(BaseModel):
         examples=[
             {str(uuid4()): Task(name="Draft plan", description="...").model_dump()}
         ],
+    )
+    task_executions: dict[UUID, "TaskExecution"] = Field(
+        default_factory=dict,
+        description="Execution attempts (E). Keys are execution UUIDs; values are TaskExecution models.",
     )
     resources: dict[UUID, Resource] = Field(
         default_factory=dict,

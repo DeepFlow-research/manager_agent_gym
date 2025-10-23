@@ -52,4 +52,3 @@ __all__ = [
     "RequestEndWorkflowAction",
     "FailedAction",
 ]
-

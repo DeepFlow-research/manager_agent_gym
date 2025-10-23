@@ -143,4 +143,3 @@ __all__ = [
     "EvaluationResult",
     "Constraint",
 ]
-

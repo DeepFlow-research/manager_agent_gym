@@ -6,14 +6,23 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from manager_agent_gym.schemas.domain.task import Task
+    from manager_agent_gym.schemas.domain.workflow import Workflow
 
 
 class TaskDisplay:
     """Stateless display service for task formatting."""
 
     @staticmethod
-    def pretty_print(task: "Task", indent: int = 0) -> str:
-        """Return a human-readable summary of the task and its subtasks."""
+    def pretty_print(
+        task: "Task", indent: int = 0, workflow: "Workflow | None" = None
+    ) -> str:
+        """Return a human-readable summary of the task and its subtasks.
+
+        Args:
+            task: Task to display
+            indent: Indentation level
+            workflow: Optional workflow to resolve execution details
+        """
         from manager_agent_gym.schemas.domain.base import TaskStatus
 
         prefix = "  " * indent
@@ -22,8 +31,11 @@ class TaskDisplay:
         if task.description:
             lines.append(f"{prefix}  Description: {task.description}")
 
-        if task.assigned_agent_id:
-            lines.append(f"{prefix}  Assigned to: {task.assigned_agent_id}")
+        # Get assigned agent from execution if available
+        if task.execution_ids and workflow:
+            execution = workflow.task_executions.get(task.execution_ids[0])
+            if execution:
+                lines.append(f"{prefix}  Assigned to: {execution.agent_id}")
 
         if task.estimated_duration_hours:
             lines.append(

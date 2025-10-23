@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
-from typing import Any, TypeAlias
+from typing import Any, TypeAlias, Literal
 from pydantic import BaseModel, Field
 
 
@@ -28,6 +28,10 @@ class RubricResult(BaseModel):
 
 class RubricGroupResult(BaseModel):
     evaluator_name: str = Field(..., description="Name of the rubric")
+    generation_metadata: Any = Field(
+        None,
+        description="Metadata from rubric generation (RubricGenerationMetadata object: costs, cognitive burden, execution time)",
+    )
     rubric_scores: list[RubricResult] = Field(
         ..., description="Scores for each criterion"
     )
@@ -118,3 +122,107 @@ class EvaluationResult(BaseModel):
 
 # Backwards-compatibility alias (fixes earlier typo)
 RubericGroupResult: TypeAlias = RubricGroupResult
+
+
+# === Staged Rubric Support (GDPEval-style evaluation) ===
+
+
+class EvaluationStage(BaseModel):
+    """Sequential stage in evaluation pipeline.
+
+    Stages evaluate in order. Each stage can be:
+    - A gate (must pass to continue)
+    - Optional (failure doesn't stop evaluation)
+    - Scored (contributes to total score)
+    """
+
+    name: str = Field(description="Stage name (e.g., 'Format Validation Gate')")
+
+    description: str = Field(description="What this stage evaluates")
+
+    is_required: bool = Field(
+        default=True, description="Must pass this stage to proceed to next stages"
+    )
+
+    min_score_to_pass: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Minimum score ratio (score/max_points) to 'pass' stage",
+    )
+
+    rules: list[dict[str, Any]] = Field(
+        description="Rules evaluated in this stage (CodeRule or LLMJudgeRule dicts)", min_length=1
+    )
+
+    max_points: float = Field(gt=0, description="Maximum points for this stage")
+
+    on_failure_action: Literal["skip_remaining", "zero_category", "continue"] = Field(
+        default="skip_remaining",
+        description=(
+            "What to do if stage fails:\n"
+            "- 'skip_remaining': Stop evaluation, return current score\n"
+            "- 'zero_category': Set entire category score to 0\n"
+            "- 'continue': Continue to next stage regardless"
+        ),
+    )
+
+    on_failure_score: float = Field(
+        default=0.0,
+        description="Score if stage fails and on_failure_action='zero_category'",
+    )
+
+
+class StagedRubric(BaseModel):
+    """Rubric with sequential evaluation stages.
+
+    Evaluation proceeds through stages in order:
+    1. Evaluate all rules in stage
+    2. Check if stage passed (score >= threshold)
+    3. If failed and required: apply failure action
+    4. If passed or not required: continue to next stage
+
+    Final score is sum of all evaluated stages (capped at max_total_score).
+    """
+
+    category_name: str = Field(description="High-level category name")
+
+    rationale: str | None = Field(
+        default=None, description="Explanation of rubric design and stage structure"
+    )
+
+    max_total_score: float = Field(
+        gt=0, description="Maximum possible total score across all stages"
+    )
+
+    stages: list[EvaluationStage] = Field(
+        description="Evaluation stages in order", min_length=1
+    )
+    
+    metadata: Any | None = Field(
+        default=None,
+        description="Optional metadata reference for tracking generation and execution costs"
+    )
+
+    def validate_stages(self) -> None:
+        """Validate that stages make sense."""
+        total_max = sum(stage.max_points for stage in self.stages)
+        if total_max > self.max_total_score:
+            raise ValueError(
+                f"Sum of stage max points ({total_max}) exceeds "
+                f"category max ({self.max_total_score})"
+            )
+
+
+class StagedRubricResult(BaseModel):
+    """Result of executing a staged rubric."""
+    
+    category_name: str = Field(description="Name of the rubric category")
+    total_score: float = Field(description="Final accumulated score")
+    max_score: float = Field(description="Maximum possible score")
+    normalized_score: float = Field(ge=0.0, le=1.0, description="Normalized score [0,1]")
+    stages_evaluated: int = Field(description="Number of stages that were evaluated")
+    stages_passed: int = Field(description="Number of stages that passed threshold")
+    failed_gate: str | None = Field(default=None, description="Name of gate that failed (if any)")
+    stopped_at: str | None = Field(default=None, description="Stage where evaluation stopped (if early exit)")
+    stage_results: list[dict[str, Any]] = Field(default_factory=list, description="Detailed results per stage")

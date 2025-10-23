@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from manager_agent_gym.schemas.domain.resource import Resource
 from manager_agent_gym.core.common.logging import logger
 from manager_agent_gym.schemas.preferences.preference import PreferenceChangeEvent
+from manager_agent_gym.schemas.execution.trace import WorkerExecutionTrace
 
 if TYPE_CHECKING:
     from manager_agent_gym.schemas.manager.observation import ManagerObservation
@@ -75,6 +76,12 @@ class ExecutionResult(BaseModel):
         default=None, description="Reasoning for approach taken"
     )
 
+    # Detailed execution trace (for debugging)
+    execution_trace: WorkerExecutionTrace | None = Field(
+        default=None,
+        description="Complete execution trace with all LLM generations, tool calls, and token usage. Only populated if agent has tracing enabled.",
+    )
+
 
 # Convenience constructors for common cases
 def create_task_result(
@@ -86,6 +93,7 @@ def create_task_result(
     cost: float = 0.0,
     error: str | None = None,
     simulated_duration_hours: float = 0.0,
+    execution_trace: WorkerExecutionTrace | None = None,
     **metadata,
 ) -> ExecutionResult:
     """Create a result for task execution."""
@@ -101,6 +109,7 @@ def create_task_result(
         simulated_duration_hours=simulated_duration_hours,
         actual_cost=cost,
         metadata=metadata,
+        execution_trace=execution_trace,
     )
 
 

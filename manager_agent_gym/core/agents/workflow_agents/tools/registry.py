@@ -12,7 +12,9 @@ from manager_agent_gym.schemas.agents import (
     AIAgentConfig,
     HumanAgentConfig,
 )
-from manager_agent_gym.core.agents.workflow_agents.schemas.agent_coordination import ScheduledAgentChange
+from manager_agent_gym.core.agents.workflow_agents.schemas.agent_coordination import (
+    ScheduledAgentChange,
+)
 from manager_agent_gym.core.agents.workflow_agents.common import AgentInterface
 from manager_agent_gym.core.agents.workflow_agents.workers.ai_agent import AIAgent
 from manager_agent_gym.core.agents.workflow_agents.workers.human_agent import (

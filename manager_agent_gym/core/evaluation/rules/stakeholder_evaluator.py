@@ -161,8 +161,12 @@ def stakeholder_assignment_load_penalty(
     assigned_count = 0
     for task in workflow.tasks.values():
         try:
-            if task.is_atomic_task() and task.assigned_agent_id == stakeholder_id:
-                assigned_count += 1
+            if task.is_atomic_task():
+                # Check if this task's execution is assigned to stakeholder
+                if task.execution_ids:
+                    execution = workflow.task_executions.get(task.execution_ids[0])
+                    if execution and execution.agent_id == stakeholder_id:
+                        assigned_count += 1
         except Exception:
             continue
     score = max(0.0, 5.0 - float(assigned_count))

@@ -13,11 +13,13 @@ This showcases the foundation for multi-agent collaboration!
 
 from examples.common_stakeholders import create_stakeholder_agent
 import asyncio
-from manager_agent_gym import (
-    WorkflowExecutionEngine,
+from manager_agent_gym.core.workflow.engine import WorkflowExecutionEngine
+from manager_agent_gym.core.agents.manager_agent.implementations.chain_of_thought import (
     ChainOfThoughtManagerAgent,
-    AgentRegistry,
-    CommunicationService,
+)
+from manager_agent_gym.core.agents.workflow_agents.tools.registry import AgentRegistry
+from manager_agent_gym.core.communication.service import CommunicationService
+from manager_agent_gym.schemas.preferences.preference import (
     PreferenceSnapshot,
     Preference,
 )

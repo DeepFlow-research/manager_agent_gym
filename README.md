@@ -33,6 +33,17 @@ Outputs are written under directories like `simulation_outputs_cot_rerun/`, `sim
 
 The CLI entrypoint lives at `examples/cli.py`.
 
+### System Dependencies
+
+Some document conversion tools require system-level dependencies:
+
+- **LibreOffice** (optional): Required for converting DOCX files to PDF using the `convert_docx_to_pdf` tool.
+  - **macOS**: `brew install --cask libreoffice`
+  - **Ubuntu/Debian**: `sudo apt-get install libreoffice`
+  - **Windows**: Download from [LibreOffice website](https://www.libreoffice.org/download/)
+
+If LibreOffice is not installed, document conversion tools will gracefully fail with informative error messages.
+
 ## 🧩 Key Concepts
 
 - **worker**: A workflow-executing agent that performs tasks and produces resources. In code these implement `AgentInterface` (see `manager_agent_gym/core/workflow_agents/interface.py`). Workers can represent simulated humans or tool-using AIs.

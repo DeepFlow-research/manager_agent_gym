@@ -1,12 +1,11 @@
-"""
-Communication tools for agents.
+"""Communication tools - two-layer architecture.
 
-These tools enable agents to send and receive messages during task execution,
-with automatic context injection for agent ID and current task ID.
+Layer 1: Core functions (_*) - pure business logic, testable, returns typed results
+Layer 2: OpenAI tool wrappers - thin adapters for OpenAI SDK, handle JSON serialization
 """
 
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from agents import function_tool
@@ -14,7 +13,199 @@ from agents import function_tool
 if TYPE_CHECKING:
     from manager_agent_gym.core.communication.service import CommunicationService
 
-from manager_agent_gym.core.common.logging import logger
+
+# ============================================================================
+# LAYER 1: COMMUNICATION OPERATIONS (Core Business Logic)
+# ============================================================================
+
+
+async def _send_message(
+    communication_service: "CommunicationService",
+    agent_id: str,
+    to_agent_id: str,
+    content: str,
+    message_type: str = "direct",
+    current_task_id: UUID | None = None,
+) -> dict[str, Any]:
+    """Send a message to another agent."""
+    try:
+        from manager_agent_gym.schemas.domain.communication import MessageType
+
+        # Convert string to MessageType enum
+        try:
+            msg_type = MessageType(message_type.lower())
+        except ValueError:
+            msg_type = MessageType.DIRECT
+
+        await communication_service.send_direct_message(
+            from_agent=agent_id,
+            to_agent=to_agent_id,
+            content=content,
+            message_type=msg_type,
+            related_task_id=current_task_id,
+        )
+
+        return {
+            "success": True,
+            "to": to_agent_id,
+            "content_preview": content[:50],
+        }
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+async def _broadcast_message(
+    communication_service: "CommunicationService",
+    agent_id: str,
+    content: str,
+    message_type: str = "broadcast",
+    current_task_id: UUID | None = None,
+) -> dict[str, Any]:
+    """Broadcast a message to all agents."""
+    try:
+        from manager_agent_gym.schemas.domain.communication import MessageType
+
+        try:
+            msg_type = MessageType(message_type.lower())
+        except ValueError:
+            msg_type = MessageType.BROADCAST
+
+        message = await communication_service.broadcast_message(
+            from_agent=agent_id,
+            content=content,
+            message_type=msg_type,
+            related_task_id=current_task_id,
+        )
+
+        return {
+            "success": True,
+            "recipient_count": len(message.recipients),
+            "content_preview": content[:50],
+        }
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def _get_recent_messages(
+    communication_service: "CommunicationService",
+    agent_id: str,
+    limit: int = 10,
+    since_minutes: int = 60,
+    message_types: str = "all",
+) -> dict[str, Any]:
+    """Get recent messages for an agent."""
+    try:
+        from manager_agent_gym.schemas.domain.communication import MessageType
+
+        # Validate parameters
+        limit = max(1, min(50, limit))
+        since_minutes = max(1, min(1440, since_minutes))
+
+        # Parse message types
+        msg_types = None
+        if message_types.lower() != "all":
+            type_list = [t.strip().lower() for t in message_types.split(",")]
+            msg_types = []
+            for type_str in type_list:
+                try:
+                    msg_types.append(MessageType(type_str))
+                except ValueError:
+                    pass
+
+        # Calculate since timestamp
+        since_time = datetime.now() - timedelta(minutes=since_minutes)
+
+        # Get messages
+        messages = communication_service.get_messages_for_agent(
+            agent_id=agent_id,
+            since=since_time,
+            message_types=msg_types,
+            limit=limit,
+        )
+
+        formatted_messages = []
+        for msg in messages:
+            formatted_messages.append(
+                {
+                    "timestamp": msg.timestamp.isoformat(),
+                    "from": msg.sender_id,
+                    "type": msg.message_type.value,
+                    "content": msg.content,
+                }
+            )
+
+        return {"success": True, "messages": formatted_messages, "count": len(messages)}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def _get_conversation_history(
+    communication_service: "CommunicationService",
+    agent_id: str,
+    other_agent_id: str,
+    limit: int = 20,
+) -> dict[str, Any]:
+    """Get conversation history with another agent."""
+    try:
+        limit = max(1, min(50, limit))
+
+        messages = communication_service.get_conversation_history(
+            agent_id=agent_id,
+            other_agent=other_agent_id,
+            limit=limit,
+        )
+
+        formatted_messages = []
+        for msg in messages:
+            formatted_messages.append(
+                {
+                    "timestamp": msg.timestamp.isoformat(),
+                    "from": msg.sender_id,
+                    "content": msg.content,
+                }
+            )
+
+        return {"success": True, "messages": formatted_messages, "count": len(messages)}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def _get_task_messages(
+    communication_service: "CommunicationService",
+    agent_id: str,
+    task_id: UUID,
+) -> dict[str, Any]:
+    """Get messages related to a task."""
+    try:
+        messages = communication_service.get_task_communications(task_id)
+
+        formatted_messages = []
+        for msg in messages:
+            recipients = (
+                ", ".join(msg.get_all_recipients()) if not msg.is_broadcast() else "ALL"
+            )
+            formatted_messages.append(
+                {
+                    "timestamp": msg.timestamp.isoformat(),
+                    "from": msg.sender_id,
+                    "to": recipients,
+                    "content": msg.content,
+                }
+            )
+
+        return {"success": True, "messages": formatted_messages, "count": len(messages)}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ============================================================================
+# LAYER 2: OPENAI TOOL WRAPPERS
+# ============================================================================
 
 
 def create_communication_tools(
@@ -22,193 +213,143 @@ def create_communication_tools(
     agent_id: str,
     current_task_id: UUID | None = None,
 ) -> list:
-    """
-    Create communication tools with injected context.
-
-    This function creates tool instances with the communication service,
-    agent ID, and current task ID automatically injected. The agent
-    doesn't need to know these details - they're handled transparently.
-
-    Args:
-        communication_service: The communication service instance
-        agent_id: The ID of the agent using these tools
-        current_task_id: The ID of the current task (auto-injected)
-
-    Returns:
-        List of communication tools ready for use
-    """
+    """Create communication tools with injected context."""
 
     @function_tool
     async def send_message(
         to_agent_id: str, content: str, message_type: str = "direct"
     ) -> str:
         """
-        Send a message to another agent during task execution.
+        Send a direct message to another agent in the workflow system.
 
-        Use this tool to communicate with other agents, ask questions,
-        provide updates, or coordinate work. The message will be
-        automatically linked to your current task.
+        This tool enables communication between agents working on related tasks. Use it
+        to request information, provide updates, ask questions, or coordinate work with
+        other agents. Messages are delivered immediately and can be retrieved by the
+        recipient using their message tools.
 
-        Args:
-            to_agent_id: The ID of the agent you want to send the message to
-            content: The message content
-            message_type: Type of message - "direct", "request", "response", "status_update", "alert"
+        Parameters:
+            to_agent_id (str):
+                The unique identifier of the agent you want to message.
+                Example: "analyst_001" or "data_processor"
+            content (str):
+                The message content to send. Be clear and specific about what you need
+                or want to communicate. Example: "Can you provide the Q4 sales data?"
+            message_type (str):
+                The type of message. Options:
+                - "direct": Standard direct message (default)
+                - "request": When asking for something
+                - "response": When replying to a request
+                - "alert": For urgent or important notifications
+                Default: "direct"
 
         Returns:
-            Confirmation message
+            str:
+                Success confirmation with the recipient and message preview, or an error
+                message if sending fails (e.g., recipient not found).
 
-        Example:
-            await send_message(
-                to_agent_id="data_analyst_agent",
-                content="Can you provide the latest metrics for the optimization task?",
-                message_type="request"
-            )
+        Usage:
+            Call this tool when you need to communicate with another agent. Common uses:
+            requesting data from another agent, asking questions, providing updates,
+            coordinating tasks, or alerting others about important information. Always
+            be clear about what you need or want to communicate.
         """
-        try:
-            # Import here to avoid circular imports
-            from manager_agent_gym.schemas.domain.communication import MessageType
-
-            # Convert string to MessageType enum, fallback to DIRECT
-            try:
-                msg_type = MessageType(message_type.lower())
-            except ValueError:
-                msg_type = MessageType.DIRECT
-                logger.warning(f"Unknown message type '{message_type}', using 'direct'")
-
-            # Send the message with auto-injected context
-            await communication_service.send_direct_message(
-                from_agent=agent_id,  # Auto-injected!
-                to_agent=to_agent_id,
-                content=content,
-                message_type=msg_type,
-                related_task_id=current_task_id,
-            )
-
-            logger.info(
-                f"Agent {agent_id} sent message to {to_agent_id}: {content[:50]}..."
-            )
-
-            return f"✅ Message sent to {to_agent_id}: {content[:50]}{'...' if len(content) > 50 else ''}"
-
-        except Exception as e:
-            logger.error(
-                f"Failed to send message from {agent_id} to {to_agent_id}: {e}"
-            )
-            return f"Failed to send message: {str(e)}"
+        result = await _send_message(
+            communication_service,
+            agent_id,
+            to_agent_id,
+            content,
+            message_type,
+            current_task_id,
+        )
+        if result["success"]:
+            return f"✅ Message sent to {to_agent_id}: {result['content_preview']}..."
+        return f"Failed to send message: {result.get('error')}"
 
     @function_tool
     async def broadcast_message(content: str, message_type: str = "broadcast") -> str:
         """
-        Send a broadcast message to all agents in the workflow.
+        Send a broadcast message to all agents in the workflow system simultaneously.
 
-        Use this for announcements, status updates, or information that
-        all team members should know about. The message will be automatically
-        linked to your current task.
+        This tool sends a message to all agents at once, useful for announcements,
+        system-wide alerts, status updates, or any information that everyone needs to
+        know. All agents in the workflow will receive and can read this message.
 
-        Args:
-            content: The message content to broadcast
-            message_type: Type of message - "broadcast", "alert", "status_update"
+        Parameters:
+            content (str):
+                The message content to broadcast. Keep it clear and relevant for all
+                recipients. Example: "All agents: System maintenance in 30 minutes"
+            message_type (str):
+                The type of broadcast. Options:
+                - "broadcast": General announcement (default)
+                - "alert": Urgent or important notification
+                - "status_update": System or workflow status information
+                Default: "broadcast"
 
         Returns:
-            Confirmation message
+            str:
+                Success confirmation with the number of agents reached and message preview,
+                or an error message if broadcasting fails.
 
-        Example:
-            await broadcast_message(
-                content="Database optimization is 75% complete, ETA 30 minutes",
-                message_type="status_update"
-            )
+        Usage:
+            Use this tool when you need to communicate with all agents simultaneously.
+            Common uses include: important announcements, system-wide alerts, workflow
+            status updates, emergency notifications, or sharing information that affects
+            all agents. Use sparingly to avoid message overload.
         """
-        try:
-            # Import here to avoid circular imports
-            from manager_agent_gym.schemas.domain.communication import MessageType
-
-            # Convert string to MessageType enum, fallback to BROADCAST
-            try:
-                msg_type = MessageType(message_type.lower())
-            except ValueError:
-                msg_type = MessageType.BROADCAST
-                logger.warning(
-                    f"Unknown message type '{message_type}', using 'broadcast'"
-                )
-
-            # Send the broadcast with auto-injected context
-            message = await communication_service.broadcast_message(
-                from_agent=agent_id,  # Auto-injected!
-                content=content,
-                message_type=msg_type,
-                related_task_id=current_task_id,  # Auto-injected!
-            )
-
-            recipient_count = len(message.recipients)
-            logger.info(
-                f"Agent {agent_id} broadcast message to {recipient_count} agents: {content[:50]}..."
-            )
-
-            return f"📢 Broadcast sent to {recipient_count} agents: {content[:50]}{'...' if len(content) > 50 else ''}"
-
-        except Exception as e:
-            logger.error(f"Failed to broadcast message from {agent_id}: {e}")
-            return f"Failed to broadcast message: {str(e)}"
+        result = await _broadcast_message(
+            communication_service, agent_id, content, message_type, current_task_id
+        )
+        if result["success"]:
+            return f"📢 Broadcast sent to {result['recipient_count']} agents: {result['content_preview']}..."
+        return f"Failed to broadcast message: {result.get('error')}"
 
     @function_tool
     async def get_recent_messages(
         limit: int = 10, since_minutes: int = 60, message_types: str = "all"
     ) -> str:
         """
-        Retrieve recent messages sent to you.
+        Retrieve recent messages that have been sent to you by other agents.
 
-        Use this to check for updates, questions, or communications from
-        other agents that might be relevant to your current work.
+        This tool fetches messages you've received, filtered by time and optionally by
+        message type. Use it regularly to check for new communications, requests, or
+        updates from other agents. Messages are formatted with timestamps and type icons
+        for easy reading.
 
-        Args:
-            limit: Maximum number of messages to retrieve (1-50)
-            since_minutes: How many minutes back to look for messages (1-1440)
-            message_types: Types to include - "all", "direct", "request", "broadcast", or comma-separated list
+        Parameters:
+            limit (int):
+                Maximum number of messages to retrieve (1-50). Default: 10.
+            since_minutes (int):
+                How far back in time to look for messages, in minutes (1-1440, i.e., up
+                to 24 hours). Default: 60 (last hour).
+            message_types (str):
+                Filter by message type. Options:
+                - "all": All message types (default)
+                - "direct": Only direct messages
+                - "request": Only requests
+                - "broadcast": Only broadcasts
+                - Or comma-separated list: "direct,request"
+                Default: "all"
 
         Returns:
-            Formatted list of recent messages
+            str:
+                Formatted list of recent messages with timestamps, sender names, and
+                content, or a message indicating no messages were found.
 
-        Example:
-            recent = await get_recent_messages(limit=5, since_minutes=30, message_types="request,direct")
+        Usage:
+            Call this tool regularly to check for new messages from other agents. Common
+            uses include: checking for incoming requests, reading updates from other agents,
+            reviewing broadcasts, or staying informed about workflow communications. Check
+            at the start of your tasks and periodically during execution.
         """
-        try:
-            # Import here to avoid circular imports
-            from manager_agent_gym.schemas.domain.communication import MessageType
-
-            # Validate and constrain parameters
-            limit = max(1, min(50, limit))
-            since_minutes = max(1, min(1440, since_minutes))  # Max 24 hours
-
-            # Parse message types
-            msg_types = None
-            if message_types.lower() != "all":
-                type_list = [t.strip().lower() for t in message_types.split(",")]
-                msg_types = []
-                for type_str in type_list:
-                    try:
-                        msg_types.append(MessageType(type_str))
-                    except ValueError:
-                        logger.warning(f"Unknown message type '{type_str}', ignoring")
-
-            # Calculate since timestamp
-            since_time = datetime.now() - timedelta(minutes=since_minutes)
-
-            # Get messages for this agent
-            messages = communication_service.get_messages_for_agent(
-                agent_id=agent_id,  # Auto-injected!
-                since=since_time,
-                message_types=msg_types,
-                limit=limit,
-            )
-
-            if not messages:
+        result = _get_recent_messages(
+            communication_service, agent_id, limit, since_minutes, message_types
+        )
+        if result["success"]:
+            if result["count"] == 0:
                 return f"No recent messages found (last {since_minutes} minutes)"
 
-            # Format messages for display
-            formatted_messages = [f"Recent messages ({len(messages)} found):"]
-
-            for msg in messages:
-                time_str = msg.timestamp.strftime("%H:%M")
+            formatted = [f"Recent messages ({result['count']} found):"]
+            for msg in result["messages"]:
                 msg_type_icon = {
                     "direct": "💬",
                     "request": "❓",
@@ -216,157 +357,136 @@ def create_communication_tools(
                     "broadcast": "📢",
                     "alert": "🚨",
                     "status_update": "📊",
-                }.get(msg.message_type.value, "📝")
+                }.get(msg["type"], "📝")
 
-                # Truncate long messages
-                content = msg.content
+                content = msg["content"]
                 if len(content) > 100:
                     content = content[:97] + "..."
 
-                formatted_messages.append(
-                    f"{msg_type_icon} [{time_str}] From {msg.sender_id}: {content}"
+                time_obj = datetime.fromisoformat(msg["timestamp"])
+                time_str = time_obj.strftime("%H:%M")
+                formatted.append(
+                    f"{msg_type_icon} [{time_str}] From {msg['from']}: {content}"
                 )
 
-            result = "\n".join(formatted_messages)
-            logger.info(f"Agent {agent_id} retrieved {len(messages)} recent messages")
-
-            return result
-
-        except Exception as e:
-            logger.error(f"Failed to get recent messages for {agent_id}: {e}")
-            return f"Failed to retrieve messages: {str(e)}"
+            return "\n".join(formatted)
+        return f"Failed to retrieve messages: {result.get('error')}"
 
     @function_tool
     async def get_conversation_with(other_agent_id: str, limit: int = 20) -> str:
         """
-        Get conversation history with a specific agent.
+        Retrieve the complete conversation history with a specific agent.
 
-        Use this to review past communications with another agent
-        to understand context or continue a conversation.
+        This tool fetches all messages exchanged between you and another agent, showing
+        the full conversation thread. Useful for reviewing past communications,
+        understanding context, or tracking what was discussed with a specific agent.
+        Messages are chronologically ordered for easy review.
 
-        Args:
-            other_agent_id: The ID of the other agent
-            limit: Maximum number of messages to retrieve (1-50)
+        Parameters:
+            other_agent_id (str):
+                The unique identifier of the agent whose conversation history you want
+                to retrieve. Example: "data_analyst" or "project_manager"
+            limit (int):
+                Maximum number of messages to retrieve from the conversation (1-50).
+                Default: 20.
 
         Returns:
-            Formatted conversation history
+            str:
+                Formatted conversation history showing messages exchanged with timestamps
+                and sender identification (You vs. the other agent), or a message if no
+                conversation history exists.
 
-        Example:
-            history = await get_conversation_with("manager_agent", limit=10)
+        Usage:
+            Call this tool when you need to review past communications with a specific
+            agent. Common uses include: reviewing what was discussed, understanding
+            context for a current request, checking if information was already provided,
+            or tracking the conversation flow with a particular agent.
         """
-        try:
-            # Validate parameters
-            limit = max(1, min(50, limit))
-
-            # Get conversation history
-            messages = communication_service.get_conversation_history(
-                agent_id=agent_id,  # Auto-injected!
-                other_agent=other_agent_id,
-                limit=limit,
-            )
-
-            if not messages:
+        result = _get_conversation_history(
+            communication_service, agent_id, other_agent_id, limit
+        )
+        if result["success"]:
+            if result["count"] == 0:
                 return f"No conversation history found with {other_agent_id}"
 
-            # Format conversation
-            formatted_messages = [
-                f"Conversation with {other_agent_id} ({len(messages)} messages):"
+            formatted = [
+                f"Conversation with {other_agent_id} ({result['count']} messages):"
             ]
+            for msg in result["messages"]:
+                time_obj = datetime.fromisoformat(msg["timestamp"])
+                time_str = time_obj.strftime("%H:%M")
+                sender_name = "You" if msg["from"] == agent_id else other_agent_id
 
-            for msg in messages:
-                time_str = msg.timestamp.strftime("%H:%M")
-                sender_name = "You" if msg.sender_id == agent_id else other_agent_id
-
-                # Truncate long messages
-                content = msg.content
+                content = msg["content"]
                 if len(content) > 150:
                     content = content[:147] + "..."
 
-                formatted_messages.append(f"[{time_str}] {sender_name}: {content}")
+                formatted.append(f"[{time_str}] {sender_name}: {content}")
 
-            result = "\n".join(formatted_messages)
-            logger.info(
-                f"Agent {agent_id} retrieved conversation history with {other_agent_id}"
-            )
-
-            return result
-
-        except Exception as e:
-            logger.error(
-                f"Failed to get conversation history for {agent_id} with {other_agent_id}: {e}"
-            )
-            return f"Failed to retrieve conversation: {str(e)}"
+            return "\n".join(formatted)
+        return f"Failed to retrieve conversation: {result.get('error')}"
 
     @function_tool
     async def get_task_messages(task_id: str | None = None) -> str:
         """
-        Get messages related to a specific task.
+        Retrieve all messages related to a specific task for context and coordination.
 
-        Use this to see all communications about a particular task,
-        which can help understand requirements, progress, or issues.
+        This tool fetches all communications (messages, broadcasts, requests) that are
+        related to a particular task. Useful for understanding task context, reviewing
+        coordination efforts, or tracking all communications about a specific work item.
+        If no task_id is provided, uses the current task.
 
-        Args:
-            task_id: The task ID to get messages for (defaults to current task)
+        Parameters:
+            task_id (str | None):
+                Optional. The unique identifier of the task whose messages you want to
+                retrieve. If None, uses the current task you're working on.
+                Example: "123e4567-e89b-12d3-a456-426614174000"
+                Default: None (uses current task)
 
         Returns:
-            Formatted list of task-related messages
+            str:
+                Formatted list of all messages related to the task, showing timestamps,
+                sender/recipient information, and message content. Returns a message if
+                no communications exist for the task.
 
-        Example:
-            task_comms = await get_task_messages()  # Current task
-            task_comms = await get_task_messages("task-uuid-here")  # Specific task
+        Usage:
+            Call this tool when you need to understand all communications about a specific
+            task. Common uses include: reviewing task coordination history, understanding
+            what's been discussed about a task, checking task-related requests or updates,
+            or getting full context before continuing work on a task.
         """
-        try:
-            # Use current task if none specified
-            target_task_id = current_task_id
-            if task_id:
-                try:
-                    target_task_id = UUID(task_id)
-                except ValueError:
-                    return "Invalid task ID format for task messages: {task_id}"
+        target_task_id = current_task_id
+        if task_id:
+            try:
+                target_task_id = UUID(task_id)
+            except ValueError:
+                return f"Invalid task ID format: {task_id}"
 
-            if not target_task_id:
-                return "No task ID available"
+        if not target_task_id:
+            return "No task ID available"
 
-            # Get task-related messages
-            messages = communication_service.get_task_communications(target_task_id)
-
-            if not messages:
+        result = _get_task_messages(communication_service, agent_id, target_task_id)
+        if result["success"]:
+            if result["count"] == 0:
                 return f"No messages found for task {target_task_id}"
 
-            # Format messages
-            formatted_messages = [
-                f"Messages for task {target_task_id} ({len(messages)} found):"
+            formatted = [
+                f"Messages for task {target_task_id} ({result['count']} found):"
             ]
+            for msg in result["messages"]:
+                time_obj = datetime.fromisoformat(msg["timestamp"])
+                time_str = time_obj.strftime("%H:%M")
+                direction = f"{msg['from']} → {msg['to']}"
 
-            for msg in messages:
-                time_str = msg.timestamp.strftime("%H:%M")
-
-                # Show who the message was to/from
-                if msg.is_broadcast():
-                    direction = f"{msg.sender_id} → ALL"
-                else:
-                    recipients = ", ".join(msg.get_all_recipients())
-                    direction = f"{msg.sender_id} → {recipients}"
-
-                # Truncate long messages
-                content = msg.content
+                content = msg["content"]
                 if len(content) > 100:
                     content = content[:97] + "..."
 
-                formatted_messages.append(f"[{time_str}] {direction}: {content}")
+                formatted.append(f"[{time_str}] {direction}: {content}")
 
-            result = "\n".join(formatted_messages)
-            logger.info(
-                f"Agent {agent_id} retrieved {len(messages)} messages for task {target_task_id}"
-            )
+            return "\n".join(formatted)
+        return f"Failed to retrieve task messages: {result.get('error')}"
 
-            return result
-
-        except Exception as e:
-            logger.error(f"Failed to get task messages for {agent_id}: {e}")
-            return f"Failed to retrieve task messages: {str(e)}"
-
-    # Return all the tools with injected context
     return [
         send_message,
         broadcast_message,

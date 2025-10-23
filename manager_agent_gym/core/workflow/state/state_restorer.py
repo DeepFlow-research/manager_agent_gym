@@ -105,16 +105,50 @@ class WorkflowStateRestorer:
 
         # Import Resource here to avoid circular imports
         from manager_agent_gym.schemas.domain.resource import Resource
+        import tempfile
+        from pathlib import Path
 
         for resource_id_str, resource_data in resources_data.items():
             resource_id = UUID(resource_id_str)
-            resource = Resource(
-                id=resource_id,
-                name=resource_data["name"],
-                description=resource_data["description"],
-                content=resource_data.get("content"),
-                content_type=resource_data.get("content_type", "text/plain"),
-            )
+
+            # Handle backward compatibility: convert old inline content to files
+            if "file_path" in resource_data:
+                # New format: file-based resource
+                resource = Resource(
+                    id=resource_id,
+                    name=resource_data["name"],
+                    description=resource_data["description"],
+                    file_path=resource_data["file_path"],
+                    mime_type=resource_data.get("mime_type", "text/plain"),
+                    size_bytes=resource_data.get("size_bytes", 0),
+                    file_format_metadata=resource_data.get("file_format_metadata"),
+                )
+            else:
+                # Old format: inline content - migrate to file
+                content = resource_data.get("content", "")
+                content_type = resource_data.get("content_type", "text/plain")
+
+                # Save to temp file
+                temp_dir = Path(tempfile.mkdtemp(prefix="restored_resource_"))
+                ext = ".md" if "text" in content_type else ".bin"
+                temp_file = temp_dir / f"resource_{resource_id}{ext}"
+
+                if isinstance(content, str):
+                    temp_file.write_text(content, encoding="utf-8")
+                else:
+                    temp_file.write_bytes(
+                        content if isinstance(content, bytes) else str(content).encode()
+                    )
+
+                resource = Resource(
+                    id=resource_id,
+                    name=resource_data["name"],
+                    description=resource_data["description"],
+                    file_path=str(temp_file.absolute()),
+                    mime_type=content_type,
+                    size_bytes=temp_file.stat().st_size,
+                )
+
             workflow.resources[resource_id] = resource
 
         # Update workflow-level state

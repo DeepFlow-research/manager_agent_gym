@@ -9,7 +9,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from manager_agent_gym.core.agents.manager_agent.implementations.rubric_generation_manager.rubric_generation import (
-    ManagerAgentGeneratedRubric,
+    ManagerAgentGeneratedRubricWithMetadata,
 )
 
 
@@ -37,6 +37,15 @@ class ClarificationTurn(BaseModel):
     )
 
 
+class DifficultyOfClarificationQuestions(BaseModel):
+    reasoning: str = Field(description="Reasoning for the difficulty level")
+    number_of_easy_questions: int = Field(description="Number of easy questions asked")
+    number_of_medium_questions: int = Field(
+        description="Number of medium questions asked"
+    )
+    number_of_hard_questions: int = Field(description="Number of hard questions asked")
+
+
 class PreExecutionLog(BaseModel):
     """Complete log of pre-execution clarification phase.
 
@@ -50,7 +59,7 @@ class PreExecutionLog(BaseModel):
     clarification_turns: list[ClarificationTurn] = Field(
         default_factory=list, description="All question-answer exchanges"
     )
-    generated_rubrics: list[ManagerAgentGeneratedRubric] = Field(
+    generated_rubrics: list[ManagerAgentGeneratedRubricWithMetadata] = Field(
         default_factory=list, description="All rubrics generated during this phase"
     )
     completion_reason: str = Field(
@@ -87,7 +96,7 @@ class PreExecutionLog(BaseModel):
         return (self.completed_at - self.started_at).total_seconds()
 
     @property
-    def questions_asked(self) -> int:
+    def number_clarification_turns(self) -> int:
         """Total number of questions asked."""
         return len(self.clarification_turns)
 

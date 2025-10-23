@@ -119,14 +119,27 @@ class StakeholderAgent(StakeholderBase):
                 current_task_id=task.id,
             )
 
-            # Prepare prompt tailored for stakeholder review/feedback
-            task_prompt = self._build_task_prompt(task, resources)
+            # Check if we should use multimodal approach
+            if self.config.use_multimodal_resources and self._has_visual_resources(
+                resources
+            ):
+                # Build multimodal input with images/PDFs/Excel for review
+                user_message = await self._build_multimodal_task_input(task, resources)
 
-            run_result: RunResult = await Runner.run(
-                self._stakeholder_agent,
-                task_prompt,
-                context=context,
-            )
+                run_result = await Runner.run(
+                    self._stakeholder_agent,
+                    [user_message],
+                    context=context,
+                )
+            else:
+                # Fallback to text-only approach (backward compatible)
+                task_prompt = self._build_task_prompt(task, resources)
+
+                run_result = await Runner.run(
+                    self._stakeholder_agent,
+                    task_prompt,
+                    context=context,
+                )
 
             output = run_result.final_output
             cost = self._calculate_accurate_cost(run_result)
@@ -178,6 +191,18 @@ class StakeholderAgent(StakeholderBase):
         except Exception:
             logger.error("Stakeholder LLM task execution failed", exc_info=True)
             execution_time = time.time() - start_time
+
+            # Create fallback output as file
+            import tempfile
+            from pathlib import Path
+
+            temp_dir = Path(tempfile.mkdtemp(prefix="stakeholder_fallback_"))
+            fallback_file = temp_dir / f"stakeholder_{task.id}_fallback.md"
+            fallback_file.write_text(
+                "# Stakeholder Response\n\nCompleted with fallback due to LLM error",
+                encoding="utf-8",
+            )
+
             return create_task_result(
                 task_id=task.id,
                 agent_id=self.config.agent_id,
@@ -187,8 +212,9 @@ class StakeholderAgent(StakeholderBase):
                     Resource(
                         name=f"Stakeholder Output: {task.name}",
                         description="Fallback stakeholder response",
-                        content="Completed with fallback due to LLM error",
-                        content_type="text/plain",
+                        file_path=str(fallback_file.absolute()),
+                        mime_type="text/markdown",
+                        size_bytes=fallback_file.stat().st_size,
                     )
                 ],
                 simulated_duration_hours=(execution_time / 3600.0),
@@ -477,7 +503,83 @@ class StakeholderAgent(StakeholderBase):
         self._seed = seed
         self._rng = random.Random(seed)
 
+    def _has_visual_resources(self, resources: list[Resource]) -> bool:
+        """Check if any resources contain visual content (images, PDFs, Excel).
+
+        Args:
+            resources: List of resources to check
+
+        Returns:
+            True if any resource is visual (not plain text)
+        """
+        for resource in resources:
+            if (
+                resource.is_image
+                or resource.is_document
+                or resource.is_spreadsheet
+                or not resource.is_text_format
+            ):
+                return True
+        return False
+
+    async def _build_multimodal_task_input(
+        self,
+        task: Task,
+        resources: list[Resource],
+    ):
+        """Build multimodal input for stakeholder review with images/PDFs/Excel.
+
+        Args:
+            task: The task to execute (typically a review task)
+            resources: Available input resources (typically work outputs to review)
+
+        Returns:
+            Message object with multimodal content
+        """
+        from manager_agent_gym.core.common.multimodal_resources import (
+            MultimodalResourceProcessor,
+            create_user_message,
+            create_text_content,
+        )
+
+        # Create processor with agent's config
+        processor = MultimodalResourceProcessor(
+            max_tokens=self.config.max_resource_tokens,
+            default_image_detail=self.config.image_detail,
+        )
+
+        # Build task text from stakeholder perspective
+        task_text = "## Review Task for {} ({})\n\n".format(
+            self.config.name, self.config.role
+        )
+        task_text += f"**Task:** {task.name}\n\n"
+        task_text += f"**Description:**\n{task.description}\n\n"
+        task_text += "**Work Outputs to Review:**\n"
+
+        # Get resource content blocks (images, PDFs, Excel, text)
+        resource_blocks = await processor.format_resources_as_content(
+            resources,
+            include_metadata=True,
+        )
+
+        # Add stakeholder perspective note
+        review_note = "\n\n### Your Perspective\n"
+        review_note += f"As **{self.config.role}**, evaluate this work based on:\n"
+        review_note += "- Quality and completeness\n"
+        review_note += "- Alignment with requirements\n"
+        review_note += "- Professional standards\n"
+        review_note += "- Your specific preferences and priorities\n\n"
+        review_note += "Provide clear, constructive feedback."
+
+        # Combine
+        return create_user_message(
+            create_text_content(task_text),
+            *resource_blocks,
+            create_text_content(review_note),
+        )
+
     def _build_task_prompt(self, task: Task, resources: list[Resource]) -> str:
+        """Build text-only task prompt (fallback)."""
         resources_text = format_resources_for_prompt(resources)
         return build_task_execution_prompt(
             task_name=task.name,

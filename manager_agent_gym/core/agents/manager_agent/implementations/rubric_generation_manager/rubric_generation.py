@@ -8,9 +8,9 @@ WorkflowRubric objects for execution.
 Design: Keep generation format separate from execution format for clarity.
 """
 
-from typing import Literal
+from typing import Literal, Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class CodeRule(BaseModel):
@@ -30,8 +30,20 @@ class CodeRule(BaseModel):
     )
     code: str = Field(
         description=(
-            "Python source defining: evaluate(task_input: str, candidate_output: str) -> float\n"
-            "Must return score in [0, 1]. Can import: re, numpy as np, pandas as pd"
+            "Python source defining: evaluate(workflow: Workflow, context: ValidationContext) -> float | tuple[float, str]\n\n"
+            "Function receives:\n"
+            "  - workflow: Workflow object with tasks, resources, agents\n"
+            "  - context: ValidationContext with helpers:\n"
+            "      context.get_primary_output() -> Resource | None (first output of last task)\n"
+            "      context.get_all_outputs() -> list[Resource] (all task outputs)\n"
+            "      context.files.read_excel(resource_id, sheet_name='Sheet1') -> DataFrame\n"
+            "      context.files.read_pdf_text(resource_id) -> str\n"
+            "      context.files.read_docx_text(resource_id) -> str\n"
+            "      context.files.read_text(resource_id) -> str (markdown/JSON)\n"
+            "      context.files.read_csv(resource_id) -> DataFrame\n"
+            "      context.files.get_path(resource_id) -> Path\n\n"
+            "Must return float in [0, weight] or tuple[float, str] with feedback.\n"
+            "Can import: re, json, pandas as pd, numpy as np"
         ),
     )
 
@@ -59,8 +71,104 @@ class LLMJudgeRule(BaseModel):
     )
 
 
+class RubricGenerationMetadata(BaseModel):
+    """Metadata about rubric generation and execution costs.
+
+    This travels with the rubric from generation → conversion → execution,
+    enabling cost tracking for reward functions in RL training.
+    """
+
+    # Generation costs (populated during rubric generation phase)
+    generation_llm_cost_usd: float | Literal["not_calculated"] = "not_calculated"
+    generation_llm_calls: int = 0
+
+    # Cognitive burden (populated during or after generation)
+    # Using Any to avoid circular imports - validated at runtime
+    cognitive_burden: Any = Field(
+        default="not_calculated",
+        description="DifficultyOfClarificationQuestions object or 'not_calculated'",
+    )
+
+    # Execution costs (populated during validation/evaluation)
+    execution_wall_time_seconds: float | Literal["not_calculated"] = "not_calculated"
+    execution_count: int = 0
+    last_executed_at: str | None = None
+    execution_breakdown: dict[str, float] = Field(
+        default_factory=dict, description="Execution time per criterion name"
+    )
+
+    @model_validator(mode="after")
+    def validate_cognitive_burden(self) -> "RubricGenerationMetadata":
+        """Validate cognitive_burden is either 'not_calculated' or DifficultyOfClarificationQuestions."""
+        if self.cognitive_burden != "not_calculated":
+            # Lazy import to avoid circular dependency
+            try:
+                from manager_agent_gym.core.execution.schemas.pre_execution import (
+                    DifficultyOfClarificationQuestions,
+                )
+
+                if not isinstance(
+                    self.cognitive_burden, (dict, DifficultyOfClarificationQuestions)
+                ):
+                    raise ValueError(
+                        f"cognitive_burden must be 'not_calculated' or DifficultyOfClarificationQuestions, "
+                        f"got {type(self.cognitive_burden)}"
+                    )
+                # Convert dict to model if needed
+                if isinstance(self.cognitive_burden, dict):
+                    self.cognitive_burden = (
+                        DifficultyOfClarificationQuestions.model_validate(
+                            self.cognitive_burden
+                        )
+                    )
+            except ImportError:
+                pass  # Allow if DifficultyOfClarificationQuestions not available yet
+        return self
+
+
+class EvaluationStageSpec(BaseModel):
+    """Specification for a single evaluation stage.
+    
+    Stages are evaluated sequentially with gate logic and failure actions.
+    """
+    
+    name: str = Field(description="Stage name (e.g., 'Shape Enforcement Gate')")
+    description: str = Field(description="What this stage evaluates")
+    is_required: bool = Field(
+        default=True,
+        description="Must pass this stage to proceed to next stages"
+    )
+    min_score_to_pass: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Minimum score ratio (score/max_points) to pass this stage"
+    )
+    rules: list[CodeRule | LLMJudgeRule] = Field(
+        min_length=1,
+        description="Rules evaluated in this stage"
+    )
+    max_points: float = Field(
+        gt=0,
+        description="Maximum points for this stage"
+    )
+    on_failure_action: Literal["skip_remaining", "zero_category", "continue"] = Field(
+        default="skip_remaining",
+        description=(
+            "What to do if stage fails:\n"
+            "- 'skip_remaining': Stop evaluation, return current score\n"
+            "- 'zero_category': Set entire category score to 0\n"
+            "- 'continue': Continue to next stage regardless"
+        ),
+    )
+    on_failure_score: float = Field(
+        default=0.0,
+        description="Score if stage fails and on_failure_action='zero_category'"
+    )
+
+
 class ManagerAgentGeneratedRubric(BaseModel):
-    """Complete rubric specification generated by LLM.
+    """Complete rubric specification generated by LLM (flat structure).
 
     This is the structured output from the rubric decomposition manager.
     It contains rules as strings (code or prompts) that will be converted
@@ -80,6 +188,61 @@ class ManagerAgentGeneratedRubric(BaseModel):
     rules: list[CodeRule | LLMJudgeRule] = Field(
         min_length=1,
         description="Evaluation rules (must have at least one)",
+    )
+
+
+class ManagerAgentGeneratedStagedRubric(BaseModel):
+    """Staged rubric specification generated by LLM (GDPEval-style).
+    
+    Uses sequential evaluation stages with gates and failure actions for
+    more sophisticated evaluation logic.
+    """
+    
+    category_name: str = Field(
+        description="High-level category name for this rubric"
+    )
+    rationale: str | None = Field(
+        default=None,
+        description="Explanation of rubric design and stage structure"
+    )
+    max_total_score: float = Field(
+        gt=0,
+        description="Maximum possible total score across all stages"
+    )
+    stages: list[EvaluationStageSpec] = Field(
+        min_length=1,
+        description="Evaluation stages in sequential order"
+    )
+    
+    def validate_stages(self) -> None:
+        """Validate that stages make sense."""
+        total_max = sum(stage.max_points for stage in self.stages)
+        if total_max > self.max_total_score:
+            raise ValueError(
+                f"Sum of stage max points ({total_max}) exceeds "
+                f"category max ({self.max_total_score})"
+            )
+
+class ManagerAgentGeneratedStagedRubricWithMetadata(ManagerAgentGeneratedStagedRubric):
+    """Staged rubric specification generated by LLM with metadata."""
+    metadata: RubricGenerationMetadata = Field(
+        default_factory=RubricGenerationMetadata,
+        description="Generation and execution cost tracking",
+    )
+
+class ManagerAgentGeneratedRubricWithMetadata(ManagerAgentGeneratedRubric):
+    """Complete rubric specification generated by LLM with metadata.
+
+    This is the structured output from the rubric decomposition manager.
+    It contains rules as strings (code or prompts) that will be converted
+    to executable WorkflowRubric objects.
+
+    Design: This is ephemeral - always convert to WorkflowRubric immediately.
+    """
+
+    metadata: RubricGenerationMetadata = Field(
+        default_factory=RubricGenerationMetadata,
+        description="Generation and execution cost tracking",
     )
 
     @field_validator("rules")
@@ -107,7 +270,6 @@ class ManagerAgentGeneratedRubric(BaseModel):
         Returns:
             Dict with rubric_id, rationale, rules (with code/prompts), etc.
         """
-        from typing import Any
 
         rules_list: list[dict[str, Any]] = []
 

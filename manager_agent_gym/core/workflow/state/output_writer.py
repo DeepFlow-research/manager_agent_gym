@@ -142,6 +142,15 @@ class WorkflowSerialiser:
             except Exception:
                 stakeholder_state_serialized = None
 
+            # Get communication summary for this timestep
+            communication_summary = None
+            try:
+                communication_summary = (
+                    self.communication_service.get_communication_summary()
+                )
+            except Exception:
+                logger.error("failed to get communication summary", exc_info=True)
+
             workflow_snapshot = {
                 **workflow.model_dump(
                     mode="json", exclude={"agents", "success_criteria"}
@@ -151,6 +160,7 @@ class WorkflowSerialiser:
                 "timestep": current_timestep,
                 "manager_state": manager_state,
                 "stakeholder_state": stakeholder_state_serialized,
+                "communication_summary": communication_summary,
                 # Explicit headline figure for convenience
                 "cumulative_workflow_hours": (
                     float(workflow.total_simulated_hours)
@@ -254,8 +264,72 @@ class WorkflowSerialiser:
             path = self.output_config.get_workflow_summary_path()
             with open(path, "w") as f:
                 json.dump(snapshot, f, indent=2, default=str)
+
+            # Save ranking summary for multi-agent tasks
+            self.save_ranking_summary(workflow)
         except Exception:
             logger.error("save_workflow_summary failed", exc_info=True)
+
+    def save_ranking_summary(self, workflow: Workflow) -> None:
+        """Save ranking summary for multi-agent tasks."""
+
+        ranking_summary: dict[str, Any] = {}
+
+        for task_id, task in workflow.tasks.items():
+            if not task.execution_ids:
+                continue
+
+            executions = task.get_executions(workflow)
+            if not executions:
+                continue
+
+            # Get executions with ranks set
+            ranked_executions = [e for e in executions if e.rank is not None]
+            if not ranked_executions:
+                continue
+
+            # Sort by rank
+            ranked_executions.sort(
+                key=lambda e: e.rank if e.rank is not None else float("inf")
+            )
+
+            ranking_summary[str(task_id)] = {
+                "task_name": task.name,
+                "n_variants": len(executions),
+                "rankings": [
+                    {
+                        "rank": ex.rank,
+                        "execution_id": str(ex.id),
+                        "agent_id": ex.agent_id,
+                        "variant_index": ex.variant_index,
+                        "resource_ids": [str(rid) for rid in ex.output_resource_ids],
+                        "resource_names": [
+                            workflow.resources[rid].name
+                            for rid in ex.output_resource_ids
+                            if rid in workflow.resources
+                        ],
+                        "aggregate_score": ex.aggregate_score,
+                        "scores_by_evaluator": ex.evaluation_scores,
+                        "evaluation_details": ex.evaluation_details,
+                        "status": ex.status.value,
+                        "duration_hours": ex.actual_duration_hours,
+                        "cost": ex.actual_cost,
+                    }
+                    for ex in ranked_executions
+                ],
+            }
+
+        if not ranking_summary:
+            return
+
+        # Write to file
+        wf_dir = self.output_config.workflow_dir
+        if wf_dir:
+            wf_dir.mkdir(parents=True, exist_ok=True)
+            ranking_file = wf_dir / f"ranking_summary_{self.output_config.run_id}.json"
+            with open(ranking_file, "w") as f:
+                json.dump(ranking_summary, f, indent=2, default=str)
+            logger.info(f"Saved ranking summary to {ranking_file}")
 
     def save_execution_logs(
         self, manager_action_history: Sequence[tuple[int, ActionResult | None]]

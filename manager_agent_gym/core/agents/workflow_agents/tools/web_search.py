@@ -1,62 +1,81 @@
+"""Web search tools - two-layer architecture.
+
+Layer 1: Core functions (_*) - pure business logic, testable, returns typed results
+Layer 2: OpenAI tool wrappers - thin adapters for OpenAI SDK, handle JSON serialization
+"""
+
 import asyncio
 import traceback
-from uuid import uuid4
+from typing import Any
 
 from agents import function_tool, RunContextWrapper
 
-from manager_agent_gym.core.agents.workflow_agents.tools.web_search.search import search
+from manager_agent_gym.core.agents.workflow_agents.tools.web_search_core import (
+    search,
+)
 from manager_agent_gym.core.common.logging import logger
 from manager_agent_gym.core.agents.workflow_agents.schemas.tools.web_search import (
     QuestionRequest,
-    QuestionRequestWithId,
     SearchResult,
+    SearchDomain,
     TimeoutMessage,
 )
 from manager_agent_gym.core.workflow.context import AgentExecutionContext
-from manager_agent_gym.core.agents.workflow_agents.schemas.telemetry import AgentToolUseEvent
+from manager_agent_gym.core.agents.workflow_agents.schemas.telemetry import (
+    AgentToolUseEvent,
+)
 
 SEARCH_TIMEOUT = 20
 SEARCH_SEMAPHORE = asyncio.Semaphore(5)
 
 
-async def _answer_single_question(
-    question: QuestionRequestWithId,
-) -> SearchResult:
-    """
-    Answer a single web search question using up-to-date search results.
+# ============================================================================
+# LAYER 1: WEB SEARCH OPERATIONS (Core Business Logic)
+# ============================================================================
 
-    This tool performs a web search for the given question, synthesizes the results,
-    and returns a comprehensive answer with citations.
 
-    Args:
-        question (QuestionRequestWithId): The question to answer, including:
-            - query (str): The search query string.
-            - return_results_from (str): The date (ISO 8601 format) from which to return results, e.g. "2025-02-08T00:00:00.000Z".
-            - domain (SearchDomain): The general domain of contents to source the answer from.
-            - question_id (str): A unique identifier for the question.
+async def _perform_web_search(
+    query: str,
+    return_results_from: str | None = None,
+    domain: str | None = None,
+    num_results: int = 5,
+) -> dict[str, Any]:
+    """Perform a web search and return results."""
+    try:
+        # Provide defaults and convert types
+        date_filter = return_results_from or "2025-01-01T00:00:00.000Z"
 
-    Returns:
-        Answer: A comprehensive answer to the query, with inline citations referencing the sources of the information.
+        # Convert string domain to SearchDomain enum, default to company
+        search_domain: SearchDomain
+        if domain:
+            try:
+                search_domain = SearchDomain(domain)
+            except ValueError:
+                search_domain = SearchDomain.company
+        else:
+            search_domain = SearchDomain.company
 
-    Example:
-        Use this tool when you need to answer a single question using recent web search results,
-        and require a detailed answer with sources.
-
-    """
-    # Our key has a ratelimit of 5 concurrent requests, so we ratelimit
-    async with SEARCH_SEMAPHORE:
-        try:
+        async with SEARCH_SEMAPHORE:
             search_results: SearchResult = await search(
-                query=question.query,
-                num_results=5,
-                return_results_from=question.return_results_from,
-                domain=question.domain,
+                query=query,
+                num_results=num_results,
+                return_results_from=date_filter,
+                domain=search_domain,
             )
-        except Exception as e:
-            logger.error(f"Web search failed: {traceback.format_exc()}")
-            raise e
 
-        return search_results
+            return {
+                "success": True,
+                "result": search_results,
+            }
+
+    except Exception as e:
+        logger.error(f"Web search failed: {traceback.format_exc()}")
+        return {"success": False, "error": str(e)}
+
+
+# ============================================================================
+# LAYER 2: OPENAI TOOL WRAPPERS
+# ============================================================================
 
 
 @function_tool
@@ -87,17 +106,22 @@ async def get_search_context(
     """
 
     try:
-        result = await asyncio.wait_for(
-            _answer_single_question(
-                QuestionRequestWithId(
-                    query=question.query,
-                    return_results_from=question.return_results_from,
-                    domain=question.domain,
-                    question_id=uuid4().hex,
-                )
+        result_dict = await asyncio.wait_for(
+            _perform_web_search(
+                query=question.query,
+                return_results_from=question.return_results_from,
+                domain=question.domain,
+                num_results=5,
             ),
             timeout=SEARCH_TIMEOUT,
         )
+
+        if not result_dict["success"]:
+            raise Exception(result_dict["error"])
+
+        result = result_dict["result"]
+
+        # Telemetry
         ctx_exc: AgentExecutionContext = wrapper.context  # type: ignore[attr-defined]
         ctx_exc.record_tool_event(
             AgentToolUseEvent(

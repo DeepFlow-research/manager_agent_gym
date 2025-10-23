@@ -200,6 +200,7 @@ async def test_live_openai_models_return_pydantic(
 @pytest.mark.live_llm
 async def test_live_anthropic_returns_pydantic() -> None:
     """Use Instructor provider wrapper for Anthropic live call when available."""
+    instructor = None
     try:
         import instructor  # type: ignore
     except Exception:
@@ -215,6 +216,7 @@ async def test_live_anthropic_returns_pydantic() -> None:
     # Build provider client per Instructor docs using chat.completions API
     # Note: We avoid touching our OpenAI async client path here to keep the provider test isolated.
     # If anthropic package is missing, gracefully skip
+    assert instructor is not None  # For type checker, already handled by pytest.skip
     try:
         # Allow overriding model via env to match account availability
         anthropic_model = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet")

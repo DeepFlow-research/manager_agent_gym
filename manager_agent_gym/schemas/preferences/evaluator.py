@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 
 from manager_agent_gym.schemas.preferences.rubric import RubricCriteria
 from enum import Enum
-from typing import Callable, Literal
+from typing import Any, Callable, Literal
 
 
 class AggregationStrategy(str, Enum):
@@ -20,9 +20,10 @@ class PreferenceMeasure(BaseModel):
     Currently, we have the following ways of expressing preferences:
     - Rubric: A set of criteria and their weights.
     - Exemplar: An output of a task that is desirable under the preference.
+    - Pairwise: A comparison of preferred vs rejected outputs.
     """
 
-    type: Literal["rubric", "exemplar"] = Field(
+    type: Literal["rubric", "exemplar", "pairwise"] = Field(
         default="rubric", description="Type of preference metric"
     )
 
@@ -35,6 +36,9 @@ class Rubric(PreferenceMeasure):
     (standalone) or wrap it inside a `Preference` for weighted aggregation.
     """
 
+    type: Literal["rubric", "exemplar", "pairwise"] = Field(
+        default="rubric", frozen=True
+    )
     name: str = Field(..., description="Rubric name")
     description: str | None = Field(
         default=None, description="Optional human-readable description"
@@ -46,6 +50,18 @@ class Rubric(PreferenceMeasure):
     criteria: list[RubricCriteria] = Field(
         default_factory=list, description="List of criteria this rubric will run"
     )
+    metadata: Any = Field(
+        default=None,
+        description="Generation and execution metadata (RubricGenerationMetadata object or None)",
+    )
+
+    def get_preference_summary(self) -> str:
+        """Get human-readable summary for this rubric.
+
+        Returns:
+            Summary string describing the rubric
+        """
+        return f"Rubric '{self.name}' with {len(self.criteria)} criteria"
 
 
 class PreferenceExemplar(PreferenceMeasure):
@@ -53,6 +69,9 @@ class PreferenceExemplar(PreferenceMeasure):
     Instead of an explicit 'criteria', we allow for the preference to be expressed via an exemplar output for a task.
     """
 
+    type: Literal["rubric", "exemplar", "pairwise"] = Field(
+        default="exemplar", frozen=True
+    )
     exemplar_output: str = Field(..., description="The output of the exemplar")
 
     def get_preference_summary(self) -> str:
@@ -67,3 +86,31 @@ class PreferenceExemplar(PreferenceMeasure):
             else self.exemplar_output
         )
         return f"Exemplar-based evaluation (output: {output_preview})"
+
+
+class PairwiseExemplar(PreferenceMeasure):
+    """
+    Preference expressed via a comparison of preferred vs rejected outputs.
+
+    This allows stakeholders to show what they value through concrete examples
+    of better and worse work, which can be more intuitive than describing criteria.
+    """
+
+    type: Literal["rubric", "exemplar", "pairwise"] = Field(
+        default="pairwise", frozen=True
+    )
+    preference_name: str = Field(
+        ..., description="Name of the preference dimension this comparison demonstrates"
+    )
+    preferred_output: str = Field(..., description="The preferred/better output")
+    rejected_output: str = Field(..., description="The rejected/worse output")
+
+    def get_preference_summary(self) -> str:
+        """Get human-readable summary for this pairwise preference.
+
+        Returns:
+            Summary string describing the pairwise approach
+        """
+        return (
+            f"Pairwise comparison for '{self.preference_name}' (preferred vs rejected)"
+        )

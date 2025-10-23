@@ -103,7 +103,9 @@ async def test_cost_bucket_and_cost_efficiency_when_agents_incur_cost(tmp_path: 
             self._cost = float(cost)
 
         async def execute_task(self, task: Task, resources: list[Resource]):
-            from manager_agent_gym.core.execution.schemas.results import create_task_result
+            from manager_agent_gym.core.execution.schemas.results import (
+                create_task_result,
+            )
 
             return create_task_result(
                 task_id=task.id,
