@@ -261,6 +261,22 @@ class CommunicationService:
 
         return messages
 
+    def get_messages_in_thread(
+        self,
+        thread_id: UUID,
+        limit: int | None = None,
+    ) -> list[Message]:
+        """Get all messages in a specific thread.
+
+        Args:
+            thread_id: Thread to retrieve messages from
+            limit: Maximum number of messages
+
+        Returns:
+            Messages sorted chronologically
+        """
+        return self.graph.get_messages_in_thread(thread_id=thread_id, limit=limit)
+
     def get_conversation_history(
         self, agent_id: str, other_agent: str, limit: int = 50
     ) -> list[Message]:
@@ -277,6 +293,33 @@ class CommunicationService:
         """
         return self.graph.get_conversation_history(
             agent_id=agent_id, other_agent=other_agent, limit=limit
+        )
+
+    def get_conversation_history_in_thread(
+        self,
+        thread_id: UUID,
+        agent_id: str,
+        other_agent: str,
+        limit: int = 50,
+    ) -> list[Message]:
+        """Get conversation between two agents within a specific thread.
+
+        Provides thread-scoped conversation history for parallel rubric generation.
+
+        Args:
+            thread_id: Thread to scope the conversation to
+            agent_id: First agent ID
+            other_agent: Second agent ID
+            limit: Maximum messages to return
+
+        Returns:
+            Messages in chronological order
+        """
+        return self.graph.get_conversation_history_in_thread(
+            thread_id=thread_id,
+            agent_id=agent_id,
+            other_agent=other_agent,
+            limit=limit,
         )
 
     def get_task_communications(self, task_id: UUID) -> list[Message]:
@@ -797,6 +840,3 @@ class CommunicationService:
             ),
             "communication_edges": len(self.graph.edges),
         }
-
-
-COMMUNICATION_SERVICE_SINGLETON = CommunicationService()

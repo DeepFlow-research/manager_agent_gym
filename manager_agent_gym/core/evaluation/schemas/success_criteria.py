@@ -236,29 +236,29 @@ class FileAccessor:
 
 class ValidationContext(BaseModel):
     """Context information provided to validation rules.
-    
+
     Provides:
     - Direct file access via .files property (multimodal support)
     - Helper methods to get task outputs
     - Legacy optional context fields for backward compatibility
-    
+
     Example usage in code rules:
         ```python
         def evaluate(workflow: Workflow, context: ValidationContext) -> float:
             # Use context helpers to access resources
-            
+
             # Get primary output (first output of last task)
             output = context.get_primary_output()
             if not output or not output.is_spreadsheet:
                 return 0.0
-            
+
             # Use file accessor for multimodal resources:
             df = context.files.read_excel(output.id, sheet_name='Analysis')
             text = context.files.read_pdf_text(output.id)
-            
+
             # Or get all outputs
             all_outputs = context.get_all_outputs()
-            
+
             return score
         ```
     """
@@ -287,7 +287,7 @@ class ValidationContext(BaseModel):
     def files(self) -> FileAccessor:
         """
         Access resource files with helper methods.
-        
+
         Provides convenient methods for reading multimodal resources:
         - context.files.read_excel(resource_id, sheet_name="Sheet1")
         - context.files.read_pdf_text(resource_id)
@@ -384,7 +384,7 @@ class ValidationContext(BaseModel):
     ) -> list[Any]:
         """
         Get resources suitable for evaluation (outputs only by default).
-        
+
         This is the primary method for code rules and LLM evaluators to get
         the resources they should evaluate.
 

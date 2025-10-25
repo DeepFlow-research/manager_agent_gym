@@ -16,7 +16,6 @@ from manager_agent_gym.core.agents.manager_agent.implementations.rubric_generati
     convert_staged_rubric_to_executable,
 )
 from manager_agent_gym.schemas.preferences.evaluation import StagedRubric
-from manager_agent_gym.core.common.llm_interface import generate_structured_response
 from manager_agent_gym.core.common.logging import logger
 
 # Import staged rubric system prompt (best practices from GDPEval)
@@ -64,23 +63,40 @@ async def decompose_preference_to_evaluator(
 
     # Build prompt using GDPEval-style system prompt
     system_prompt = STAGED_RUBRIC_SYSTEM_PROMPT
-    
+
     # Build user prompt from task + clarification context
     user_prompt = _build_staged_rubric_user_prompt(
         task_summary=workflow.workflow_goal,
-        task_description=workflow.tasks[list(workflow.tasks.keys())[0]].description if workflow.tasks else "",
+        task_description=workflow.tasks[list(workflow.tasks.keys())[0]].description
+        if workflow.tasks
+        else "",
         stakeholder_manager_messages=stakeholder_manager_messages,
     )
 
-    # LLM generates staged rubric spec
-    rubric_spec: ManagerAgentGeneratedStagedRubric = await generate_structured_response(  # type: ignore
-        model=model_name,
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        response_type=ManagerAgentGeneratedStagedRubric,
-        temperature=1.0,
-        seed=seed,
+    # LLM generates staged rubric spec using Agents SDK (not old Instructor approach)
+    from manager_agent_gym.core.common.llm_generator import CloudLLMGenerator
+    from agents import Agent
+    from agents.run import Runner
+
+    # Create generator for this model
+    generator = CloudLLMGenerator(model_name=model_name)
+
+    # Create agent with structured output type
+    rubric_agent = Agent(
+        name="rubric_generator",
+        model=generator,
+        instructions=system_prompt,
+        output_type=ManagerAgentGeneratedStagedRubric,
     )
+
+    # Run agent to get structured rubric
+    result = await Runner.run(
+        rubric_agent,
+        user_prompt,
+    )
+
+    # Extract the structured output
+    rubric_spec: ManagerAgentGeneratedStagedRubric = result.final_output  # type: ignore
 
     # Convert to executable StagedRubric
     executable_rubric = convert_staged_rubric_to_executable(rubric_spec)
@@ -98,12 +114,12 @@ def _build_staged_rubric_user_prompt(
     stakeholder_manager_messages: list[Message],
 ) -> str:
     """Build user prompt for staged rubric generation.
-    
+
     Args:
         task_summary: High-level task goal
         task_description: Detailed task description
         stakeholder_manager_messages: Clarification dialogue
-    
+
     Returns:
         User prompt for LLM
     """
@@ -117,28 +133,35 @@ def _build_staged_rubric_user_prompt(
         task_description,
         "",
     ]
-    
+
     if stakeholder_manager_messages:
-        parts.extend([
-            "## Stakeholder Clarification Dialogue",
-            "",
-            "The following Q&A exchanges clarify what the stakeholder values:",
-            "",
-        ])
+        parts.extend(
+            [
+                "## Stakeholder Clarification Dialogue",
+                "",
+                "The following Q&A exchanges clarify what the stakeholder values:",
+                "",
+            ]
+        )
         for msg in stakeholder_manager_messages:
             parts.append(f"**{msg.sender_id}**: {msg.content}")
             parts.append("")
-    
-    parts.extend([
-        "---",
-        "",
-        "Generate a staged evaluation rubric for this task that:",
-        "1. Uses 2-3 sequential stages (gate → correctness → quality)",
-        "2. Makes the first stage a required gate for format/structure",
-        "3. Includes both code rules (for precision) and LLM judges (for quality)",
-        "4. Has clear failure actions for each stage",
-        "",
-        "Return a ManagerAgentGeneratedStagedRubric object.",
-    ])
-    
+
+    parts.extend(
+        [
+            "---",
+            "",
+            "Generate a staged evaluation rubric for this task that:",
+            "1. Uses 2-3 sequential stages (gate → correctness → quality)",
+            "2. Makes the first stage a required gate for format/structure",
+            "3. Includes both code rules (for precision) and LLM judges (for quality)",
+            "4. Has clear failure actions for each stage",
+            "5. **IMPORTANT: Use high point values (20-50 total points) for numerical precision in GRPO**",
+            "   - This gives finer granularity in advantage scores between outputs",
+            "   - Example: max_total_score=40 with stages [8, 16, 16] is better than [2, 4, 4]",
+            "",
+            "Return a ManagerAgentGeneratedStagedRubric object.",
+        ]
+    )
+
     return "\n".join(parts)

@@ -13,7 +13,7 @@ from manager_agent_gym.core.workflow.services import WorkflowQueries
 if TYPE_CHECKING:
     from manager_agent_gym.schemas.domain.workflow import Workflow
     from manager_agent_gym.core.communication.service import CommunicationService
-
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 
 from manager_agent_gym.core.agents.manager_agent.actions.base import (
     BaseManagerAction,
@@ -32,6 +32,7 @@ class GetWorkflowStatusAction(BaseManagerAction):
         self,
         workflow: "Workflow",
         communication_service: "CommunicationService | None" = None,
+        llm_generator: "LLMGenerator | None" = None,
     ) -> ActionResult:
         """Execute workflow status check (no state modification)."""
         logger.info("📊 Manager analyzed workflow status")
@@ -70,6 +71,7 @@ class GetAvailableAgentsAction(BaseManagerAction):
         self,
         workflow: "Workflow",
         communication_service: "CommunicationService | None" = None,
+        llm_generator: "LLMGenerator | None" = None,
     ) -> ActionResult:
         """Execute agent info check (no state modification)."""
         logger.info("👥 Manager analyzed available agents")
@@ -95,6 +97,7 @@ class GetPendingTasksAction(BaseManagerAction):
         self,
         workflow: "Workflow",
         communication_service: "CommunicationService | None" = None,
+        llm_generator: "LLMGenerator | None" = None,
     ) -> ActionResult:
         """Execute pending tasks check (no state modification)."""
         logger.info("📋 Manager analyzed pending tasks")

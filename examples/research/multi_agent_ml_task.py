@@ -9,8 +9,16 @@ Demonstrates the complete GRPO training pipeline:
 5. Rank outputs by score
 6. Store all metadata (costs, cognitive burden) for GRPO loss computation
 
-This is the GRPO training pipeline: multi-rubric generation → N+1-way execution → 
+This is the GRPO training pipeline: multi-rubric generation → N+1-way execution →
 evaluation → ranking → metadata collection
+
+Train/Eval Split:
+=================
+The script automatically uses the appropriate data split from GDPEval:
+- Training mode (--mode train): Uses TRAINING SPLIT (175 rubrics, 80%)
+- Baseline modes (best_of_n, ground_truth, trained_policy): Use EVAL SPLIT (44 rubrics, 20%)
+- Each workflow in a batch gets a different random sample (based on workflow_id seed)
+- Split files: curation/gdpeval/data/generated/staged_v1/{train,eval}_rubrics.jsonl
 
 Command-Line Arguments:
 ========================
@@ -18,7 +26,7 @@ Command-Line Arguments:
 --mode <MODE>
     Execution mode for the workflow. Choices: train, best_of_n, ground_truth, trained_policy
     Default: train
-    
+
     - train: GRPO training mode
         * Generates N synthetic rubrics via manager-stakeholder dialogue
         * Uses 1 hardcoded ground truth rubric (for evaluation only)
@@ -26,18 +34,18 @@ Command-Line Arguments:
         * Each worker is guided by its assigned synthetic rubric during execution
         * ALL workers evaluated with ground truth rubric (not their guiding rubrics)
         * Tracks generation costs, cognitive burden for GRPO loss computation
-    
+
     - best_of_n: Best-of-N baseline
         * Creates N worker variants with NO rubric guidance
         * Workers use only base task description
         * Tests whether rubric guidance improves quality beyond sampling diversity
         * Use with --n to specify number of variants
-    
+
     - ground_truth: Ground truth rubric baseline
         * Creates 1 worker guided by the hardcoded ground truth rubric
         * Represents best-case scenario with perfect rubric
         * Useful for evaluating upper bound of rubric-guided performance
-    
+
     - trained_policy: Trained policy rubric baseline
         * Generates 1 synthetic rubric using the trained policy
         * Creates 1 worker guided by that rubric
@@ -48,11 +56,11 @@ Command-Line Arguments:
     Number of synthetic rubrics to generate in training mode
     Default: 2
     Only applies to --mode train
-    
+
     Examples:
         --n-synthetic 2  → Generate 2 synthetic rubrics, create 2 workers
         --n-synthetic 5  → Generate 5 synthetic rubrics, create 5 workers
-    
+
     Note: Ground truth rubric is NOT used to create a worker - it's only used
     for evaluation after all workers complete.
 
@@ -60,10 +68,25 @@ Command-Line Arguments:
     Number of worker variants for best_of_n baseline
     Default: 10
     Only applies to --mode best_of_n
-    
+
     Examples:
         --n 10 → Create 10 worker variants (no rubric guidance)
         --n 50 → Create 50 worker variants (no rubric guidance)
+
+--batch-size <N>
+    Number of workflows to run concurrently (for concurrency testing and training)
+    Default: 1 (sequential execution)
+
+    Examples:
+        --batch-size 1 → Run single workflow sequentially (default)
+        --batch-size 4 → Run 4 workflows concurrently with shared LLM generator
+        --batch-size 8 → Run 8 workflows concurrently (stress test concurrency)
+
+    Note: When batch-size > 1, each workflow gets its own isolated state (communication
+    service, agent registry, stakeholder, etc.) but ALL workflows share the SAME
+    LLM generator instance. This tests concurrency-safety and prepares for GRPO
+    training where a shared policy (manager agent) needs to accumulate gradients
+    across multiple episodes.
 
 Usage Examples:
 ===============
@@ -85,6 +108,12 @@ python -m examples.research.multi_agent_ml_task --mode ground_truth
 
 # Trained policy rubric baseline (1 worker with trained policy rubric)
 python -m examples.research.multi_agent_ml_task --mode trained_policy
+
+# Test concurrency with 4 parallel workflows (shared LLM generator)
+python -m examples.research.multi_agent_ml_task --batch-size 4
+
+# Stress test with 8 parallel workflows
+python -m examples.research.multi_agent_ml_task --mode train --n-synthetic 2 --batch-size 8
 
 GRPO Training Context:
 ======================
@@ -108,6 +137,8 @@ policy gradients. Baselines provide comparison points for evaluating the trained
 policy's performance.
 """
 
+import traceback
+
 import argparse
 import asyncio
 from uuid import uuid4
@@ -115,7 +146,6 @@ from uuid import uuid4
 from manager_agent_gym.schemas.domain.workflow import Workflow
 from manager_agent_gym.schemas.domain.task import Task
 from manager_agent_gym.schemas.domain.resource import Resource
-from manager_agent_gym.schemas.domain.base import TaskStatus
 from manager_agent_gym.schemas.agents import AIAgentConfig
 from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
 from manager_agent_gym.schemas.agents.stakeholder import StakeholderConfig
@@ -133,8 +163,6 @@ from manager_agent_gym.core.workflow.phases.multi_rubric_training import (
 )
 from manager_agent_gym.core.workflow.phases.baseline_phases import (
     create_baseline_phase,
-)
-from manager_agent_gym.core.workflow.phases.rubric_execution_base import (
     RubricExecutionPhaseBase,
 )
 from manager_agent_gym.core.agents.manager_agent.implementations.rubric_generation_manager.rubric_decomposition_manager import (
@@ -143,50 +171,412 @@ from manager_agent_gym.core.agents.manager_agent.implementations.rubric_generati
 from manager_agent_gym.core.agents.stakeholder_agent.rubric_stakeholder import (
     ClarificationStakeholderAgent,
 )
-from manager_agent_gym.core.agents.manager_agent.implementations.rubric_generation_manager.rubric_generation import (
-    ManagerAgentGeneratedRubricWithMetadata,
-    RubricGenerationMetadata,
+
+import logging
+from manager_agent_gym.core.common.logging import configure_library_logging
+
+# Configure root logger to output to console
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
+# Enable library logging
+configure_library_logging(level=logging.INFO)
 
 
-def load_gdpeval_ground_truth():
-    """Load first GDPEval sample as ground truth.
-    
+async def run_single_workflow_instance(
+    workflow_id: int,
+    mode: str,
+    n_synthetic: int,
+    n_variants: int,
+    fast_llm_generator,  # CloudLLMGenerator for clarification/rubric gen
+    quality_llm_generator,  # CloudLLMGenerator for workers
+    batch_name: str,  # Batch-level timestamp directory
+) -> dict:
+    """Run a single workflow execution instance with isolated state.
+
+    Each workflow gets its own:
+    - CommunicationService
+    - Stakeholder agent
+    - Rubric decomposition manager
+    - Agent registry
+    - Worker configs
+    - Execution manager
+    - Workflow engine
+
+    All workflows SHARE the same generators (for GRPO gradient accumulation).
+
+    Args:
+        workflow_id: Unique identifier for this workflow instance (for logging)
+        mode: Execution mode
+        n_synthetic: Number of synthetic rubrics for training mode
+        n_variants: Number of variants for best_of_n baseline
+        fast_llm_generator: SHARED fast generator for clarification/rubric gen
+        quality_llm_generator: SHARED quality generator for workers
+
     Returns:
-        Dictionary with task info and gold rubric
+        Dictionary with workflow results (status, metrics, etc.)
     """
-    from pathlib import Path
+    print(f"\n[Workflow {workflow_id}] 🚀 Starting workflow execution...")
+
+    from manager_agent_gym.core.communication.service import CommunicationService
     from manager_agent_gym.core.evaluation.loaders.gdpeval_sample_loader import (
-        load_first_gdpeval_sample,
+        load_gdpeval_sample,
+    )
+    from manager_agent_gym.schemas.domain.task import TaskStatus
+    from pathlib import Path
+    from manager_agent_gym.core.agents.manager_agent.implementations.rubric_generation_manager.utils import (
+        convert_staged_rubric_to_executable,
+    )
+    from manager_agent_gym.core.agents.manager_agent.implementations.rubric_generation_manager.rubric_generation import (
+        ManagerAgentGeneratedStagedRubricWithMetadata,
+    )
+    from manager_agent_gym.core.agents.workflow_agents.tools.tool_factory import (
+        ToolFactory,
+    )
+    from manager_agent_gym.core.workflow.resource_storage import ResourceFileManager
+
+    SEED = 42 + workflow_id  # Different seed per workflow
+
+    # ============================================================
+    # 1. Create isolated communication service
+    # ============================================================
+    communication_service = CommunicationService()
+    print(f"[Workflow {workflow_id}]   ✓ Created fresh CommunicationService")
+
+    # ============================================================
+    # 2. Load GDPEval sample with train/eval split
+    # ============================================================
+    # Training mode: Use training split with random sampling for diversity
+    # Baseline modes: Use eval split with random sampling
+    if mode == "train":
+        use_train_split = True
+        split_label = "TRAIN"
+    else:
+        use_train_split = False
+        split_label = "EVAL"
+    
+    # Use workflow_id-based random seed for diverse sampling across batch
+    gdpeval_sample = load_gdpeval_sample(
+        use_train_split=use_train_split,
+        random_seed=SEED,
     )
     
-    # Load first GDPEval sample
-    sample = load_first_gdpeval_sample()
+    print(
+        f"[Workflow {workflow_id}]   ✓ Loaded {split_label} sample "
+        f"({gdpeval_sample['sample_index']}/{gdpeval_sample['total_samples_in_split']-1}): "
+        f"{gdpeval_sample['task_id'][:8]}..."
+    )
+
+    workflow = Workflow(
+        name=f"{gdpeval_sample['task_name']} (W{workflow_id})",
+        workflow_goal=gdpeval_sample["task_description"],
+        owner_id=uuid4(),
+        seed=SEED,
+    )
+
+    # Add reference files as input resources
+    input_resources = []
+    for ref_file_path in gdpeval_sample["reference_files"]:
+        ref_file = Path(ref_file_path)
+        if ref_file.exists():
+            suffix = ref_file.suffix.lower()
+            mime_type_map = {
+                ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                ".pdf": "application/pdf",
+                ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                ".txt": "text/plain",
+                ".csv": "text/csv",
+                ".json": "application/json",
+            }
+            mime_type = mime_type_map.get(suffix, "application/octet-stream")
+
+            resource = Resource(
+                name=ref_file.name,
+                description=f"Reference file for {gdpeval_sample['occupation']} task",
+                file_path=str(ref_file.absolute()),
+                mime_type=mime_type,
+                size_bytes=ref_file.stat().st_size,
+            )
+            WorkflowMutations.add_resource(workflow, resource)
+            input_resources.append(resource)
+
+    # Create main task
+    gdpeval_task = Task(
+        name=gdpeval_sample["task_name"],
+        description=gdpeval_sample["task_description"],
+        status=TaskStatus.PENDING,
+        input_resource_ids=[r.id for r in input_resources],
+    )
+    WorkflowMutations.add_task(workflow, gdpeval_task)
+
+    print(
+        f"[Workflow {workflow_id}]   ✓ Created workflow with {len(input_resources)} input(s)"
+    )
+
+    # ============================================================
+    # 3. Prepare ground truth rubric
+    # ============================================================
+    gt_rubric_spec_raw = gdpeval_sample["rubric_spec"]
+    gt_rubric_spec = ManagerAgentGeneratedStagedRubricWithMetadata(
+        **gt_rubric_spec_raw.model_dump(),
+    )
+    gt_rubric_executable = convert_staged_rubric_to_executable(gt_rubric_spec)
+
+    print(
+        f"[Workflow {workflow_id}]   ✓ Gold rubric: {gt_rubric_executable.category_name}"
+    )
+
+    # ============================================================
+    # 4. Create clarification stakeholder (isolated)
+    # ============================================================
+    stakeholder_config = StakeholderConfig(
+        agent_id=f"gdpeval_stakeholder_w{workflow_id}",
+        agent_type="stakeholder",
+        name=f"{gdpeval_sample['occupation']} Expert",
+        role=gdpeval_sample["occupation"],
+        persona_description=f"Expert in {gdpeval_sample['sector']}",
+        agent_description=f"{gdpeval_sample['occupation']} stakeholder",
+        agent_capabilities=["domain expertise", "quality evaluation"],
+        preference_data=gt_rubric_executable,
+        model_name="gpt-4.1-mini",  # not used rn note!
+    )
+
+    stakeholder = ClarificationStakeholderAgent(
+        config=stakeholder_config,
+        llm_generator=fast_llm_generator,  # FAST generator for clarification
+        seed=SEED,
+    )
+
+    print(
+        f"[Workflow {workflow_id}]   ✓ Created stakeholder (uses FAST LLM for clarification)"
+    )
+
+    # ============================================================
+    # 5. Create rubric decomposition manager (isolated)
+    # ============================================================
+    rubric_manager = RubricDecompositionManagerAgent(
+        llm_generator=fast_llm_generator,  # FAST generator for rubric generation
+        model_name="gpt-4.1-mini",  # not used rn note!
+        max_clarification_budget=2,
+        seed=SEED,
+    )
+
+    print(f"[Workflow {workflow_id}]   ✓ Created rubric manager (uses FAST LLM)")
+
+    # ============================================================
+    # 6. Create agent registry and tools (isolated)
+    # ============================================================
+    # ⚠️ CRITICAL: AgentRegistry MUST use quality_llm_generator!
+    # All AI workers (AIAgent instances) created via registry.register_ai_agent()
+    # will use this generator for task execution. If you use fast_llm_generator here,
+    # the simulation will fail with structured output errors when using Claude models.
+    agent_registry = AgentRegistry(
+        llm_generator=quality_llm_generator  # ✅ QUALITY generator for workers (Claude Haiku 4.5)
+    )
+    agent_registry.register_agent_class("ai", AIAgent)
+
+    resource_manager = ResourceFileManager()
+    gdpeval_tools = ToolFactory.create_gdpeval_tools(resource_manager=resource_manager)
+
+    worker_config = AIAgentConfig(
+        agent_id=f"ml_researcher_w{workflow_id}",
+        agent_type="ai",
+        model_name="gpt-5",
+        agent_description="expert ML researcher",
+        agent_capabilities=["algorithm design", "model development", "evaluation"],
+        max_turns=20,
+        enable_execution_tracing=True,
+        use_multimodal_resources=True,
+    )
+
+    print(f"[Workflow {workflow_id}]   ✓ Created agent registry & tools")
+
+    # ============================================================
+    # 7. Create pre-execution phase based on mode
+    # ============================================================
+    pre_execution_phase: MultiRubricTrainingPhase | RubricExecutionPhaseBase
+    if mode == "train":
+        pre_execution_phase = MultiRubricTrainingPhase(
+            llm_generator=fast_llm_generator,
+            n_synthetic_rubrics=n_synthetic,
+            ground_truth_rubric=gt_rubric_spec,
+            base_worker_config=worker_config,
+            agent_registry=agent_registry,
+            rubric_manager=rubric_manager,
+            stakeholder=stakeholder,
+            communication_service=communication_service,
+            additional_tools=gdpeval_tools,
+            max_turns=5,
+        )
+        print(
+            f"[Workflow {workflow_id}]   ✓ Training phase: {n_synthetic} synthetic rubrics"
+        )
+
+    elif mode == "best_of_n":
+        pre_execution_phase = create_baseline_phase(
+            baseline="best_of_n",
+            n=n_variants,
+            base_worker_config=worker_config,
+            agent_registry=agent_registry,
+            rubric_manager=rubric_manager,
+            stakeholder=stakeholder,
+            communication_service=communication_service,
+            llm_generator=fast_llm_generator,
+            additional_tools=gdpeval_tools,
+        )
+        print(f"[Workflow {workflow_id}]   ✓ Best-of-N: {n_variants} variants")
+
+    elif mode == "ground_truth":
+        pre_execution_phase = create_baseline_phase(
+            baseline="ground_truth",
+            ground_truth_rubric=gt_rubric_spec,
+            base_worker_config=worker_config,
+            agent_registry=agent_registry,
+            rubric_manager=rubric_manager,
+            stakeholder=stakeholder,
+            communication_service=communication_service,
+            llm_generator=fast_llm_generator,
+            additional_tools=gdpeval_tools,
+        )
+        print(f"[Workflow {workflow_id}]   ✓ Ground truth baseline")
+
+    elif mode == "trained_policy":
+        pre_execution_phase = create_baseline_phase(
+            baseline="trained_policy",
+            base_worker_config=worker_config,
+            agent_registry=agent_registry,
+            rubric_manager=rubric_manager,
+            stakeholder=stakeholder,
+            communication_service=communication_service,
+            llm_generator=fast_llm_generator,
+            additional_tools=gdpeval_tools,
+        )
+        print(f"[Workflow {workflow_id}]   ✓ Trained policy baseline")
+    else:
+        raise ValueError(f"Unknown mode: {mode}")
+
+    # ============================================================
+    # 8. Create NoOp execution manager (isolated)
+    # ============================================================
+    execution_manager = create_manager_agent(
+        llm_generator=quality_llm_generator,  # QUALITY generator (though NoOp doesn't use it)
+        preferences=PreferenceSnapshot(preferences=[]),
+        manager_mode="noop",
+    )
+
+    print(f"[Workflow {workflow_id}]   ✓ Created NoOp execution manager")
+
+    # ============================================================
+    # 9. Create and run workflow engine
+    # ============================================================
     
-    return sample
+    # Create output config with batch-level timestamp + GDP task ID structure
+    from manager_agent_gym.core.workflow.schemas.config import OutputConfig
+    from pathlib import Path
+    
+    output_config = OutputConfig(
+        base_output_dir=Path("./simulation_outputs") / batch_name,  # Batch timestamp directory
+        run_id=gdpeval_sample["task_id"],  # GDP task ID for this run
+        create_run_subdirectory=True,
+    )
+    print(f"[Workflow {workflow_id}]   ✓ Output directory: {batch_name}/run_{gdpeval_sample['task_id']}")
+    
+    engine = WorkflowExecutionEngine(
+        workflow=workflow,
+        llm_generator=quality_llm_generator,
+        agent_registry=agent_registry,
+        stakeholder_agent=stakeholder,
+        manager_agent=execution_manager,
+        communication_service=communication_service,
+        seed=SEED,
+        output_config=output_config,  # Pass custom output config with batch + task structure
+        pre_execution_phases=[pre_execution_phase],
+        gold_rubrics=[gt_rubric_executable],
+        max_timesteps=10,
+        enable_timestep_logging=True,
+        enable_final_metrics_logging=True,
+        log_preference_evaluation_progress=False,  # Disable inner progress bars for parallel eval
+    )
+
+    # Enable ignore_gates mode for GRPO training (provides continuous reward signal)
+    if mode == "train":
+        engine.validation_engine._ignore_gates = True
+        print(f"[Workflow {workflow_id}]   ✓ Training mode: ignore_gates enabled")
+        print(
+            f"[Workflow {workflow_id}]     → All rubric stages will run for continuous reward signal"
+        )
+
+    print(f"[Workflow {workflow_id}]   ✓ Created workflow engine")
+    print(f"[Workflow {workflow_id}] ▶ Running execution...\n")
+
+    # Run the workflow
+    try:
+        final_state = await engine.run_full_execution()
+
+        print(f"\n[Workflow {workflow_id}] ✅ Execution complete!")
+
+        return {
+            "workflow_id": workflow_id,
+            "status": "completed",
+            "task_id": gdpeval_sample["task_id"],
+            "workflow_name": workflow.name,
+            "final_state": final_state,
+            "message": f"Workflow {workflow_id} completed successfully",
+        }
+    except Exception as e:
+        print(
+            f"\n[Workflow {workflow_id}] ❌ Execution failed: {e, traceback.format_exc()}"
+        )
+        return {
+            "workflow_id": workflow_id,
+            "status": "failed",
+            "workflow_name": workflow.name,
+            "error": str(e),
+            "message": f"Workflow {workflow_id} failed",
+        }
 
 
 async def run_multi_agent_ml_example(
     mode: str = "train",
     n_synthetic: int = 2,
     n_variants: int = 10,
+    batch_size: int = 1,
 ):
-    """Run a complete multi-agent ML task with rubric generation and evaluation.
-    
+    """Run multi-agent ML task with optional batch processing for concurrency testing.
+
+    The script automatically uses the appropriate train/eval split:
+    - Training mode (mode="train"): Uses training split (175 rubrics, 80%)
+    - Baseline modes (best_of_n, ground_truth, trained_policy): Use eval split (44 rubrics, 20%)
+    - Each workflow in a batch gets a different random sample from the split (based on workflow_id seed)
+
     Args:
         mode: Execution mode - "train", "best_of_n", "ground_truth", or "trained_policy"
         n_synthetic: Number of synthetic rubrics for training mode
         n_variants: Number of variants for best_of_n baseline
+        batch_size: Number of workflows to run concurrently (1 = sequential, >1 = parallel)
     """
+    
+    # Create batch-level timestamp for all runs in this session
+    from datetime import datetime
+    batch_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    batch_name = f"batch_{batch_timestamp}"
 
     print("=" * 80)
     if mode == "train":
         print("Multi-Rubric Training Example (GRPO)")
+        print("📊 Data Split: TRAINING SET (175 rubrics, 80%)")
     else:
         print(f"Baseline Evaluation: {mode}")
+        print("📊 Data Split: EVAL SET (44 rubrics, 20%)")
+
+    print(f"📁 Batch Directory: simulation_outputs/{batch_name}/")
+    if batch_size > 1:
+        print(f"🔀 BATCH MODE: Running {batch_size} workflows concurrently")
+        print("   Testing concurrency-safety with shared LLM generator")
+        print("   Each workflow samples a different task (seed = 42 + workflow_id)")
     print("=" * 80)
     print()
-    
+
     if mode == "train":
         print("This example demonstrates the GRPO training pipeline:")
         print("  1. Generate N synthetic rubrics")
@@ -206,638 +596,156 @@ async def run_multi_agent_ml_example(
     print()
 
     # ============================================================
-    # 1. Load GDPEval sample and create workflow
+    # CREATE DUAL LLM GENERATORS (fast for rubric gen, quality for workers)
     # ============================================================
-    print("🔧 Step 1: Loading GDPEval sample and creating workflow...")
+    print("🔧 Creating dual LLM generators...")
+    print("")
+    print("  📋 Generator Architecture:")
+    print("     • fast_llm_generator → clarification dialogue, rubric generation")
+    print("     • quality_llm_generator → worker task execution (via AgentRegistry)")
+    print("")
+    print("  ⚠️  CRITICAL: AgentRegistry MUST use quality_llm_generator!")
+    print("     Claude models don't support native structured outputs, so we use")
+    print("     a two-step process: Claude executes → GPT-4.1-mini parses to JSON")
+    print("")
 
-    SEED = 42
+    from manager_agent_gym.core.common.llm_generator import CloudLLMGenerator
 
-    # Load first GDPEval sample
-    gdpeval_sample = load_gdpeval_ground_truth()
-    
-    print(f"  ✓ Loaded GDPEval task: {gdpeval_sample['task_id']}")
-    print(f"  ✓ Sector: {gdpeval_sample['sector']}")
-    print(f"  ✓ Occupation: {gdpeval_sample['occupation']}")
-    print(f"  ✓ Reference files: {len(gdpeval_sample['reference_files'])}")
+    fast_llm_generator = CloudLLMGenerator(model_name="gpt-4.1-mini")
+    quality_llm_generator = CloudLLMGenerator(model_name="claude-haiku-4-5")
 
-    workflow = Workflow(
-        name=gdpeval_sample['task_name'],
-        workflow_goal=gdpeval_sample['task_description'],  # Truncate for display
-        owner_id=uuid4(),
-        seed=SEED,
-    )
-
-    # Add reference files as input resources
-    from pathlib import Path
-    input_resources = []
-    for ref_file_path in gdpeval_sample['reference_files']:
-        ref_file = Path(ref_file_path)
-        if ref_file.exists():
-            # Determine MIME type
-            suffix = ref_file.suffix.lower()
-            mime_type_map = {
-                '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                '.pdf': 'application/pdf',
-                '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                '.txt': 'text/plain',
-                '.csv': 'text/csv',
-                '.json': 'application/json',
-            }
-            mime_type = mime_type_map.get(suffix, 'application/octet-stream')
-            
-            resource = Resource(
-                name=ref_file.name,
-                description=f"Reference file for {gdpeval_sample['occupation']} task",
-                file_path=str(ref_file.absolute()),
-                mime_type=mime_type,
-                size_bytes=ref_file.stat().st_size,
-            )
-            WorkflowMutations.add_resource(workflow, resource)
-            input_resources.append(resource)
-
-    # Create main task from GDPEval prompt
-    gdpeval_task = Task(
-        name=gdpeval_sample['task_name'],
-        description=gdpeval_sample['task_description'],
-        status=TaskStatus.PENDING,
-        input_resource_ids=[r.id for r in input_resources],
-    )
-    WorkflowMutations.add_task(workflow, gdpeval_task)
-
-    print(f"  ✓ Created workflow: {workflow.name}")
-    print(f"  ✓ Created task: {gdpeval_task.name}")
-    print(f"  ✓ Added {len(input_resources)} reference file(s) as inputs")
-    for res in input_resources:
-        print(f"      - {res.name} ({res.mime_type})")
+    print("  ✓ Fast generator (gpt-4.1-mini) for clarification & rubric generation")
+    print("  ✓ Quality generator (claude-haiku-4-5) for worker task execution")
+    print("    → Claude Haiku 4.5: Fast, cost-effective, excellent tool calling!")
+    print(f"  ✓ Generators will be SHARED across all {batch_size} workflow(s)")
     print()
 
     # ============================================================
-    # 2. Create communication service
+    # RUN WORKFLOWS (sequential or parallel based on batch_size)
     # ============================================================
-    print("🔧 Step 2: Setting up communication service...")
-
-    from manager_agent_gym.core.communication.service import (
-        COMMUNICATION_SERVICE_SINGLETON,
-    )
-
-    communication_service = COMMUNICATION_SERVICE_SINGLETON
-
-    print("  ✓ Communication service initialized (using singleton)")
-    print()
-
-    # ============================================================
-    # 3. Prepare ground truth rubric (GDPEval gold standard)
-    # ============================================================
-    print("🔧 Step 3: Preparing GDPEval gold standard rubric...")
-
-    # Convert GDPEval rubric to executable format
-    from manager_agent_gym.core.agents.manager_agent.implementations.rubric_generation_manager.utils import (
-        convert_staged_rubric_to_executable,
-    )
-    from manager_agent_gym.core.agents.manager_agent.implementations.rubric_generation_manager.rubric_generation import (
-        ManagerAgentGeneratedStagedRubricWithMetadata,
-        RubricGenerationMetadata,
-    )
-    
-    # Wrap GDPEval rubric with metadata (metadata is empty for gold standard)
-    gt_rubric_spec_raw = gdpeval_sample['rubric_spec']
-    gt_rubric_spec = ManagerAgentGeneratedStagedRubricWithMetadata(
-        **gt_rubric_spec_raw.model_dump(),
-        metadata=RubricGenerationMetadata(),  # No generation cost for gold standard
-    )
-    gt_rubric_executable = convert_staged_rubric_to_executable(gt_rubric_spec)
-    
-    print(f"  ✓ Gold rubric: {gt_rubric_executable.category_name}")
-    print(f"  ✓ Max score: {gt_rubric_executable.max_total_score}")
-    print(f"  ✓ Stages: {len(gt_rubric_executable.stages)}")
-    for stage in gt_rubric_executable.stages:
-        gate_marker = "🚪 GATE" if stage.is_required else "  "
-        print(f"    {gate_marker} {stage.name}: {len(stage.rules)} rules, {stage.max_points} pts")
-    print()
-
-    # ============================================================
-    # 4. Create clarification stakeholder (no preference data needed)
-    # ============================================================
-    print("🔧 Step 4: Creating stakeholder for rubric generation...")
-
-    stakeholder_config = StakeholderConfig(
-        agent_id="gdpeval_stakeholder",
-        agent_type="stakeholder",
-        name=f"{gdpeval_sample['occupation']} Expert",
-        role=gdpeval_sample['occupation'],
-        persona_description=f"Expert in {gdpeval_sample['sector']} with deep knowledge of {gdpeval_sample['occupation']} best practices.",
-        agent_description=f"{gdpeval_sample['occupation']} stakeholder for rubric generation",
-        agent_capabilities=[
-            "domain expertise",
-            "quality evaluation",
-            "professional standards",
-        ],
-        preference_data=None,  # No preference data - using gold rubrics directly
-        model_name="gpt-5",
-    )
-
-    stakeholder = ClarificationStakeholderAgent(
-        config=stakeholder_config,
-        seed=SEED,
-    )
-
-    print(f"  ✓ Created clarification stakeholder: {stakeholder.config.agent_id}")
-    print("  ✓ Role: {stakeholder.config.role}")
-    print("  ✓ Note: Stakeholder will help generate rubrics; gold rubric used for evaluation")
-    print()
-
-    # ============================================================
-    # 5. Create rubric decomposition manager
-    # ============================================================
-    print("🔧 Step 5: Creating rubric decomposition manager...")
-
-    rubric_manager = RubricDecompositionManagerAgent(
-        model_name="gpt-4o-mini",
-        max_clarification_budget=3,
-        seed=SEED,
-    )
-
-    print(f"  ✓ Created rubric manager: {rubric_manager.agent_id}")
-    print("  ✓ Max clarification budget: 3 turns")
-    print()
-
-    # ============================================================
-    # 6. Create agent registry, worker config, and GDPEval tools
-    # ============================================================
-    print("🔧 Step 6: Setting up agent registry, worker, and tools...")
-
-    agent_registry = AgentRegistry()
-    agent_registry.register_agent_class("ai", AIAgent)
-
-    # Create GDPEval toolkit (REAL tools for file creation!)
-    from manager_agent_gym.core.agents.workflow_agents.tools.tool_factory import (
-        ToolFactory,
-    )
-    from manager_agent_gym.core.workflow.resource_storage import ResourceFileManager
-
-    resource_manager = ResourceFileManager()
-    gdpeval_tools = ToolFactory.create_gdpeval_tools(resource_manager=resource_manager)
-
-    print(f"  ✓ Created GDPEval toolkit with {len(gdpeval_tools)} real tools")
-
-    worker_config = AIAgentConfig(
-        agent_id="ml_researcher",
-        agent_type="ai",
-        # system_prompt removed - now using agent_description (uses proper template)
-        model_name="gpt-5",  # Using mini for faster/cheaper execution
-        agent_description="an expert ML researcher with deep knowledge of machine learning algorithms, model evaluation, and best practices who develops creative and effective solutions",
-        agent_capabilities=[
-            "algorithm design",
-            "model development",
-            "data analysis",
-            "evaluation",
-            "multimodal deliverable creation",
-        ],
-        max_turns=20,  # Allow more turns for complex tasks
-        enable_execution_tracing=True,  # Capture detailed execution traces
-        use_multimodal_resources=True,  # Enable multimodal inputs
-    )
-
-    print("  ✓ Registered agent type: ai")
-    print(f"  ✓ Created base worker config: {worker_config.agent_id}")
-    print()
-
-
-    # ============================================================
-    # 7. Create pre-execution phase based on mode
-    # ============================================================
-    print(f"🔧 Step 7: Configuring pre-execution phase (mode={mode})...")
-
-    # Create the appropriate phase based on mode
-    pre_execution_phase: RubricExecutionPhaseBase
-    
-    if mode == "train":
-        # Create multi-rubric training phase (generates N synthetic + 1 ground truth)
-        pre_execution_phase = MultiRubricTrainingPhase(
-            n_synthetic_rubrics=n_synthetic,
-            ground_truth_rubric=gt_rubric_spec,
-            base_worker_config=worker_config,
-            agent_registry=agent_registry,
-            rubric_manager=rubric_manager,
-            stakeholder=stakeholder,
-            communication_service=communication_service,
-            additional_tools=gdpeval_tools,
-            max_turns=5,
+    if batch_size == 1:
+        print("🔧 Running single workflow (sequential mode)...")
+        result = await run_single_workflow_instance(
+            workflow_id=0,
+            mode=mode,
+            n_synthetic=n_synthetic,
+            n_variants=n_variants,
+            fast_llm_generator=fast_llm_generator,
+            quality_llm_generator=quality_llm_generator,
+            batch_name=batch_name,
         )
-        print(f"  ✓ Training phase configured: {n_synthetic} synthetic rubrics")
-        print(f"  ✓ Total workers per task: {n_synthetic}")
-        print("  ✓ Evaluation: All workers evaluated with ground truth rubric")
-    
-    elif mode == "best_of_n":
-        # Best-of-N baseline
-        pre_execution_phase = create_baseline_phase(
-            baseline="best_of_n",
-            n=n_variants,
-            base_worker_config=worker_config,
-            agent_registry=agent_registry,
-            rubric_manager=rubric_manager,
-            stakeholder=stakeholder,
-            communication_service=communication_service,
-            additional_tools=gdpeval_tools,
-        )
-        print(f"  ✓ Best-of-N baseline configured: {n_variants} variants")
-    
-    elif mode == "ground_truth":
-        # Ground truth baseline
-        pre_execution_phase = create_baseline_phase(
-            baseline="ground_truth",
-            ground_truth_rubric=gt_rubric_spec,
-            base_worker_config=worker_config,
-            agent_registry=agent_registry,
-            rubric_manager=rubric_manager,
-            stakeholder=stakeholder,
-            communication_service=communication_service,
-            additional_tools=gdpeval_tools,
-        )
-        print("  ✓ Ground truth baseline configured: 1 worker with GT rubric")
-    
-    elif mode == "trained_policy":
-        # Trained policy baseline
-        pre_execution_phase = create_baseline_phase(
-            baseline="trained_policy",
-            base_worker_config=worker_config,
-            agent_registry=agent_registry,
-            rubric_manager=rubric_manager,
-            stakeholder=stakeholder,
-            communication_service=communication_service,
-            additional_tools=gdpeval_tools,
-        )
-        print("  ✓ Trained policy baseline configured: 1 worker with policy rubric")
-    
+        results = [result]
     else:
-        raise ValueError(f"Unknown mode: {mode}")
-    
-    print()
-
-    # ============================================================
-    # 8. Create NoOp manager for main execution
-    # ============================================================
-    print("🔧 Step 8: Creating NoOp manager for main execution...")
-
-    execution_manager = create_manager_agent(
-        preferences=PreferenceSnapshot(preferences=[]),
-        manager_mode="noop",
-    )
-
-    print("  ✓ Execution manager: NoOp (no intervention)")
-    print()
-
-    # ============================================================
-    # 9. Create and run engine with pre-execution phase
-    # ============================================================
-    print("🔧 Step 9: Creating workflow engine...")
-    print()
-
-    engine = WorkflowExecutionEngine(
-        workflow=workflow,
-        agent_registry=agent_registry,
-        stakeholder_agent=stakeholder,
-        manager_agent=execution_manager,
-        communication_service=communication_service,
-        seed=SEED,
-        pre_execution_phases=[
-            pre_execution_phase,  # Selected phase based on mode
-        ],
-        gold_rubrics=[gt_rubric_executable],  # GDPEval gold standard for evaluation
-        max_timesteps=10,
-        enable_timestep_logging=False,  # Disable for cleaner output
-        enable_final_metrics_logging=True,
-    )
-
-    print(
-        f"  ✓ Engine configured with {len(engine.pre_execution_phases)} pre-execution phase(s)"
-    )
-    print()
-
-    print("=" * 80)
-    print("🚀 Starting Execution")
-    print("=" * 80)
-    print()
-    if mode == "train":
-        print("Multi-Rubric Training Phase...")
-    else:
-        print(f"Baseline Phase: {mode}...")
-    print("-" * 80)
-
-    await engine.run_full_execution()
-
-    print()
-    print("=" * 80)
-    print("✅ Execution Complete")
-    print("=" * 80)
-    print()
-
-    # ============================================================
-    # 9. Display Gold Standard Evaluation Results
-    # ============================================================
-    if hasattr(workflow, "metadata") and workflow.metadata and "gold_evaluation_results" in workflow.metadata:
-        print("🏆 Gold Standard Evaluation (GDPEval)")
-        print("=" * 80)
-        print()
-        
-        gold_results = workflow.metadata["gold_evaluation_results"]
-        for category_name, result in gold_results.items():
-            print(f"Category: {category_name}")
-            print("-" * 80)
-            print(f"  Total Score: {result['total_score']:.2f} / {result['max_score']:.2f}")
-            print(f"  Normalized: {result['normalized_score']:.2%}")
-            print(f"  Stages Evaluated: {result['stages_evaluated']}")
-            print(f"  Stages Passed: {result['stages_passed']}")
-            
-            if result.get('failed_gate'):
-                print(f"  ❌ Failed Gate: {result['failed_gate']}")
-                print(f"  ⚠️  Evaluation stopped at: {result['stopped_at']}")
-            else:
-                print(f"  ✅ All required gates passed!")
-            
-            print()
-        
-        print("=" * 80)
+        print(f"🔧 Running {batch_size} workflows concurrently...")
+        print("  ⚡ Testing concurrency-safety of workflow engine")
+        print("  🔗 All workflows share the same LLM generators")
+        print("  📁 Each workflow saves outputs immediately upon completion")
         print()
 
-    # ============================================================
-    # 10. Display results
-    # ============================================================
-    print("📊 Results Summary")
-    print("=" * 80)
-    print()
-
-    # Show rubric generation results
-    print("Rubric Generation:")
-    print("-" * 80)
-    if stakeholder.generated_rubrics:
-        rubric = stakeholder.generated_rubrics[0]
-        print(f"  ✓ Generated rubric: {rubric.name}")
-        print(f"  ✓ Number of criteria: {len(rubric.criteria)}")
-        print("  ✓ Criteria names:")
-        for criterion in rubric.criteria:
-            print(f"    - {criterion.name}")
-    else:
-        print("  ⚠️  No rubric generated")
-    print()
-
-    # Show task execution results using new TaskExecution model
-    completed_task = workflow.tasks[gdpeval_task.id]
-    print("Task Execution:")
-    print("-" * 80)
-    print(f"  Task: {completed_task.name}")
-    print(f"  Status: {completed_task.status.value}")
-
-    # Get all executions for this task
-    executions = completed_task.get_executions(workflow)
-    if executions:
-        completed_executions = [ex for ex in executions if ex.is_completed()]
-        print(
-            f"  Variants executed: {len(completed_executions)}/{len(executions)}"
-        )
-    print()
-
-    # Show ranking results using new TaskExecution model
-    if executions:
-        # Get ranked executions (sorted by rank)
-        ranked_executions = [ex for ex in executions if ex.rank is not None]
-        ranked_executions.sort(key=lambda ex: ex.rank if ex.rank is not None else float('inf'))
+        # Track completions for progress reporting
+        completed_count = 0
+        completed_tasks: list[tuple[int, dict[str, object] | Exception, float]] = []
+        start_time = asyncio.get_event_loop().time()
         
-        if ranked_executions:
-            print("Output Rankings:")
-            print("-" * 80)
-            print(f"  Total outputs evaluated: {len(ranked_executions)}")
-            print()
-
-            for execution in ranked_executions[:3]:  # Show top 3
-                print(f"  Rank {execution.rank}:")
-                print(f"    Score: {execution.aggregate_score:.2f}/10" if execution.aggregate_score else "    Score: N/A")
-                print(f"    Agent: {execution.agent_id}")
+        # Wrapper to track completion and report progress
+        async def run_with_progress_tracking(workflow_id: int):
+            nonlocal completed_count
+            try:
+                result = await run_single_workflow_instance(
+                    workflow_id=workflow_id,
+                    mode=mode,
+                    n_synthetic=n_synthetic,
+                    n_variants=n_variants,
+                    fast_llm_generator=fast_llm_generator,
+                    quality_llm_generator=quality_llm_generator,
+                    batch_name=batch_name,
+                )
+                completed_count += 1
+                elapsed = asyncio.get_event_loop().time() - start_time
                 
-                # Show all resources produced by this execution
-                if execution.output_resource_ids:
-                    print(f"    Resources produced: {len(execution.output_resource_ids)}")
-                    for resource_id in execution.output_resource_ids[:3]:  # Show first 3
-                        resource = workflow.resources.get(resource_id)
-                        if resource:
-                            print(f"      - {resource.name}")
-                            print(f"        Path: {resource.file_path}")
-                            print(f"        MIME: {resource.mime_type}")
-                            print(f"        Size: {resource.size_bytes} bytes")
+                # Report completion immediately
+                if isinstance(result, dict) and result.get('status') == 'completed':
+                    task_id = result.get('task_id', 'unknown')
+                    task_name = result.get('workflow_name', 'unknown')
+                    print("\n" + "=" * 80)
+                    print(f"✅ EPISODE {completed_count}/{batch_size} COMPLETE")
+                    print("=" * 80)
+                    print(f"  Workflow ID: {workflow_id}")
+                    print(f"  GDP Task ID: {task_id}")
+                    print(f"  Task: {task_name}")
+                    print(f"  Elapsed Time: {elapsed:.1f}s")
+                    print(f"  Output Directory: simulation_outputs/run_{task_id}/")
+                    print(f"  Progress: {completed_count}/{batch_size} episodes ({completed_count/batch_size*100:.1f}%)")
+                    
+                    # Estimate time remaining
+                    if completed_count < batch_size:
+                        avg_time = elapsed / completed_count
+                        remaining_time = avg_time * (batch_size - completed_count)
+                        print(f"  Estimated Time Remaining: {remaining_time:.1f}s ({remaining_time/60:.1f}m)")
+                    print("=" * 80 + "\n")
+                
+                completed_tasks.append((workflow_id, result, elapsed))
+                return result
+            except Exception as e:
+                completed_count += 1
+                elapsed = asyncio.get_event_loop().time() - start_time
+                print("\n" + "=" * 80)
+                print(f"❌ EPISODE {completed_count}/{batch_size} FAILED")
+                print("=" * 80)
+                print(f"  Workflow ID: {workflow_id}")
+                print(f"  Error: {type(e).__name__}: {e}")
+                print(f"  Elapsed Time: {elapsed:.1f}s")
+                print(f"  Progress: {completed_count}/{batch_size} episodes ({completed_count/batch_size*100:.1f}%)")
+                print("=" * 80 + "\n")
+                completed_tasks.append((workflow_id, e, elapsed))
+                return e
 
-                            # Check if file exists and show content type
-                            if hasattr(resource, "is_spreadsheet") and resource.is_spreadsheet:
-                                print("        Type: Excel file")
-                                if resource.file_format_metadata:
-                                    print(f"        Metadata: {resource.file_format_metadata}")
-                            elif hasattr(resource, "is_text_format") and resource.is_text_format:
-                                print("        Type: Text file")
-                                # Try to show preview
-                                try:
-                                    preview = resource.load_text()[:200]
-                                    if len(resource.load_text()) > 200:
-                                        preview += "..."
-                                    print(f"        Preview: {preview}")
-                                except Exception as e:
-                                    print(f"        (Could not preview: {e})")
+        # Create batch of workflows with progress tracking
+        workflow_tasks = [
+            run_with_progress_tracking(i)
+            for i in range(batch_size)
+        ]
 
-                # Show evaluation details
-                if execution.evaluation_details and "reasoning" in execution.evaluation_details:
-                    print(f"    Evaluation: {execution.evaluation_details['reasoning']}")
+        # Run all workflows concurrently with incremental reporting
+        print(f"🚀 Starting {batch_size} parallel episodes...\n")
+        results = await asyncio.gather(*workflow_tasks, return_exceptions=False)  # type: ignore[assignment]
 
-                print()
+        # Final summary
+        total_elapsed = asyncio.get_event_loop().time() - start_time
+        failures = [r for r in results if isinstance(r, Exception)]
+        successes = [r for r in results if isinstance(r, dict) and r.get('status') == 'completed']
+        
+        print(f"\n{'='*80}")
+        print("📊 BATCH EXECUTION SUMMARY")
+        print(f"{'='*80}")
+        print(f"  Total Episodes: {batch_size}")
+        print(f"  Successful: {len(successes)}")
+        print(f"  Failed: {len(failures)}")
+        print(f"  Total Time: {total_elapsed:.1f}s ({total_elapsed/60:.1f}m)")
+        print(f"  Average Time per Episode: {total_elapsed/batch_size:.1f}s")
+        print(f"{'='*80}")
+        
+        if failures:
+            print(f"\n❌ {len(failures)} episode(s) failed:")
+            for i, exc in enumerate(failures):
+                print(f"  • Workflow {i}: {type(exc).__name__}: {exc}")
+        
+        # List all output directories
+        print("\n📁 Output Directories (all saved incrementally):")
+        for result in successes:
+            if isinstance(result, dict):
+                task_id = result.get('task_id', 'unknown')
+                print(f"  • simulation_outputs/run_{task_id}/")
+        print()
 
-            # Show selection results using best execution
-            best_execution = completed_task.get_best_execution(workflow)
-            print("Output Selection:")
-            print("-" * 80)
-            if best_execution:
-                print(
-                    f"  ✓ Selected: Rank {best_execution.rank} (score: {best_execution.aggregate_score:.2f}/10)"
-                )
-                print(f"  ✓ Agent: {best_execution.agent_id}")
-                print(f"  ✓ Resources: {len(best_execution.output_resource_ids)}")
-                print("  ✓ Ready for propagation to downstream tasks")
-            else:
-                print(f"  ℹ️  All {len(completed_task.output_resource_ids)} outputs selected")
-        else:
-            print("⚠️  No ranked executions found")
-    else:
-        print("⚠️  No executions found")
-
-    print()
-    print("=" * 80)
-    print("✅ Smoke Test Complete!")
-    print("=" * 80)
-    print()
-    print("This example demonstrated:")
-    print("  ✓ Rubric generation via manager-stakeholder dialogue")
-    print("  ✓ Multi-agent task assignment (N variants)")
-    print("  ✓ Parallel execution of N workers")
-    print("  ✓ Rubric-based evaluation of outputs")
-    print("  ✓ Ranking and selection of best output")
-    print("  ✓ Full result serialization")
-    print()
-    print(
-        f"Check output files for detailed results in: {engine.output_writer.output_config.workflow_dir}"
-    )
-    print("=" * 80)
-
-    # ============================================================
-    # 10. Analyze multimodal outputs (Phase 2 validation)
-    # ============================================================
-    print()
-    print("=" * 80)
-    print("📁 Phase 2 Multimodal Output Analysis")
-    print("=" * 80)
-    print()
-    print("Analyzing all generated files to validate Phase 2 implementation...")
+    print("✅ Batch execution complete!")
     print()
 
-    # Collect all output resources
-    all_resources = list(workflow.resources.values())
-    output_resources = [
-        r for r in all_resources if r.id != input_resource.id
-    ]  # Exclude input
+    # Note: All workflow execution is now handled by run_single_workflow_instance
+    # The legacy single-workflow code below has been removed since each workflow
+    # in the batch gets its own complete execution environment
 
-    print(f"Total resources in workflow: {len(all_resources)}")
-    print("Input resources: 1 (customer_data.xlsx)")
-    print(f"Output resources: {len(output_resources)}")
-    print()
-
-    # Analyze by type
-    excel_outputs = [
-        r for r in output_resources if hasattr(r, "is_spreadsheet") and r.is_spreadsheet
-    ]
-    text_outputs = [
-        r for r in output_resources if hasattr(r, "is_text_format") and r.is_text_format
-    ]
-
-    print("Outputs by type:")
-    print(f"  📊 Excel files: {len(excel_outputs)}")
-    print(f"  📝 Text/Markdown files: {len(text_outputs)}")
-    print()
-
-    # Detailed analysis of each output type
-    if excel_outputs:
-        print("Excel File Analysis:")
-        print("-" * 80)
-        for resource in excel_outputs[:3]:  # Show first 3
-            print(f"  File: {Path(resource.file_path).name}")
-            print(f"    Path: {resource.file_path}")
-            print(f"    Size: {resource.size_bytes:,} bytes")
-            if resource.file_format_metadata:
-                print(
-                    f"    Sheets: {resource.file_format_metadata.get('sheet_names', 'N/A')}"
-                )
-                print(
-                    f"    Rows: {resource.file_format_metadata.get('num_rows', 'N/A')}"
-                )
-
-            # Verify file exists
-            if Path(resource.file_path).exists():
-                print("    ✓ File exists on disk")
-
-                # Try to read Excel content
-                try:
-                    import pandas as pd
-
-                    xls = pd.ExcelFile(resource.file_path)
-                    print(f"    ✓ File is valid Excel ({len(xls.sheet_names)} sheets)")
-                    for sheet in xls.sheet_names:
-                        df = pd.read_excel(xls, sheet_name=sheet)
-                        print(
-                            f"      - Sheet '{sheet}': {len(df)} rows × {len(df.columns)} columns"
-                        )
-                except Exception as e:
-                    print(f"    ✗ Could not read Excel: {e}")
-            else:
-                print("    ✗ File does not exist!")
-            print()
-
-    if text_outputs:
-        print("Text/Markdown File Analysis:")
-        print("-" * 80)
-        for resource in text_outputs[:3]:  # Show first 3
-            print(f"  File: {Path(resource.file_path).name}")
-            print(f"    Path: {resource.file_path}")
-            print(f"    Size: {resource.size_bytes:,} bytes")
-
-            # Verify file exists
-            if Path(resource.file_path).exists():
-                print("    ✓ File exists on disk")
-
-                # Try to read text content
-                try:
-                    text = resource.load_text()
-                    print(f"    ✓ File is valid text ({len(text)} characters)")
-
-                    # Show first 200 chars
-                    preview = text[:200].replace("\n", " ")
-                    if len(text) > 200:
-                        preview += "..."
-                    print(f"    Preview: {preview}")
-                except Exception as e:
-                    print(f"    ✗ Could not read text: {e}")
-            else:
-                print("    ✗ File does not exist!")
-            print()
-
-    # Validation summary
-    print("=" * 80)
-    print("✅ Phase 2 Validation Summary")
-    print("=" * 80)
-
-    validation_checks = []
-
-    # Check 1: Workers created file-based outputs
-    if len(output_resources) > 0:
-        validation_checks.append(("✓", "Workers created file-based outputs"))
-    else:
-        validation_checks.append(("✗", "No output resources created"))
-
-    # Check 2: Excel files were created
-    if len(excel_outputs) > 0:
-        validation_checks.append(
-            ("✓", f"Excel outputs created ({len(excel_outputs)} files)")
-        )
-    else:
-        validation_checks.append(("✗", "No Excel outputs created"))
-
-    # Check 3: Text/Markdown files were created
-    if len(text_outputs) > 0:
-        validation_checks.append(
-            ("✓", f"Text/Markdown outputs created ({len(text_outputs)} files)")
-        )
-    else:
-        validation_checks.append(("✗", "No text outputs created"))
-
-    # Check 4: Files exist on disk
-    existing_files = sum(1 for r in output_resources if Path(r.file_path).exists())
-    if existing_files == len(output_resources):
-        validation_checks.append(
-            ("✓", f"All {existing_files} output files exist on disk")
-        )
-    else:
-        validation_checks.append(
-            ("⚠", f"Only {existing_files}/{len(output_resources)} files exist")
-        )
-
-    # Check 5: Resources have proper metadata
-    with_metadata = sum(1 for r in output_resources if r.file_format_metadata)
-    if with_metadata > 0:
-        validation_checks.append(
-            ("✓", f"{with_metadata}/{len(output_resources)} resources have metadata")
-        )
-    else:
-        validation_checks.append(("✗", "No resources have metadata"))
-
-    print()
-    for symbol, message in validation_checks:
-        print(f"  {symbol} {message}")
-
-    print()
-    print("=" * 80)
+    return
 
 
 if __name__ == "__main__":
@@ -849,25 +757,34 @@ if __name__ == "__main__":
         type=str,
         choices=["train", "best_of_n", "ground_truth", "trained_policy"],
         default="train",
-        help="Execution mode: train (GRPO training), or baseline (best_of_n, ground_truth, trained_policy)"
+        help="Execution mode: train (GRPO training), or baseline (best_of_n, ground_truth, trained_policy)",
     )
     parser.add_argument(
         "--n-synthetic",
         type=int,
         default=2,
-        help="Number of synthetic rubrics for training mode (default: 2)"
+        help="Number of synthetic rubrics for training mode (default: 2)",
     )
     parser.add_argument(
         "--n",
         type=int,
         default=8,
-        help="Number of variants for best_of_n baseline (default: 10)"
+        help="Number of variants for best_of_n baseline (default: 10)",
     )
-    
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=1,
+        help="Number of workflows to run concurrently (tests concurrency-safety, default: 1)",
+    )
+
     args = parser.parse_args()
-    
-    asyncio.run(run_multi_agent_ml_example(
-        mode=args.mode,
-        n_synthetic=args.n_synthetic,
-        n_variants=args.n,
-    ))
+
+    asyncio.run(
+        run_multi_agent_ml_example(
+            mode=args.mode,
+            n_synthetic=args.n_synthetic,
+            n_variants=args.n,
+            batch_size=args.batch_size,
+        )
+    )

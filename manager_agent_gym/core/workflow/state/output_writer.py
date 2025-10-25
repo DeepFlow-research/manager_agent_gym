@@ -169,6 +169,13 @@ class WorkflowSerialiser:
                 ),
                 # Include pre-execution phase metrics if available
                 "pre_execution_metrics": workflow.metadata.get("pre_execution_metrics"),
+                # Include timestep evaluation results (GRPO training data)
+                "timestep_evaluation": (
+                    workflow.metadata["timestep_evaluation"].model_dump(mode="json")
+                    if "timestep_evaluation" in workflow.metadata
+                    and workflow.metadata["timestep_evaluation"] is not None
+                    else None
+                ),
             }
 
             wf_dir = self.output_config.workflow_dir
@@ -389,6 +396,17 @@ class WorkflowSerialiser:
             history_path = self.output_config.get_evaluation_results_path(
                 timestamp=self.output_config.run_id
             )
+
+            # Check if GRPO evaluation data is in workflow metadata
+            # (for GRPO training, evaluation_results list may be empty but data is in workflow.metadata)
+            grpo_data = None
+            if (
+                hasattr(self, "workflow")
+                and hasattr(self.workflow, "metadata")
+                and self.workflow.metadata
+            ):
+                grpo_data = self.workflow.metadata.get("timestep_evaluation")
+
             with open(history_path, "w") as f:
                 history_payload = {
                     "evaluation_history": [
@@ -396,6 +414,16 @@ class WorkflowSerialiser:
                     ],
                     "reward_vector": list(reward_vector or []),
                 }
+
+                # ✅ FIX: Include GRPO training data if available
+                if grpo_data is not None:
+                    history_payload["grpo_training_data"] = (
+                        grpo_data.model_dump(mode="json")
+                        if hasattr(grpo_data, "model_dump")
+                        else grpo_data
+                    )
+                    logger.info("✅ Saved GRPO training data to evaluation_results")
+
                 json.dump(history_payload, f, indent=2, default=str)
         except Exception:
             logger.error("failed saving evaluation history", exc_info=True)
@@ -438,3 +466,222 @@ class WorkflowSerialiser:
                 }
             )
         return serialized
+
+    def _save_rubric_definitions(
+        self,
+        synthetic_rubrics: list,  # list[StagedRubric]
+        ground_truth_rubrics: list,  # list[StagedRubric]
+    ) -> dict[str, str]:
+        """
+        Save all rubric definitions to rubrics/ directory.
+        
+        Returns:
+            Mapping of rubric_id -> file_path for cross-reference
+        """
+        rubrics_dir = self.output_config.get_rubrics_dir()
+        rubrics_dir.mkdir(parents=True, exist_ok=True)
+        
+        rubric_paths = {}
+        
+        # Save ground truth rubrics
+        for rubric in ground_truth_rubrics:
+            filename = f"ground_truth_{rubric.category_name.replace(' ', '_')}.json"
+            filepath = rubrics_dir / filename
+            
+            rubric_data = {
+                "rubric_id": str(rubric.id) if hasattr(rubric, 'id') else rubric.category_name,
+                "rubric_type": "ground_truth",
+                "category_name": rubric.category_name,
+                "full_rubric": rubric.model_dump(mode="json"),
+            }
+            
+            with open(filepath, "w") as f:
+                json.dump(rubric_data, f, indent=2, default=str)
+            
+            rubric_paths[rubric.category_name] = str(filepath.relative_to(self.output_config.base_dir))
+            logger.info(f"Saved ground truth rubric: {filename}")
+        
+        # Save synthetic rubrics
+        for i, rubric in enumerate(synthetic_rubrics):
+            # Extract metadata from rubric if available
+            metadata = getattr(rubric, 'metadata', None)
+            if metadata and hasattr(metadata, 'generation_seed'):
+                seed = metadata.generation_seed if metadata.generation_seed is not None else i
+            else:
+                seed = i
+            
+            filename = f"synthetic_v{i}_seed{seed}.json"
+            filepath = rubrics_dir / filename
+            
+            rubric_data = {
+                "rubric_id": str(rubric.id) if hasattr(rubric, 'id') else f"synthetic_v{i}",
+                "rubric_type": f"synthetic_v{i}",
+                "generation_seed": seed,
+                "variant_index": i,
+                "category_name": rubric.category_name,
+                "full_rubric": rubric.model_dump(mode="json"),
+                "generation_metadata": metadata.model_dump() if metadata and hasattr(metadata, 'model_dump') else {},
+            }
+            
+            with open(filepath, "w") as f:
+                json.dump(rubric_data, f, indent=2, default=str)
+            
+            rubric_paths[f"synthetic_v{i}"] = str(filepath.relative_to(self.output_config.base_dir))
+            logger.info(f"Saved synthetic rubric: {filename}")
+        
+        return rubric_paths
+
+    def _preserve_worker_outputs(
+        self,
+        task_executions: dict,  # dict[UUID, list[TaskExecution]]
+        workflow,  # Workflow
+    ) -> dict[str, dict]:
+        """
+        Copy worker output resources to permanent storage.
+        
+        Args:
+            task_executions: Mapping of task_id -> list of TaskExecutions
+            workflow: Current workflow with resource registry
+        
+        Returns:
+            Mapping of execution_id -> metadata dict
+        """
+        from pathlib import Path
+        import shutil
+        import hashlib
+        
+        outputs_dir = self.output_config.get_worker_outputs_dir()
+        outputs_dir.mkdir(parents=True, exist_ok=True)
+        
+        execution_metadata = {}
+        
+        for task_id, executions in task_executions.items():
+            for execution in executions:
+                exec_dir = outputs_dir / f"execution_{execution.id}"
+                exec_dir.mkdir(parents=True, exist_ok=True)
+                
+                # Get resources from execution result
+                resources = []
+                if execution.execution_result and execution.execution_result.output_resources:
+                    resources = execution.execution_result.output_resources
+                
+                preserved_resources = []
+                
+                for resource in resources:
+                    # Copy file to permanent storage
+                    if resource.file_path and Path(resource.file_path).exists():
+                        # Sanitize filename
+                        safe_name = resource.name.replace('/', '_').replace('\\', '_')
+                        dest_path = exec_dir / safe_name
+                        
+                        try:
+                            shutil.copy2(resource.file_path, dest_path)
+                            
+                            # Compute SHA256 for integrity
+                            sha256_hash = hashlib.sha256()
+                            with open(dest_path, "rb") as f:
+                                for byte_block in iter(lambda: f.read(4096), b""):
+                                    sha256_hash.update(byte_block)  # type: ignore[arg-type]
+                            
+                            preserved_resources.append({
+                                "resource_id": str(resource.id),
+                                "name": resource.name,
+                                "mime_type": resource.mime_type,
+                                "size_bytes": resource.size_bytes,
+                                "role": resource.resource_role,
+                                "local_path": safe_name,
+                                "original_path": resource.file_path,
+                                "sha256": sha256_hash.hexdigest(),
+                            })
+                            
+                        except Exception as e:
+                            logger.warning(f"Failed to copy resource {resource.name}: {e}")
+                
+                # Save execution metadata
+                metadata = {
+                    "execution_id": str(execution.id),
+                    "variant_index": execution.variant_index,
+                    "task_id": str(execution.task_id),
+                    "task_name": workflow.tasks[execution.task_id].name,
+                    "guided_by_rubric_type": execution.metadata.get("rubric_type"),
+                    "generation_seed": execution.metadata.get("generation_seed"),
+                    "agent_id": execution.agent_id,
+                    "resources": preserved_resources,
+                    "execution_metadata": {
+                        "execution_time_seconds": execution.execution_result.execution_time_seconds if execution.execution_result else None,
+                        "simulated_duration_hours": execution.execution_result.simulated_duration_hours if execution.execution_result else None,
+                        "actual_cost": execution.execution_result.actual_cost if execution.execution_result else None,
+                    },
+                }
+                
+                with open(exec_dir / "metadata.json", "w") as f:
+                    json.dump(metadata, f, indent=2, default=str)
+                
+                execution_metadata[str(execution.id)] = metadata
+                logger.info(f"Preserved outputs for execution {execution.id}: {len(preserved_resources)} resources")
+        
+        return execution_metadata
+
+    def save_enhanced_evaluation_data(
+        self,
+        synthetic_rubrics: list,
+        ground_truth_rubrics: list,
+        task_executions: dict,
+        workflow,
+    ) -> None:
+        """
+        Save comprehensive evaluation data for deferred calibration analysis.
+        
+        This saves everything needed for batch re-evaluation:
+        - All rubric definitions (synthetic + ground truth)
+        - Worker output resources (copied to permanent storage)
+        - Execution metadata (which rubric guided which worker)
+        - Manifest for batch re-evaluation script
+        """
+        from datetime import datetime
+        
+        try:
+            logger.info("Saving enhanced evaluation data for calibration analysis...")
+            
+            # 1. Save rubric definitions
+            rubric_paths = self._save_rubric_definitions(
+                synthetic_rubrics=synthetic_rubrics,
+                ground_truth_rubrics=ground_truth_rubrics,
+            )
+            
+            # 2. Preserve worker outputs
+            execution_metadata = self._preserve_worker_outputs(
+                task_executions=task_executions,
+                workflow=workflow,
+            )
+            
+            # 3. Create re-evaluation manifest
+            calibration_dir = self.output_config.get_calibration_dir()
+            calibration_dir.mkdir(parents=True, exist_ok=True)
+            
+            manifest = {
+                "run_id": self.output_config.run_id,
+                "timestamp": datetime.now().isoformat(),
+                "workflow_id": str(workflow.id),
+                "workflow_name": workflow.name,
+                "rubric_paths": rubric_paths,
+                "execution_metadata": execution_metadata,
+                "num_synthetic_rubrics": len(synthetic_rubrics),
+                "num_ground_truth_rubrics": len(ground_truth_rubrics),
+                "num_executions": len(execution_metadata),
+                "instructions": {
+                    "description": "Use batch_evaluate_calibration.py to compute synthetic evaluations",
+                    "command": f"python -m examples.research.batch_evaluate_calibration {self.output_config.base_dir}",
+                }
+            }
+            
+            with open(calibration_dir / "re_evaluation_manifest.json", "w") as f:
+                json.dump(manifest, f, indent=2, default=str)
+            
+            logger.info("✅ Saved enhanced evaluation data:")
+            logger.info(f"   - {len(rubric_paths)} rubrics")
+            logger.info(f"   - {len(execution_metadata)} worker outputs")
+            logger.info("   - Re-evaluation manifest created")
+            
+        except Exception as e:
+            logger.error(f"Failed to save enhanced evaluation data: {e}", exc_info=True)

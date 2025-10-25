@@ -1,4 +1,5 @@
 import asyncio
+from typing import TYPE_CHECKING
 
 from manager_agent_gym.core.agents.manager_agent.common.interface import ManagerAgent
 from manager_agent_gym.schemas.manager import ManagerObservation
@@ -15,12 +16,14 @@ from manager_agent_gym.core.agents.manager_agent.common.action_constraints impor
 from manager_agent_gym.schemas.domain.workflow import Workflow
 from manager_agent_gym.core.execution.schemas.state import ExecutionState
 from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
-from manager_agent_gym.core.common.llm_interface import generate_structured_response
 from manager_agent_gym.core.common.logging import logger
 from manager_agent_gym.core.agents.workflow_agents.common.interface import AgentConfig
 from manager_agent_gym.schemas.agents.stakeholder import (
     StakeholderPublicProfile,
 )
+
+if TYPE_CHECKING:
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 
 
 class BulkAssignmentPromptBuilder:
@@ -63,10 +66,16 @@ class BulkAssignmentPromptBuilder:
 class OneShotDelegateManagerAgent(ManagerAgent):
     """Baseline: delegate all pending tasks to any agent exactly once, then no-op."""
 
-    def __init__(self, preferences: PreferenceSnapshot, model_name: str = "o3"):
+    def __init__(
+        self,
+        preferences: PreferenceSnapshot,
+        llm_generator: "LLMGenerator",
+        model_name: str = "o3",
+    ):
         super().__init__(agent_id="oneshot_delegate_manager", preferences=preferences)
         self._has_delegated = False
         self.model_name = model_name
+        self.llm_generator = llm_generator
 
     async def take_action(self, observation: ManagerObservation) -> BaseManagerAction:
         await asyncio.sleep(0.5)
@@ -98,13 +107,19 @@ class OneShotDelegateManagerAgent(ManagerAgent):
                 available_agent_configs=(non_stakeholders or []),
             )
 
-            parsed = await generate_structured_response(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                response_type=constrained_schema,
-                model=self.model_name,
-                seed=self._seed,
+            # Use Agents SDK approach
+            from agents import Agent
+            from agents.run import Runner
+
+            agent = Agent(
+                name="oneshot_delegator",
+                model=self.llm_generator,
+                instructions=system_prompt,
+                output_type=constrained_schema,
             )
+
+            agent_result = await Runner.run(agent, user_prompt)
+            parsed = agent_result.final_output
 
             action: AssignTasksToAgentsAction = parsed.action  # type: ignore[attr-defined]
 

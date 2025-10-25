@@ -2,6 +2,7 @@ import random
 import asyncio
 import traceback
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from manager_agent_gym.core.agents.manager_agent.common.interface import ManagerAgent
 from manager_agent_gym.schemas.manager import ManagerObservation
@@ -27,12 +28,14 @@ from manager_agent_gym.core.agents.manager_agent.common.llm_action_utils import 
 from manager_agent_gym.core.agents.manager_agent.prompts.structured_manager_prompts import (
     STRUCTURED_MANAGER_SYSTEM_PROMPT_TEMPLATE,
 )
-from manager_agent_gym.core.common.llm_interface import generate_structured_response
 from manager_agent_gym.core.common.logging import logger
 from manager_agent_gym.core.agents.workflow_agents.common.interface import AgentConfig
 from manager_agent_gym.schemas.agents.stakeholder import (
     StakeholderPublicProfile,
 )
+
+if TYPE_CHECKING:
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 
 
 class RandomManagerAgent(ManagerAgent):
@@ -127,6 +130,7 @@ class RandomManagerAgentV2(ManagerAgent):
     def __init__(
         self,
         preferences: PreferenceSnapshot,
+        llm_generator: "LLMGenerator",
         model_name: str = "o3",
         allowed_action_classes: list[type[BaseManagerAction]] | None = None,
         seed: int = 42,
@@ -137,6 +141,7 @@ class RandomManagerAgentV2(ManagerAgent):
             allowed_action_classes or get_default_action_classes()
         )
         self.random = random.Random(seed)
+        self.llm_generator = llm_generator
 
     def configure_seed(self, seed: int) -> None:
         self._seed = seed
@@ -158,13 +163,19 @@ class RandomManagerAgentV2(ManagerAgent):
             )
             user_prompt = self._prepare_context(observation, selected_class)
 
-            parsed_action = await generate_structured_response(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                response_type=constrained_schema,
-                model=self.model_name,
-                seed=self._seed,
+            # Use Agents SDK approach
+            from agents import Agent
+            from agents.run import Runner
+
+            agent = Agent(
+                name="random_manager",
+                model=self.llm_generator,
+                instructions=system_prompt,
+                output_type=constrained_schema,
             )
+
+            agent_result = await Runner.run(agent, user_prompt)
+            parsed_action = agent_result.final_output
 
             return parsed_action.action  # type: ignore[attr-defined]
 

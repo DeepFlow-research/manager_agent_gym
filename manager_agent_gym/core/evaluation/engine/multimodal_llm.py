@@ -7,22 +7,23 @@ by preprocessing files into multimodal prompts.
 
 import base64
 import logging
+import os
 import tempfile
 from pathlib import Path
 from typing import Any
 
+import instructor
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
 from manager_agent_gym.schemas.domain.resource import Resource
-from manager_agent_gym.core.common.llm_interface import _get_openai_client
 
 logger = logging.getLogger(__name__)
 
 
 class _MultimodalLLMResponse(BaseModel):
     """Internal: Structured response format for multimodal LLM evaluation.
-    
+
     This is a private class used only for parsing GPT-4 Vision responses.
     Not to be confused with the public EvaluationResult in preferences.evaluation.
     """
@@ -49,9 +50,11 @@ class MultimodalEvaluator:
         Args:
             client: OpenAI async client (creates default if None)
         """
-        self.client = client or AsyncOpenAI()
-        # Get Instructor-patched client for structured outputs
-        self.instructor_client = _get_openai_client()
+        # Create base OpenAI client
+        base_client = client or AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        self.client = base_client
+        # Patch with Instructor for structured outputs
+        self.instructor_client = instructor.from_openai(base_client)
 
     async def evaluate_with_vision(
         self,
@@ -76,6 +79,17 @@ class MultimodalEvaluator:
         """
         logger.info(f"Evaluating {len(resources)} resources with multimodal LLM")
 
+        # Log detailed resource information
+        for idx, resource in enumerate(resources):
+            logger.info(
+                f"Starting evaluation of {len(resources)} resources with multimodal LLM"
+                f"  Resource {idx + 1}/{len(resources)}: "
+                f"name='{resource.name}', "
+                f"mime_type={resource.mime_type}, "
+                f"file_path={resource.file_path}, "
+                f"size={resource.size_bytes} bytes"
+            )
+
         # Prepare multimodal content
         content: list[dict[str, Any]] = [
             {
@@ -85,10 +99,12 @@ class MultimodalEvaluator:
         ]
 
         for idx, resource in enumerate(resources):
+            # Include resource role to help evaluator distinguish outputs from intermediaries
+            role_label = resource.resource_role or "output"
             content.append(
                 {
                     "type": "text",
-                    "text": f"\n\n--- Resource {idx + 1}: {resource.name} ---",
+                    "text": f"\n\n--- Resource {idx + 1}: {resource.name} (role: {role_label}) ---",
                 }
             )
 
@@ -147,10 +163,15 @@ class MultimodalEvaluator:
 Definition and setting:
 - Task outputs in this system are multimodal resources (Excel files, PDFs, Markdown reports, images) produced by AI agents completing workflow tasks.
 - You will be shown the FULL CONTENT of all output resources: PDFs as images, Excel sheets as rendered tables, text/markdown directly, etc.
+- Each resource is labeled with its role: "output" (final deliverable) or "intermediary" (working file/process artifact).
 
 Evaluation framing:
 - Your job is to assess how well the artifacts meet specific quality criteria defined in the EVALUATION CRITERIA below (treat it as a detailed rubric).
 - The criteria may cover structure, correctness, formatting, completeness, professionalism, or other aspects.
+- **CRITICAL**: Focus your evaluation on resources marked with role="output" (the final deliverables). Intermediary files are shown for context only.
+  - For FORMAT/STRUCTURE checks: Only evaluate final outputs (role="output"). Intermediary files are part of the process and should NOT be critiqued for format issues.
+  - For QUALITY/CORRECTNESS checks: Use intermediary files as supporting evidence if helpful, but score based on the final outputs.
+  - If the criteria explicitly mentions "process" or "working files", then consider intermediaries; otherwise, focus on final outputs.
 
 Instructions:
 - Carefully read the EVALUATION CRITERIA and operationalize them as checkable conditions.

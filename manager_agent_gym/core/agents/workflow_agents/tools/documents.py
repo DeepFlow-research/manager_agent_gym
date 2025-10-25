@@ -555,6 +555,8 @@ async def _save_markdown(content: str, file_name: str) -> dict[str, Any]:
 
 def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool]:
     """Create document processing tools for OpenAI SDK."""
+    from manager_agent_gym.core.workflow.context import AgentExecutionContext
+    from agents import RunContextWrapper
 
     @function_tool
     async def read_pdf(file_path: str) -> str:
@@ -618,13 +620,20 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
         return json.dumps(result, indent=2)
 
     @function_tool
-    async def merge_pdfs(pdf_paths: list[str], output_path: str) -> str:
+    async def merge_pdfs(
+        ctx: RunContextWrapper[AgentExecutionContext],
+        pdf_paths: list[str],
+        output_path: str,
+    ) -> str:
         """
         Combine multiple PDF files into a single unified PDF document.
 
         This tool takes multiple PDF files and merges them in the order provided,
         creating one consolidated PDF. Useful for combining reports, chapters, or
         related documents into a single file.
+
+        **✨ AUTOMATIC FILE TRACKING:**
+        Files you create are **automatically tracked as resources**!
 
         Parameters:
             pdf_paths (list[str]):
@@ -636,8 +645,7 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
 
         Returns:
             str:
-                Success message with the number of PDFs merged and output location,
-                or an error message if the operation fails.
+                Human-readable summary: "✅ Merged X PDFs into: filename.pdf"
 
         Usage:
             Call this tool when you need to combine multiple PDF documents into one file.
@@ -646,15 +654,42 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
             scanned pages.
         """
         result = await _merge_pdfs(pdf_paths, output_path)
+
+        # AUTO-REGISTER: Track created file as intermediary resource
         if result["success"]:
-            return (
-                f"Successfully merged {result['merged_count']} PDFs into {output_path}"
-            )
-        return f"Error: {result.get('error', 'Unknown error')}"
+            from pathlib import Path
+
+            try:
+                if ctx.context:
+                    from manager_agent_gym.schemas.domain.resource import Resource
+
+                    filename = Path(result["output_path"]).name
+                    file_size = Path(result["output_path"]).stat().st_size
+                    ctx.context.register_created_resource(
+                        Resource(
+                            name=f"Generated: {filename}",
+                            description="Auto-created by merge_pdfs tool",
+                            file_path=result["output_path"],
+                            mime_type="application/pdf",
+                            size_bytes=file_size,
+                            resource_role="intermediary",
+                        )
+                    )
+            except Exception as e:
+                from manager_agent_gym.core.common.logging import logger
+
+                logger.warning(f"Failed to auto-register merged PDF resource: {e}")
+
+            return f"✅ Merged {result['merged_count']} PDFs into: {Path(result['output_path']).name}\nLocation: {result['output_path']}"
+
+        return f"❌ Error merging PDFs: {result.get('error', 'Unknown error')}"
 
     @function_tool
     async def create_simple_pdf(
-        text_content: str, output_path: str, title: str | None = None
+        ctx: RunContextWrapper[AgentExecutionContext],
+        text_content: str,
+        output_path: str,
+        title: str | None = None,
     ) -> str:
         """
         Generate a formatted PDF document from plain text content.
@@ -662,6 +697,9 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
         This tool creates a professional-looking PDF from text content, with optional
         title formatting. The text is automatically formatted with proper line spacing,
         margins, and pagination. Paragraphs separated by double newlines are preserved.
+
+        **✨ AUTOMATIC FILE TRACKING:**
+        Files you create are **automatically tracked as resources**!
 
         Parameters:
             text_content (str):
@@ -675,8 +713,7 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
 
         Returns:
             str:
-                Success message with the output path and file size, or an error message
-                if PDF creation fails.
+                Human-readable summary: "✅ Created PDF: filename.pdf"
 
         Usage:
             Use this tool to create PDF documents from generated text, reports, summaries,
@@ -684,9 +721,35 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
             formal documents, reports, or letters.
         """
         result = await _create_pdf(text_content, output_path, title)
+
+        # AUTO-REGISTER: Track created file as intermediary resource
         if result["success"]:
-            return f"Successfully created PDF at {result['output_path']}"
-        return f"Error: {result.get('error', 'Unknown error')}"
+            from pathlib import Path
+
+            try:
+                if ctx.context:
+                    from manager_agent_gym.schemas.domain.resource import Resource
+
+                    filename = Path(result["output_path"]).name
+                    file_size = Path(result["output_path"]).stat().st_size
+                    ctx.context.register_created_resource(
+                        Resource(
+                            name=f"Generated: {filename}",
+                            description="Auto-created by create_simple_pdf tool",
+                            file_path=result["output_path"],
+                            mime_type="application/pdf",
+                            size_bytes=file_size,
+                            resource_role="intermediary",
+                        )
+                    )
+            except Exception as e:
+                from manager_agent_gym.core.common.logging import logger
+
+                logger.warning(f"Failed to auto-register PDF resource: {e}")
+
+            return f"✅ Created PDF: {Path(result['output_path']).name}\nLocation: {result['output_path']}"
+
+        return f"❌ Error creating PDF: {result.get('error', 'Unknown error')}"
 
     @function_tool
     async def read_docx(file_path: str) -> str:
@@ -719,6 +782,7 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
 
     @function_tool
     async def create_docx(
+        ctx: RunContextWrapper[AgentExecutionContext],
         content: str,
         output_path: str,
         title: str | None = None,
@@ -731,6 +795,10 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
         Markdown-style headings (# for Heading 1, ## for Heading 2, etc.) and offers
         different template styles for various document types like formal letters, memos,
         or standard documents.
+
+        **✨ AUTOMATIC FILE TRACKING:**
+        Files you create are **automatically tracked as resources**! Just create the file
+        and reference it in your notes - the system handles resource management.
 
         Parameters:
             content (str):
@@ -748,8 +816,7 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
 
         Returns:
             str:
-                Success message with the output path and file size, or an error message
-                if document creation fails.
+                Human-readable summary: "✅ Created Word document: filename.docx (X KB)"
 
         Usage:
             Use this tool to create professional Word documents for reports, letters,
@@ -757,9 +824,36 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
             communication needs.
         """
         result = await _create_docx(content, output_path, title, template_style)
+
+        # AUTO-REGISTER: Track created file as intermediary resource
         if result["success"]:
-            return f"Successfully created DOCX document at {result['output_path']}"
-        return f"Error: {result.get('error', 'Unknown error')}"
+            from pathlib import Path
+
+            try:
+                if ctx.context:
+                    from manager_agent_gym.schemas.domain.resource import Resource
+
+                    filename = Path(result["output_path"]).name
+                    ctx.context.register_created_resource(
+                        Resource(
+                            name=f"Generated: {filename}",
+                            description="Auto-created by create_docx tool",
+                            file_path=result["output_path"],
+                            mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            size_bytes=result["file_size"],
+                            resource_role="intermediary",
+                        )
+                    )
+            except Exception as e:
+                from manager_agent_gym.core.common.logging import logger
+
+                logger.warning(f"Failed to auto-register DOCX resource: {e}")
+
+            return f"✅ Created Word document: {Path(result['output_path']).name} ({result['file_size']} bytes)\nLocation: {result['output_path']}"
+
+        return (
+            f"❌ Error creating Word document: {result.get('error', 'Unknown error')}"
+        )
 
     @function_tool
     async def add_table_to_docx(
@@ -831,13 +925,18 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
         return json.dumps(result, indent=2)
 
     @function_tool
-    async def convert_docx_to_pdf(docx_path: str, output_path: str) -> str:
+    async def convert_docx_to_pdf(
+        ctx: RunContextWrapper[AgentExecutionContext], docx_path: str, output_path: str
+    ) -> str:
         """
         Convert a Microsoft Word document to PDF format while preserving formatting.
 
         This tool converts .docx or .doc files to PDF format using LibreOffice, preserving all
         formatting, styles, images, and layout. The resulting PDF maintains the
         professional appearance of the original Word document.
+
+        **✨ AUTOMATIC FILE TRACKING:**
+        Files you create are **automatically tracked as resources**!
 
         IMPORTANT: This tool ONLY accepts Word documents (.docx, .doc files).
         If you have Markdown (.md) or other formats, convert them to DOCX first using
@@ -855,8 +954,7 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
 
         Returns:
             str:
-                Success message with the output path, or an error message if conversion
-                fails (e.g., LibreOffice not installed, file not found, wrong file type).
+                Human-readable summary: "✅ Converted to PDF: filename.pdf"
 
         Usage:
             Call this tool when you need to convert Word documents to PDF for sharing,
@@ -866,12 +964,42 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
             For Markdown files: First use 'convert_markdown_to_docx', then use this tool.
         """
         result = await _convert_docx_to_pdf(docx_path, output_path)
+
+        # AUTO-REGISTER: Track created file as intermediary resource
         if result["success"]:
-            return f"Successfully converted DOCX to PDF at {result['output_path']}"
-        return f"Error: {result.get('error', 'Unknown error')}"
+            from pathlib import Path
+
+            try:
+                if ctx.context:
+                    from manager_agent_gym.schemas.domain.resource import Resource
+
+                    filename = Path(result["output_path"]).name
+                    file_size = Path(result["output_path"]).stat().st_size
+                    ctx.context.register_created_resource(
+                        Resource(
+                            name=f"Generated: {filename}",
+                            description="Auto-created by convert_docx_to_pdf tool",
+                            file_path=result["output_path"],
+                            mime_type="application/pdf",
+                            size_bytes=file_size,
+                            resource_role="intermediary",
+                        )
+                    )
+            except Exception as e:
+                from manager_agent_gym.core.common.logging import logger
+
+                logger.warning(f"Failed to auto-register converted PDF resource: {e}")
+
+            return f"✅ Converted to PDF: {Path(result['output_path']).name}\nLocation: {result['output_path']}"
+
+        return f"❌ Error converting to PDF: {result.get('error', 'Unknown error')}"
 
     @function_tool
-    async def convert_markdown_to_docx(markdown_content: str, output_path: str) -> str:
+    async def convert_markdown_to_docx(
+        ctx: RunContextWrapper[AgentExecutionContext],
+        markdown_content: str,
+        output_path: str,
+    ) -> str:
         """
         Convert Markdown-formatted text into a professionally styled Word document.
 
@@ -879,6 +1007,9 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
         Headings, lists, code blocks, and paragraphs are all converted to appropriate
         Word styles. Perfect for turning documentation, notes, or Markdown files into
         editable Word documents.
+
+        **✨ AUTOMATIC FILE TRACKING:**
+        Files you create are **automatically tracked as resources**!
 
         Parameters:
             markdown_content (str):
@@ -893,8 +1024,7 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
 
         Returns:
             str:
-                Success message with the output path and file size, or an error message
-                if conversion fails.
+                Human-readable summary: "✅ Converted Markdown to DOCX: filename.docx"
 
         Usage:
             Use this tool to convert Markdown content (from files, generated text, or
@@ -902,13 +1032,42 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
             Markdown documentation or converting notes into formal documents.
         """
         result = await _convert_markdown_to_docx(markdown_content, output_path)
+
+        # AUTO-REGISTER: Track created file as intermediary resource
         if result["success"]:
-            return f"Successfully converted Markdown to DOCX at {result['output_path']}"
-        return f"Error: {result.get('error', 'Unknown error')}"
+            from pathlib import Path
+
+            try:
+                if ctx.context:
+                    from manager_agent_gym.schemas.domain.resource import Resource
+
+                    filename = Path(result["output_path"]).name
+                    file_size = Path(result["output_path"]).stat().st_size
+                    ctx.context.register_created_resource(
+                        Resource(
+                            name=f"Generated: {filename}",
+                            description="Auto-created by convert_markdown_to_docx tool",
+                            file_path=result["output_path"],
+                            mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            size_bytes=file_size,
+                            resource_role="intermediary",
+                        )
+                    )
+            except Exception as e:
+                from manager_agent_gym.core.common.logging import logger
+
+                logger.warning(f"Failed to auto-register converted DOCX resource: {e}")
+
+            return f"✅ Converted Markdown to DOCX: {Path(result['output_path']).name}\nLocation: {result['output_path']}"
+
+        return f"❌ Error converting Markdown to DOCX: {result.get('error', 'Unknown error')}"
 
     @function_tool
     async def convert_text_to_docx(
-        text_content: str, output_path: str, font_size: int = 11
+        ctx: RunContextWrapper[AgentExecutionContext],
+        text_content: str,
+        output_path: str,
+        font_size: int = 11,
     ) -> str:
         """
         Convert plain text into a Word document with customizable font size.
@@ -916,6 +1075,9 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
         This tool takes plain text and creates a simple Word document with consistent
         formatting. Paragraphs separated by double newlines are preserved. Useful for
         converting plain text files or generated content into editable Word documents.
+
+        **✨ AUTOMATIC FILE TRACKING:**
+        Files you create are **automatically tracked as resources**!
 
         Parameters:
             text_content (str):
@@ -929,8 +1091,7 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
 
         Returns:
             str:
-                Success message with the output path and file size, or an error message
-                if conversion fails.
+                Human-readable summary: "✅ Converted text to DOCX: filename.docx"
 
         Usage:
             Use this tool to convert plain text content into editable Word documents.
@@ -938,19 +1099,51 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
             that can be easily formatted and shared.
         """
         result = await _convert_text_to_docx(text_content, output_path, font_size)
+
+        # AUTO-REGISTER: Track created file as intermediary resource
         if result["success"]:
-            return f"Successfully converted text to DOCX at {result['output_path']}"
-        return f"Error: {result.get('error', 'Unknown error')}"
+            from pathlib import Path
+
+            try:
+                if ctx.context:
+                    from manager_agent_gym.schemas.domain.resource import Resource
+
+                    filename = Path(result["output_path"]).name
+                    file_size = Path(result["output_path"]).stat().st_size
+                    ctx.context.register_created_resource(
+                        Resource(
+                            name=f"Generated: {filename}",
+                            description="Auto-created by convert_text_to_docx tool",
+                            file_path=result["output_path"],
+                            mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            size_bytes=file_size,
+                            resource_role="intermediary",
+                        )
+                    )
+            except Exception as e:
+                from manager_agent_gym.core.common.logging import logger
+
+                logger.warning(f"Failed to auto-register converted DOCX resource: {e}")
+
+            return f"✅ Converted text to DOCX: {Path(result['output_path']).name}\nLocation: {result['output_path']}"
+
+        return (
+            f"❌ Error converting text to DOCX: {result.get('error', 'Unknown error')}"
+        )
 
     @function_tool
-    async def save_text_as_markdown(content: str, file_name: str) -> str:
+    async def save_text_as_markdown(
+        ctx: RunContextWrapper[AgentExecutionContext], content: str, file_name: str
+    ) -> str:
         """
         Save text content as a Markdown (.md) file with automatic formatting detection.
 
         This tool saves text content as a Markdown file, automatically appending the .md
-        extension if needed. It provides detailed metadata about the saved file including
-        word count, line count, and number of headings. Perfect for saving documentation,
-        notes, or formatted text.
+        extension if needed. Perfect for saving documentation, notes, or formatted text.
+
+        **✨ AUTOMATIC FILE TRACKING:**
+        Files you create are **automatically tracked as resources**! Just create the file
+        and reference it in your notes - the system handles resource management.
 
         Parameters:
             content (str):
@@ -962,12 +1155,7 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
 
         Returns:
             str:
-                JSON string containing:
-                - file_path: Full path to the saved file
-                - file_name: Name of the saved file
-                - size_bytes: File size in bytes
-                - content_summary: Statistics (line count, word count, heading count, preview)
-                - message: Success summary
+                Human-readable summary: "✅ Saved markdown: filename.md (X words)"
 
         Usage:
             Use this tool to save generated or processed text as Markdown files. Ideal for
@@ -975,20 +1163,36 @@ def create_documents_tools(resource_manager: "ResourceFileManager") -> list[Tool
             might be used later or shared with others.
         """
         result = await _save_markdown(content, file_name)
+
+        # AUTO-REGISTER: Track created file as intermediary resource
         if result["success"]:
-            return json.dumps(
-                {
-                    "success": True,
-                    "file_path": result["file_path"],
-                    "file_name": result["file_name"],
-                    "mime_type": result["mime_type"],
-                    "size_bytes": result["size_bytes"],
-                    "content_summary": result["content_summary"],
-                    "message": f"Saved markdown document '{result['file_name']}' with {result['content_summary']['word_count']} words",
-                },
-                indent=2,
+            try:
+                if ctx.context:
+                    from manager_agent_gym.schemas.domain.resource import Resource
+
+                    ctx.context.register_created_resource(
+                        Resource(
+                            name=f"Generated: {result['file_name']}",
+                            description="Auto-created by save_text_as_markdown tool",
+                            file_path=result["file_path"],
+                            mime_type=result["mime_type"],
+                            size_bytes=result["size_bytes"],
+                            resource_role="intermediary",
+                        )
+                    )
+            except Exception as e:
+                from manager_agent_gym.core.common.logging import logger
+
+                logger.warning(f"Failed to auto-register markdown resource: {e}")
+
+            word_count = result["content_summary"]["word_count"]
+            return (
+                f"✅ Saved markdown: {result['file_name']} "
+                f"({word_count} words, {result['size_bytes']} bytes)\n"
+                f"Location: {result['file_path']}"
             )
-        return json.dumps({"success": False, "error": result.get("error")})
+
+        return f"❌ Error saving markdown: {result.get('error', 'Unknown error')}"
 
     return [
         read_pdf,

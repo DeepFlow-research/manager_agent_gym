@@ -8,6 +8,10 @@ through stakeholder clarification dialogue.
 import traceback
 from typing import TYPE_CHECKING, cast
 from collections import defaultdict
+from uuid import UUID
+
+from agents import Agent, Runner
+from agents.agent_output import AgentOutputSchema
 
 from manager_agent_gym.core.agents.manager_agent.implementations.chain_of_thought import (
     ChainOfThoughtManagerAgent,
@@ -23,9 +27,8 @@ from manager_agent_gym.core.agents.manager_agent.actions import (
 from manager_agent_gym.core.common.logging import logger
 from manager_agent_gym.core.common.llm_interface import (
     LLMInferenceTruncationError,
-    generate_structured_response,
-    StructuredLLMResponse,
     calculate_llm_cost,
+    LLMUsage,
 )
 from manager_agent_gym.core.agents.manager_agent.common.action_constraints import (
     build_context_constrained_action_schema,
@@ -41,6 +44,7 @@ from manager_agent_gym.schemas.manager import ManagerObservation
 if TYPE_CHECKING:
     from manager_agent_gym.core.communication.service import CommunicationService
     from manager_agent_gym.schemas.domain.communication import Message
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 
 
 class RubricDecompositionManagerAgent(ChainOfThoughtManagerAgent):
@@ -60,6 +64,7 @@ class RubricDecompositionManagerAgent(ChainOfThoughtManagerAgent):
 
     def __init__(
         self,
+        llm_generator: "LLMGenerator",
         model_name: str = "gpt-4o",
         max_clarification_budget: int = 1,
         seed: int = 42,
@@ -67,6 +72,7 @@ class RubricDecompositionManagerAgent(ChainOfThoughtManagerAgent):
         """Initialize rubric decomposition manager.
 
         Args:
+            llm_generator: LLM generator (shared across workflow for training)
             model_name: LLM model for decision-making
             max_clarification_budget: Maximum clarification TURNS allowed (not individual questions)
             seed: Random seed for reproducibility
@@ -90,8 +96,10 @@ class RubricDecompositionManagerAgent(ChainOfThoughtManagerAgent):
             model_name=model_name,
             action_classes=decomposition_actions,
             manager_persona="Rubric Decomposition Specialist",
+            llm_generator=llm_generator,
         )
 
+        self.llm_generator = llm_generator
         self.max_clarification_budget = max_clarification_budget
         self.current_clarification_budget = 0
         self.configure_seed(seed)
@@ -103,24 +111,49 @@ class RubricDecompositionManagerAgent(ChainOfThoughtManagerAgent):
         self.accumulated_llm_cost_usd: float = 0.0
         self.total_llm_calls: int = 0
 
+        # Thread context for parallel rubric generation (None = backward compatible)
+        self.current_thread_id: UUID | None = None
+
         logger.info(
             f"Initialized RubricDecompositionManagerAgent (discovery mode), "
             f"budget={max_clarification_budget}, model={model_name}"
         )
+
+    def set_thread_context(self, thread_id: UUID | None) -> None:
+        """Set thread context for scoped operation.
+
+        Args:
+            thread_id: Thread ID to scope operations to, or None for global
+        """
+        self.current_thread_id = thread_id
+        if thread_id:
+            logger.debug(
+                f"RubricDecompositionManagerAgent: Set thread context to {thread_id}"
+            )
 
     def _read_stakeholder_messages(
         self, communication_service: "CommunicationService"
     ) -> dict[str, list["Message"]]:
         """Read messages from communication service and group by sender.
 
+        If thread context is set, only reads messages from that thread.
+
         Returns:
             Dict mapping sender_id -> list of messages
         """
         try:
-            all_messages = communication_service.get_messages_for_agent(
-                agent_id="decomposition_manager",
-                limit=100,
-            )
+            if self.current_thread_id:
+                # Thread-scoped: get messages from current thread only
+                all_messages = communication_service.get_messages_in_thread(
+                    thread_id=self.current_thread_id,
+                    limit=100,
+                )
+            else:
+                # Global: get all messages for this agent (backward compatible)
+                all_messages = communication_service.get_messages_for_agent(
+                    agent_id="decomposition_manager",
+                    limit=100,
+                )
 
             # Group by sender, filter out already processed
             messages_by_sender = defaultdict(list)
@@ -198,12 +231,16 @@ class RubricDecompositionManagerAgent(ChainOfThoughtManagerAgent):
         return "\n".join(context_parts)
 
     def reset(self) -> None:
-        """Reset manager state for new decomposition phase."""
+        """Reset manager state for new decomposition phase.
+
+        Note: Preserves thread context - call set_thread_context(None) to clear it.
+        """
         super().reset()
         self._processed_message_ids.clear()
         self.current_clarification_budget = 0
         self.accumulated_llm_cost_usd = 0.0
         self.total_llm_calls = 0
+        # Note: current_thread_id is NOT reset - it persists across dialogue turns
         logger.debug("RubricDecompositionManagerAgent reset")
 
     async def take_action(self, observation: ManagerObservation) -> BaseManagerAction:
@@ -235,31 +272,33 @@ class RubricDecompositionManagerAgent(ChainOfThoughtManagerAgent):
             system_prompt = RUBRIC_DECOMPOSITION_SYSTEM_PROMPT
             user_prompt = self._prepare_context(observation)
 
-            # Direct LLM call with structured output (validated by Pydantic)
-            response = await generate_structured_response(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                response_type=constrained_schema,
-                model=self.model_name,
-                seed=self._seed,
-                return_usage=True,  # Track token usage for cost calculation
+            # Create fresh Agent with dynamic schema for OpenAI tracing
+            temp_agent = Agent(
+                model=self.llm_generator,
+                name=f"{self.agent_id}_rubric_decision",
+                instructions=system_prompt,
+                output_type=AgentOutputSchema(constrained_schema),
             )
 
-            # Extract result and calculate cost
-            if isinstance(response, StructuredLLMResponse):
-                parsed_action = response.result
-                if response.usage:
-                    cost = calculate_llm_cost(response.usage, self.model_name)
-                    self.accumulated_llm_cost_usd += cost
-                    self.total_llm_calls += 1
-                    logger.debug(
-                        f"LLM call cost: ${cost:.4f} (total: ${self.accumulated_llm_cost_usd:.4f}, calls: {self.total_llm_calls})"
-                    )
-            else:
-                # Fallback if return_usage=False
-                parsed_action = response
+            # Run agent to get traced decision in OpenAI dashboard
+            result = await Runner.run(temp_agent, user_prompt)
 
-            action = parsed_action.action  # type: ignore[attr-defined]
+            # Extract action from structured output
+            parsed_response = result.final_output
+            action = parsed_response.action  # type: ignore[attr-defined]
+
+            # Track usage and cost
+            if result.context_wrapper and result.context_wrapper.usage:
+                usage = LLMUsage(
+                    input_tokens=result.context_wrapper.usage.input_tokens,
+                    output_tokens=result.context_wrapper.usage.output_tokens,
+                )
+                cost = calculate_llm_cost(usage, self.model_name)
+                self.accumulated_llm_cost_usd += cost
+                self.total_llm_calls += 1
+                logger.debug(
+                    f"LLM call cost: ${cost:.4f} (total: ${self.accumulated_llm_cost_usd:.4f}, calls: {self.total_llm_calls})"
+                )
 
             # Increment budget by 1 per turn (not per question)
             if isinstance(action, AskClarificationQuestionsAction):

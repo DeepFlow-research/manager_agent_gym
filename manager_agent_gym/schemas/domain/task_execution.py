@@ -74,8 +74,7 @@ class TaskExecution(BaseModel):
     # Execution metadata
     execution_result: Any | None = Field(
         default=None,
-        description="Full ExecutionResult object from agent",
-        exclude=True,  # Don't serialize the full result
+        description="Full ExecutionResult object from agent (includes execution_trace if tracing enabled)",
     )
     error_message: str | None = Field(
         default=None, description="Error message if execution failed"

@@ -10,15 +10,21 @@ class AITaskOutput(BaseModel):
     """
     Structured output representing the result of an AI task execution.
 
-    It should have the reasoning be the reasoning as to what the resources be, and ALWAYS have at least one resource.
+    Note: Resources are now auto-tracked by tools! You can optionally provide
+    resource descriptions for better clarity, but the system will automatically
+    merge your descriptions with files actually created by tools.
     """
 
     reasoning: str = Field(
         ..., description="Your thought process and key decisions about this task"
     )
     resources: list[Resource] = Field(
-        ...,
-        description="Resources created by the AI agent. There MUST BE AT LEAST ONE RESOURCE.",
+        default_factory=list,
+        description=(
+            "OPTIONAL: Provide resource descriptions if you want to add context. "
+            "Files created by tools are automatically tracked, so you only need "
+            "to describe final outputs here if you want to add meaningful descriptions."
+        ),
     )
     confidence: float = Field(
         default=0.8,

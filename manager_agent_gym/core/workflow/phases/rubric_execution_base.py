@@ -6,10 +6,9 @@ rubric injection, and tracking all metadata required for GRPO training.
 """
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Union
 
 from manager_agent_gym.core.common.logging import logger
-from manager_agent_gym.core.common.llm_interface import generate_structured_response
 from manager_agent_gym.core.agents.manager_agent.actions import (
     GeneratePreferenceRubricAction,
 )
@@ -26,6 +25,7 @@ from manager_agent_gym.core.agents.manager_agent.implementations.rubric_generati
 from manager_agent_gym.schemas.domain.task_execution import TaskExecution
 from manager_agent_gym.schemas.domain.base import TaskStatus
 from manager_agent_gym.schemas.agents import AIAgentConfig
+from manager_agent_gym.schemas.domain.communication import Message
 
 if TYPE_CHECKING:
     from manager_agent_gym.schemas.domain.workflow import Workflow
@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from manager_agent_gym.core.agents.workflow_agents.tools.registry import (
         AgentRegistry,
     )
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 
 
 class RubricExecutionPhaseBase(PreExecutionPhase):
@@ -64,6 +65,7 @@ class RubricExecutionPhaseBase(PreExecutionPhase):
         rubric_manager: "RubricDecompositionManagerAgent",
         stakeholder: "ClarificationStakeholderAgent",
         communication_service: "CommunicationService",
+        llm_generator: "LLMGenerator",
         additional_tools: list[Any] | None = None,
         max_turns: int = 5,
     ):
@@ -75,6 +77,7 @@ class RubricExecutionPhaseBase(PreExecutionPhase):
             rubric_manager: Manager agent for rubric generation
             stakeholder: Stakeholder agent for clarification
             communication_service: Service for manager-stakeholder dialogue
+            llm_generator: LLM generator for structured outputs
             additional_tools: Tools to inject into worker agents
             max_turns: Maximum dialogue turns for rubric generation
         """
@@ -85,6 +88,7 @@ class RubricExecutionPhaseBase(PreExecutionPhase):
         self.communication_service = communication_service
         self.additional_tools = additional_tools
         self.max_turns = max_turns
+        self.llm_generator = llm_generator
 
         # Wire up communication
         self.rubric_manager.set_communication_service(self.communication_service)
@@ -115,6 +119,7 @@ class RubricExecutionPhaseBase(PreExecutionPhase):
         )
 
         # Reset manager state for fresh generation
+        self.rubric_manager.reset()
         if seed is not None:
             self.rubric_manager._seed = seed
 
@@ -154,6 +159,7 @@ class RubricExecutionPhaseBase(PreExecutionPhase):
             action_result = await action.execute(
                 workflow=workflow,
                 communication_service=self.communication_service,
+                llm_generator=self.llm_generator,
             )
 
             # Track rubric generation (completion signal)
@@ -170,8 +176,10 @@ class RubricExecutionPhaseBase(PreExecutionPhase):
                     )
 
                     # Create STAGED rubric and populate generation cost metadata
-                    rubric = ManagerAgentGeneratedStagedRubricWithMetadata.model_validate(
-                        rubric_spec_dict
+                    rubric = (
+                        ManagerAgentGeneratedStagedRubricWithMetadata.model_validate(
+                            rubric_spec_dict
+                        )
                     )
                     rubric.metadata.generation_llm_cost_usd = (
                         self.rubric_manager.accumulated_llm_cost_usd
@@ -195,7 +203,7 @@ class RubricExecutionPhaseBase(PreExecutionPhase):
                         )
                         cognitive_burden = await self._analyze_cognitive_burden(
                             clarification_turns=clarification_turns,
-                            model=self.rubric_manager.model_name,
+                            llm_generator=self.llm_generator,
                             seed=self.rubric_manager._seed,
                         )
                         rubric.metadata.cognitive_burden = cognitive_burden
@@ -243,13 +251,13 @@ class RubricExecutionPhaseBase(PreExecutionPhase):
             rubric = ManagerAgentGeneratedStagedRubricWithMetadata(
                 category_name="Failed Generation",
                 rationale="Rubric generation failed to complete",
-                max_total_score=0.0,
+                max_total_score=1,
                 stages=[
                     EvaluationStageSpec(
                         name="Placeholder Stage",
                         description="Generation failed",
                         is_required=False,
-                        max_points=0.0,
+                        max_points=1.0,
                         min_score_to_pass=0.0,
                         on_failure_action="continue",
                         rules=[
@@ -334,17 +342,17 @@ class RubricExecutionPhaseBase(PreExecutionPhase):
 
         return turns
 
+    @staticmethod
     async def _analyze_cognitive_burden(
-        self,
-        clarification_turns: list[ClarificationTurn],
-        model: str = "gpt-4o-mini",
+        clarification_turns: Union[list[ClarificationTurn], list[Message]],
+        llm_generator: "LLMGenerator",
         seed: int = 42,
     ) -> DifficultyOfClarificationQuestions:
         """Analyze the cognitive burden of clarification questions using an LLM.
 
         Args:
-            clarification_turns: List of clarification turns
-            model: LLM model to use for classification
+            clarification_turns: List of clarification turns or messages
+            llm_generator: LLM generator for structured outputs
             seed: Random seed for reproducibility
 
         Returns:
@@ -361,12 +369,19 @@ class RubricExecutionPhaseBase(PreExecutionPhase):
         # Build conversation summary
         conversation_summary = []
         for turn in clarification_turns:
-            if turn.manager_question:
-                conversation_summary.append(f"Manager asked: {turn.manager_question}")
-            if turn.stakeholder_response:
-                conversation_summary.append(
-                    f"Stakeholder responded: {turn.stakeholder_response}"
-                )
+            # Handle both ClarificationTurn and Message types
+            if isinstance(turn, ClarificationTurn):
+                if turn.manager_question:
+                    conversation_summary.append(
+                        f"Manager asked: {turn.manager_question}"
+                    )
+                if turn.stakeholder_response:
+                    conversation_summary.append(
+                        f"Stakeholder responded: {turn.stakeholder_response}"
+                    )
+            else:
+                # Handle Message objects
+                conversation_summary.append(f"{turn.sender_id}: {turn.content}")
 
         system_prompt = """You are an expert at analyzing the cognitive burden of questions.
 You will be shown a conversation between a manager agent and a stakeholder.
@@ -385,13 +400,19 @@ Provide your reasoning and then count the total number of questions in each diff
 Count every distinct question the manager asked and classify them as easy, medium, or hard based on the cognitive burden they place on the stakeholder."""
 
         try:
-            result = await generate_structured_response(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                response_type=DifficultyOfClarificationQuestions,
-                model=model,
-                seed=seed,
+            # Use Agents SDK approach
+            from agents import Agent
+            from agents.run import Runner
+
+            agent = Agent(
+                name="cognitive_burden_analyzer",
+                model=llm_generator,
+                instructions=system_prompt,
+                output_type=DifficultyOfClarificationQuestions,
             )
+
+            agent_result = await Runner.run(agent, user_prompt)
+            result = agent_result.final_output
             return result  # type: ignore[return-value]
         except Exception as e:
             logger.warning(f"Failed to analyze cognitive burden: {e}")
@@ -516,13 +537,14 @@ Count every distinct question the manager asked and classify them as easy, mediu
         from manager_agent_gym.core.agents.manager_agent.utils.rubric_formatting import (
             format_staged_rubric_for_worker,
         )
-        
+
         return format_staged_rubric_for_worker(rubric)
 
-    async def run(self, workflow: "Workflow") -> None:
+    async def run(self, workflow: "Workflow", llm_generator: "LLMGenerator") -> None:
         """Run pre-execution phase. Must be implemented by subclasses.
 
         Args:
             workflow: Workflow to prepare
+            llm_generator: LLM generator for structured outputs
         """
         raise NotImplementedError("Subclasses must implement run()")

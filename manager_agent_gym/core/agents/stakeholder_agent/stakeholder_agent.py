@@ -16,10 +16,14 @@ from __future__ import annotations
 import os
 import random
 import time
+from typing import TYPE_CHECKING
 
 from agents import Agent, Runner, RunResult, Tool
 from agents.extensions.models.litellm_model import LitellmModel
 from litellm.cost_calculator import cost_per_token
+
+if TYPE_CHECKING:
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 
 from manager_agent_gym.config import settings
 from manager_agent_gym.schemas.domain import Task, Resource
@@ -64,6 +68,7 @@ class StakeholderAgent(StakeholderBase):
     def __init__(
         self,
         config: StakeholderConfig,
+        llm_generator: "LLMGenerator",
         seed: int | None = 42,
     ):
         # Validate preference data type before calling super
@@ -85,7 +90,7 @@ class StakeholderAgent(StakeholderBase):
         self.tools: list[Tool] = COMMUNICATION_TOOLS
 
         self._stakeholder_agent: Agent = Agent(
-            model=LitellmModel(model=build_litellm_model_id(self.config.model_name)),
+            model=llm_generator,  # Use our custom generator (shared across workflow)
             name=self.config.agent_id,
             instructions=self._build_stakeholder_system_prompt(),
             tools=self.tools,
@@ -241,22 +246,22 @@ class StakeholderAgent(StakeholderBase):
         communications,
         manager_actions,
     ) -> None:
-        """Evaluate using PreferenceSnapshot preferences."""
+        """Evaluate using PreferenceSnapshot preferences.
 
-        # Get current preferences for this timestep
-        preferences = self.get_preferences_for_timestep(timestep)
+        Note: The legacy evaluation path has been removed. For multimodal support with staged rubrics,
+        use ClarificationStakeholderAgent instead, which accepts StagedRubric directly in its config.
+        
+        This method is now a no-op for backwards compatibility.
+        """
 
-        # Trigger validation engine with preferences
-        await validation_engine.evaluate_timestep(
-            workflow=workflow,
-            timestep=timestep,
-            preferences=preferences,
-            workflow_evaluators=[],  # Preferences have embedded evaluators
-            cadence=RunCondition.EACH_TIMESTEP,
-            communications=communications,
-            manager_actions=manager_actions,
+        # TODO: Legacy evaluation path removed - PreferenceSnapshot needs to be converted
+        # to StagedRubrics for evaluation. For now, this is a no-op.
+        logger.warning(
+            f"StakeholderAgent.evaluate_for_timestep is deprecated. "
+            f"Use ClarificationStakeholderAgent with StagedRubrics instead."
         )
-
+        pass
+    
     def get_serializable_state(self, timestep: int) -> dict:
         """Serialize preference weights for logging."""
         preferences = self.get_preferences_for_timestep(timestep)

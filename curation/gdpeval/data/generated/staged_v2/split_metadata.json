@@ -1,0 +1,11 @@
+{
+  "total_rubrics": 220,
+  "train_count": 176,
+  "eval_count": 44,
+  "train_ratio": 0.8,
+  "eval_ratio": 0.2,
+  "seed": 42,
+  "source_file": "/Users/charliemasters/Desktop/deepflow/manager_agent_gym/curation/gdpeval/data/generated/staged_v2/staged_rubrics.jsonl",
+  "train_file": "/Users/charliemasters/Desktop/deepflow/manager_agent_gym/curation/gdpeval/data/generated/staged_v2/train_rubrics.jsonl",
+  "eval_file": "/Users/charliemasters/Desktop/deepflow/manager_agent_gym/curation/gdpeval/data/generated/staged_v2/eval_rubrics.jsonl"
+}

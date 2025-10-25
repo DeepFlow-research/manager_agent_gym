@@ -120,32 +120,32 @@ def format_rubric_summary(rubric: ManagerAgentGeneratedRubricWithMetadata) -> st
 
 def format_staged_rubric_for_worker(rubric: ManagerAgentGeneratedStagedRubric) -> str:
     """Format a STAGED rubric as clean markdown for worker consumption.
-    
+
     Stages provide clear progression: validation gates → correctness → quality.
     Workers understand what MUST pass vs what contributes to final score.
-    
+
     Args:
         rubric: Staged rubric to format
-    
+
     Returns:
         Clean markdown with stage structure
     """
     lines = []
-    
+
     # Header
     lines.append(f"## Evaluation Rubric: {rubric.category_name}")
     lines.append("")
-    
+
     # Rationale
     if rubric.rationale:
         lines.append(f"**Evaluation Approach:** {rubric.rationale}")
         lines.append("")
-    
+
     lines.append(f"**Maximum Score:** {rubric.max_total_score:.1f} points")
     lines.append("")
     lines.append("Your work will be evaluated in sequential stages:")
     lines.append("")
-    
+
     # Format each stage
     for stage_num, stage in enumerate(rubric.stages, 1):
         # Stage header with gate indicator
@@ -154,25 +154,29 @@ def format_staged_rubric_for_worker(rubric: ManagerAgentGeneratedStagedRubric) -
         lines.append("")
         lines.append(f"**Description:** {stage.description}")
         lines.append(f"**Max Points:** {stage.max_points:.1f}")
-        
+
         if stage.is_required:
-            lines.append(f"**Gate Threshold:** Must score at least {stage.min_score_to_pass:.0%} to proceed")
+            lines.append(
+                f"**Gate Threshold:** Must score at least {stage.min_score_to_pass:.0%} to proceed"
+            )
             lines.append(f"**On Failure:** {stage.on_failure_action}")
-        
+
         lines.append("")
         lines.append(f"**Criteria in this stage:** ({len(stage.rules)} rules)")
         lines.append("")
-        
+
         # Format rules in this stage
         for rule_num, rule in enumerate(stage.rules, 1):
             # Rule header
-            lines.append(f"#### {stage_num}.{rule_num} {rule.name} ({rule.weight:.1f} pts)")
-            
+            lines.append(
+                f"#### {stage_num}.{rule_num} {rule.name} ({rule.weight:.1f} pts)"
+            )
+
             # Type
             rule_type = "Automated Check" if rule.type == "code" else "Expert Review"
             lines.append(f"**Type:** {rule_type}")
             lines.append(f"**Description:** {rule.description}")
-            
+
             # Show code or judge prompt
             if rule.type == "code":
                 lines.append("")
@@ -186,31 +190,33 @@ def format_staged_rubric_for_worker(rubric: ManagerAgentGeneratedStagedRubric) -
                 lines.append("")
                 lines.append("**Judge Prompt:**")
                 lines.append(f"> {rule.judge_prompt}")
-            
+
             lines.append("")
-        
+
         lines.append("---")
         lines.append("")
-    
+
     # Footer
-    lines.append("**Note:** Stages are evaluated sequentially. If you fail a required gate, ")
+    lines.append(
+        "**Note:** Stages are evaluated sequentially. If you fail a required gate, "
+    )
     lines.append("evaluation may stop early. Ensure you meet all gate requirements!")
-    
+
     return "\n".join(lines)
 
 
 def format_staged_rubric_summary(rubric: ManagerAgentGeneratedStagedRubric) -> str:
     """Create a brief summary of a staged rubric.
-    
+
     Args:
         rubric: Staged rubric to summarize
-    
+
     Returns:
         Brief text summary
     """
     total_rules = sum(len(stage.rules) for stage in rubric.stages)
     gates = sum(1 for stage in rubric.stages if stage.is_required)
-    
+
     return (
         f"Staged Rubric '{rubric.category_name}': {len(rubric.stages)} stages, "
         f"{total_rules} rules, {gates} gates, max score {rubric.max_total_score:.1f}"

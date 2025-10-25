@@ -18,6 +18,7 @@ from manager_agent_gym.core.workflow.services import WorkflowQueries
 if TYPE_CHECKING:
     from manager_agent_gym.schemas.domain.workflow import Workflow
     from manager_agent_gym.core.communication.service import CommunicationService
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 
 
 from manager_agent_gym.core.agents.manager_agent.actions.base import (
@@ -55,6 +56,7 @@ class CreateTaskAction(BaseManagerAction):
         self,
         workflow: "Workflow",
         communication_service: "CommunicationService | None" = None,
+        llm_generator: "LLMGenerator | None" = None,
     ) -> ActionResult:
         """Execute task creation."""
         from manager_agent_gym.schemas.domain.task import Task, TaskStatus
@@ -94,6 +96,7 @@ class RemoveTaskAction(BaseManagerAction):
         self,
         workflow: "Workflow",
         communication_service: "CommunicationService | None" = None,
+        llm_generator: "LLMGenerator | None" = None,
     ) -> ActionResult:
         """Execute task removal."""
         if self.task_id not in workflow.tasks:
@@ -152,6 +155,7 @@ class RefineTaskAction(BaseManagerAction):
         self,
         workflow: "Workflow",
         communication_service: "CommunicationService | None" = None,
+        llm_generator: "LLMGenerator | None" = None,
     ) -> ActionResult:
         """Execute task refinement."""
         if self.task_id not in workflow.tasks:
@@ -241,6 +245,7 @@ class AddTaskDependencyAction(BaseManagerAction):
         self,
         workflow: "Workflow",
         communication_service: "CommunicationService | None" = None,
+        llm_generator: "LLMGenerator | None" = None,
     ) -> ActionResult:
         """Execute dependency addition."""
 
@@ -356,6 +361,7 @@ class RemoveTaskDependencyAction(BaseManagerAction):
         self,
         workflow: "Workflow",
         communication_service: "CommunicationService | None" = None,
+        llm_generator: "LLMGenerator | None" = None,
     ) -> ActionResult:
         """Execute dependency removal."""
 
@@ -422,6 +428,7 @@ class InspectTaskAction(BaseManagerAction):
         self,
         workflow: "Workflow",
         communication_service: "CommunicationService | None" = None,
+        llm_generator: "LLMGenerator | None" = None,
     ) -> ActionResult:
         """Execute task inspection (read-only)."""
 
@@ -477,9 +484,18 @@ class DecomposeTaskAction(BaseManagerAction):
         self,
         workflow: "Workflow",
         communication_service: "CommunicationService | None" = None,
+        llm_generator: "LLMGenerator | None" = None,
     ) -> ActionResult:
         """Execute task decomposition."""
+        from manager_agent_gym.core.common.llm_generator import CloudLLMGenerator
+        
         logger.info(f"Manager is decomposing task {self.task_id}")
+        
+        # Ensure we have an LLM generator
+        if llm_generator is None:
+            logger.warning("No LLM generator provided, creating default CloudLLMGenerator")
+            llm_generator = CloudLLMGenerator()
+        
         try:
             # Find the task in the workflow
             target_task = WorkflowQueries.find_task_by_id(workflow, self.task_id)
@@ -514,7 +530,10 @@ class DecomposeTaskAction(BaseManagerAction):
 
             # Decompose the task (thread workflow seed for reproducibility)
             await decompose_task(
-                target_task, workflow_context=context, seed=workflow.seed
+                target_task, 
+                llm_generator=llm_generator,
+                workflow_context=context, 
+                seed=workflow.seed
             )
 
             logger.info(

@@ -39,11 +39,15 @@ class ClarificationTurn(BaseModel):
 
 class DifficultyOfClarificationQuestions(BaseModel):
     reasoning: str = Field(description="Reasoning for the difficulty level")
-    number_of_easy_questions: int = Field(description="Number of easy questions asked")
-    number_of_medium_questions: int = Field(
-        description="Number of medium questions asked"
+    number_of_easy_questions: int = Field(
+        default=5, description="Number of easy questions asked"
     )
-    number_of_hard_questions: int = Field(description="Number of hard questions asked")
+    number_of_medium_questions: int = Field(
+        default=0, description="Number of medium questions asked"
+    )
+    number_of_hard_questions: int = Field(
+        default=0, description="Number of hard questions asked"
+    )
 
 
 class PreExecutionLog(BaseModel):

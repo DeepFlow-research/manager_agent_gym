@@ -55,39 +55,23 @@ class ResourceTokenEstimator:
             if mode == ResourceRepresentationMode.DATA:
                 # PDF as text: estimate based on file size
                 # Rough: 1 page = ~2KB text = ~500 tokens
-                pages = (
-                    resource.file_format_metadata.get("page_count", 1)
-                    if resource.file_format_metadata
-                    else 1
-                )
-                return min(int(pages) * 500, 5000)
+                pages = resource.extract_page_count()
+                return min(pages * 500, 5000)
             else:
                 # PDF as images: 1024 tokens per page
-                pages = (
-                    resource.file_format_metadata.get("page_count", 1)
-                    if resource.file_format_metadata
-                    else 1
-                )
-                return min(int(pages) * 1024, 10240)
+                pages = resource.extract_page_count()
+                return min(pages * 1024, 10240)
 
         elif resource.is_spreadsheet:
             if mode == ResourceRepresentationMode.DATA:
                 # Excel as markdown tables: much cheaper!
                 # Estimate: 100 rows × 6 columns × 10 chars/cell ÷ 4 = ~1500 tokens per sheet
-                sheet_count = (
-                    resource.file_format_metadata.get("sheet_count", 1)
-                    if resource.file_format_metadata
-                    else 1
-                )
-                return min(int(sheet_count) * 1500, 7500)
+                sheet_count = resource.extract_sheet_count()
+                return min(sheet_count * 1500, 7500)
             else:
                 # Excel as images: 1024 tokens per sheet
-                sheet_count = (
-                    resource.file_format_metadata.get("sheet_count", 1)
-                    if resource.file_format_metadata
-                    else 1
-                )
-                return min(int(sheet_count) * 1024, 10240)
+                sheet_count = resource.extract_sheet_count()
+                return min(sheet_count * 1024, 10240)
 
         elif resource.is_text_format:
             # Text: ~4 chars per token (rough estimate)

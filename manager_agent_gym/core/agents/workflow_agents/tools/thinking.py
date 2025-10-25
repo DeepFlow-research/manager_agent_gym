@@ -2,7 +2,7 @@
 Thinking and planning tools for workflow agents.
 
 Provides agents with explicit space to think through tasks, plan their approach,
-and track progress through multi-step work.
+track progress, and create stakeholder-facing documentation of their methodology.
 """
 
 from agents import function_tool, RunContextWrapper, Tool
@@ -197,62 +197,145 @@ async def update_plan_progress(
 
 
 @function_tool
-async def reflect_on_approach(
+async def document_approach_for_stakeholder(
     wrapper: RunContextWrapper[AgentExecutionContext],
-    reflection: str,
+    approach_overview: str,
+    methodology_notes: str,
+    key_decisions: str,
+    considerations: str,
 ) -> str:
     """
-    Reflect on your current approach and consider adjustments.
+    Create a stakeholder-facing document explaining your approach and methodology.
 
-    Use this tool to:
-    - Pause and assess if your current approach is working
-    - Consider alternative strategies or methods
-    - Identify obstacles and how to overcome them
-    - Evaluate if you're meeting the task requirements
-    - Decide if you need to pivot or adjust your plan
+    This tool creates a Markdown document that demonstrates your systematic thinking
+    and professional approach to the task. This document:
+    - Shows stakeholders your thought process and rationale
+    - Provides transparency into your methodology
+    - Demonstrates thoroughness and strategic thinking
+    - Can be evaluated for quality and professionalism
 
-    Reflection is a key part of high-quality work. Use this whenever you
-    need to step back and evaluate your progress.
+    **When to use this:**
+    - For complex analytical tasks where methodology matters
+    - When stakeholders value transparency in your process
+    - For tasks requiring justification of approach
+    - To demonstrate systematic and professional work habits
+
+    **✨ AUTOMATIC FILE TRACKING:**
+    The created document is automatically tracked as an intermediary resource
+    that evaluators and stakeholders can review.
 
     Args:
-        reflection: Your reflections on what's working, what's not, and potential adjustments
+        approach_overview: High-level summary of your approach (2-3 sentences)
+        methodology_notes: Detailed explanation of methods, tools, or techniques used
+        key_decisions: Important decisions made and why you made them
+        considerations: Alternatives considered, risks identified, or constraints addressed
 
     Returns:
-        Acknowledgment of your reflection
+        Confirmation message with file details
+
+    Example:
+        document_approach_for_stakeholder(
+            approach_overview="I am using NPV analysis to compare suppliers...",
+            methodology_notes="NPV calculation uses 10% discount rate based on...",
+            key_decisions="Chose 5-year time horizon because...",
+            considerations="Considered IRR but NPV is more appropriate because..."
+        )
     """
     ctx = wrapper.context
     try:
-        logger.debug(
-            f"Agent {ctx.agent_id} reflecting on task {ctx.current_task_id}: {reflection[:100]}..."
+        # Build formatted markdown content
+        content = f"""# Methodology & Approach Documentation
+
+**Task:** {ctx.current_task_id}
+**Agent:** {ctx.agent_id}
+
+---
+
+## Approach Overview
+
+{approach_overview}
+
+---
+
+## Methodology Notes
+
+{methodology_notes}
+
+---
+
+## Key Decisions & Rationale
+
+{key_decisions}
+
+---
+
+## Considerations & Alternatives
+
+{considerations}
+
+---
+
+*This document provides transparency into the analytical approach and decision-making process used to complete this task.*
+"""
+
+        # Save as markdown file
+        import tempfile
+        from pathlib import Path
+        from manager_agent_gym.schemas.domain.resource import Resource
+
+        # Create file in temp directory
+        temp_dir = Path(tempfile.gettempdir())
+        file_name = f"methodology_notes_{ctx.current_task_id}.md"
+        file_path = temp_dir / file_name
+
+        # Write content
+        file_path.write_text(content, encoding="utf-8")
+
+        # Register as intermediary resource
+        ctx.register_created_resource(
+            Resource(
+                name=f"Methodology Documentation: {ctx.agent_id}",
+                description="Stakeholder-facing documentation of analytical approach, methodology, key decisions, and considerations",
+                file_path=str(file_path),
+                mime_type="text/markdown",
+                size_bytes=len(content.encode("utf-8")),
+                resource_role="intermediary",
+            )
+        )
+
+        logger.info(
+            f"Agent {ctx.agent_id} created methodology documentation for task {ctx.current_task_id}"
         )
 
         ctx.record_tool_event(
             AgentToolUseEvent(
                 agent_id=ctx.agent_id,
                 task_id=ctx.current_task_id,
-                tool_name="reflect_on_approach",
+                tool_name="document_approach_for_stakeholder",
                 succeeded=True,
             )
         )
 
+        word_count = len(content.split())
         return (
-            "✓ Reflection recorded. Based on your reflection, proceed with your "
-            "chosen approach or make adjustments as needed."
+            f"✅ Created methodology documentation: {file_name}\n"
+            f"📄 {word_count} words documenting your approach\n"
+            f"This document will be visible to stakeholders and evaluators as supporting evidence of your systematic approach."
         )
 
     except Exception as e:
-        logger.error(f"Failed to record reflection: {e}")
+        logger.error(f"Failed to create methodology documentation: {e}")
         ctx.record_tool_event(
             AgentToolUseEvent(
                 agent_id=ctx.agent_id,
                 task_id=ctx.current_task_id,
-                tool_name="reflect_on_approach",
+                tool_name="document_approach_for_stakeholder",
                 succeeded=False,
                 error_type=type(e).__name__,
                 error_message=str(e),
             )
         )
-        return f"Failed to record reflection: {str(e)}"
+        return f"Failed to create methodology documentation: {str(e)}"
 
 
 # Export all thinking tools
@@ -260,7 +343,7 @@ THINKING_TOOLS: list[Tool] = [
     think_through_task,
     create_task_plan,
     update_plan_progress,
-    reflect_on_approach,
+    document_approach_for_stakeholder,
 ]
 
 

@@ -16,6 +16,9 @@ from manager_agent_gym.core.agents.manager_agent.implementations.rubric_generati
     RubricGenerationMetadata,
 )
 from manager_agent_gym.schemas.agents import AIAgentConfig
+from manager_agent_gym.core.workflow.phases.parallel_rubric_generation import (
+    generate_rubrics_parallel,
+)
 
 if TYPE_CHECKING:
     from manager_agent_gym.schemas.domain.workflow import Workflow
@@ -29,6 +32,7 @@ if TYPE_CHECKING:
     from manager_agent_gym.core.agents.workflow_agents.tools.registry import (
         AgentRegistry,
     )
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 
 
 class MultiRubricTrainingPhase(RubricExecutionPhaseBase):
@@ -56,6 +60,7 @@ class MultiRubricTrainingPhase(RubricExecutionPhaseBase):
         rubric_manager: "RubricDecompositionManagerAgent",
         stakeholder: "ClarificationStakeholderAgent",
         communication_service: "CommunicationService",
+        llm_generator: "LLMGenerator",
         additional_tools: list[Any] | None = None,
         max_turns: int = 5,
     ):
@@ -80,11 +85,12 @@ class MultiRubricTrainingPhase(RubricExecutionPhaseBase):
             communication_service=communication_service,
             additional_tools=additional_tools,
             max_turns=max_turns,
+            llm_generator=llm_generator,
         )
         self.n_synthetic = n_synthetic_rubrics
         self.gt_rubric = ground_truth_rubric
 
-    async def run(self, workflow: "Workflow") -> None:
+    async def run(self, workflow: "Workflow", llm_generator: "LLMGenerator") -> None:
         """Generate N synthetic rubrics and create N workers.
 
         Workflow:
@@ -102,14 +108,35 @@ class MultiRubricTrainingPhase(RubricExecutionPhaseBase):
             workflow: Workflow to prepare
         """
         logger.info("=" * 80)
-        logger.info("🚀 Multi-Rubric Training Phase (GRPO)")
+        logger.info("🚀 Multi-Rubric Training Phase (GRPO) - PARALLEL")
         logger.info("=" * 80)
         logger.info(f"Synthetic rubrics to generate: {self.n_synthetic}")
         logger.info(f"Ground truth rubric: {self.gt_rubric.category_name}")
         logger.info(f"Max turns per rubric: {self.max_turns}")
+        logger.info("Parallel execution: max 8 concurrent")
         logger.info("=" * 80)
         logger.info("")
 
+        # Generate N synthetic rubrics IN PARALLEL using thread isolation
+        logger.info(
+            f"📝 Generating {self.n_synthetic} synthetic rubrics in parallel..."
+        )
+
+        base_seed = workflow.seed if workflow.seed else 42
+
+        parallel_results = await generate_rubrics_parallel(
+            n_variants=self.n_synthetic,
+            workflow=workflow,
+            rubric_manager=self.rubric_manager,
+            stakeholder=self.stakeholder,
+            communication_service=self.communication_service,
+            llm_generator=self.llm_generator,
+            max_turns=self.max_turns,
+            max_concurrent=8,  # Rate limit to avoid API throttling
+            base_seed=base_seed,
+        )
+
+        # Convert parallel results to expected format
         synthetic_rubrics_with_metadata: list[
             tuple[
                 str,  # rubric_type
@@ -120,26 +147,16 @@ class MultiRubricTrainingPhase(RubricExecutionPhaseBase):
             ]
         ] = []
 
-        # Generate N synthetic rubrics
-        logger.info(f"📝 Generating {self.n_synthetic} synthetic rubrics...")
-        for i in range(self.n_synthetic):
-            variant_seed = (workflow.seed + i) if workflow.seed else i
-
-            rubric, metadata = await self._generate_single_rubric(
-                workflow=workflow,
-                variant_index=i,
-                seed=variant_seed,
-            )
-
+        for i, (thread_id, rubric, metadata) in enumerate(parallel_results):
+            variant_seed = base_seed + i
             synthetic_rubrics_with_metadata.append(
                 (f"synthetic_v{i}", rubric, metadata, i, variant_seed)
             )
 
             logger.info(
-                f"✅ Synthetic rubric {i + 1}/{self.n_synthetic} generated: "
+                f"✅ Synthetic rubric {i + 1}/{len(parallel_results)} packaged: "
                 f"'{rubric.category_name}' "
-                f"(cost=${metadata.generation_llm_cost_usd if metadata.generation_llm_cost_usd != 'not_calculated' else 0:.4f}, "
-                f"calls={metadata.generation_llm_calls})"
+                f"(thread={thread_id}, seed={variant_seed})"
             )
 
         # Store ground truth rubric in workflow metadata for evaluation
@@ -177,6 +194,10 @@ class MultiRubricTrainingPhase(RubricExecutionPhaseBase):
             "✅ Ground truth rubric configured for evaluation (no worker created)"
         )
         logger.info("")
+
+        # Store synthetic rubrics for later access (calibration analysis)
+        self.synthetic_rubrics = [rubric for _, rubric, _, _, _ in synthetic_rubrics_with_metadata]
+        logger.info(f"Stored {len(self.synthetic_rubrics)} synthetic rubrics for calibration")
 
         # Create workers ONLY for synthetic rubrics
         logger.info("👷 Creating workers for synthetic rubrics...")

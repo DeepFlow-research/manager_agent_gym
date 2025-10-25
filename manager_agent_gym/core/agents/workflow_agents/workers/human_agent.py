@@ -723,12 +723,9 @@ Deliver the output as you normally would for this task, fully believing it satis
                 f"  Size: {resource.size_bytes} bytes",
             ]
 
-            # Add format-specific metadata if available (format as key=value)
+            # Add format-specific metadata if available
             if resource.file_format_metadata:
-                metadata_items = [
-                    f"{k}={v}" for k, v in resource.file_format_metadata.items()
-                ]
-                resource_info.append(f"  Metadata: {', '.join(metadata_items)}")
+                resource_info.append(f"  Metadata: {resource.file_format_metadata}")
 
             # Try to show text preview for text-based files
             try:

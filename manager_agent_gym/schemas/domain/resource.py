@@ -3,7 +3,7 @@ Resource data models for Manager Agent Gym.
 """
 
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
@@ -39,10 +39,7 @@ class Resource(BaseModel):
             file_path="/tmp/workflow_xyz/revenue_q4.xlsx",
             mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             size_bytes=45120,
-            file_format_metadata={
-                "sheet_names": ["Summary", "Q1", "Q2", "Q3", "Q4"],
-                "sheet_count": 5
-            }
+            file_format_metadata="Excel: 5 sheets (Summary, Q1, Q2, Q3, Q4)"
         )
         ```
     """
@@ -85,10 +82,10 @@ class Resource(BaseModel):
         description="File size in bytes",
     )
 
-    # Optional metadata
-    file_format_metadata: dict[str, Any] | None = Field(
+    # Optional metadata (as freeform string for strict JSON schema compatibility)
+    file_format_metadata: str | None = Field(
         default=None,
-        description="Format-specific metadata (e.g., Excel: sheet names, PDF: page count, images: dimensions)",
+        description="Format-specific metadata as descriptive text (e.g., 'Excel: 3 sheets (Summary, Data, Charts)', 'PDF: 5 pages', 'Image: 1920x1080')",
     )
 
     # Resource flow control
@@ -101,6 +98,60 @@ class Resource(BaseModel):
     def resource_id(self) -> UUID:
         """Alias for id field to maintain compatibility."""
         return self.id
+
+    def extract_page_count(self) -> int:
+        """Extract page count from metadata string.
+
+        Looks for patterns like "5 pages", "page_count: 10", etc.
+        Returns 1 if not found or cannot parse.
+        """
+        if not self.file_format_metadata:
+            return 1
+
+        import re
+
+        # Try common patterns: "5 pages", "page_count: 10", "pages: 3"
+        patterns = [
+            r"(\d+)\s*pages?",
+            r"page[_-]?count[:\s]+(\d+)",
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, self.file_format_metadata, re.IGNORECASE)
+            if match:
+                try:
+                    return int(match.group(1))
+                except (ValueError, IndexError):
+                    continue
+
+        return 1
+
+    def extract_sheet_count(self) -> int:
+        """Extract sheet count from metadata string.
+
+        Looks for patterns like "3 sheets", "sheet_count: 2", etc.
+        Returns 1 if not found or cannot parse.
+        """
+        if not self.file_format_metadata:
+            return 1
+
+        import re
+
+        # Try common patterns: "3 sheets", "sheet_count: 2", "sheets: 5"
+        patterns = [
+            r"(\d+)\s*sheets?",
+            r"sheet[_-]?count[:\s]+(\d+)",
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, self.file_format_metadata, re.IGNORECASE)
+            if match:
+                try:
+                    return int(match.group(1))
+                except (ValueError, IndexError):
+                    continue
+
+        return 1
 
     @property
     def file_extension(self) -> str:

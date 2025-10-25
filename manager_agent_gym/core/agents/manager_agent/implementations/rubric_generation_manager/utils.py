@@ -115,11 +115,11 @@ def convert_stage_spec_to_execution(
     run_condition: RunCondition = RunCondition.ON_COMPLETION,
 ) -> EvaluationStage:
     """Convert stage specification to executable evaluation stage.
-    
+
     Args:
         stage_spec: Stage specification from LLM/GDPEval
         run_condition: When rules should run
-        
+
     Returns:
         EvaluationStage ready for execution with converted rules
     """
@@ -127,23 +127,27 @@ def convert_stage_spec_to_execution(
     rules_dict = []
     for rule in stage_spec.rules:
         if isinstance(rule, CodeRule):
-            rules_dict.append({
-                "type": "code",
-                "name": rule.name,
-                "description": rule.description,
-                "weight": rule.weight,
-                "code": rule.code,
-            })
+            rules_dict.append(
+                {
+                    "type": "code",
+                    "name": rule.name,
+                    "description": rule.description,
+                    "weight": rule.weight,
+                    "code": rule.code,
+                }
+            )
         elif isinstance(rule, LLMJudgeRule):
-            rules_dict.append({
-                "type": "llm_judge",
-                "name": rule.name,
-                "description": rule.description,
-                "weight": rule.weight,
-                "judge_prompt": rule.judge_prompt,
-                "expectation": rule.expectation,
-            })
-    
+            rules_dict.append(
+                {
+                    "type": "llm_judge",
+                    "name": rule.name,
+                    "description": rule.description,
+                    "weight": rule.weight,
+                    "judge_prompt": rule.judge_prompt,
+                    "expectation": rule.expectation,
+                }
+            )
+
     return EvaluationStage(
         name=stage_spec.name,
         description=stage_spec.description,
@@ -157,16 +161,17 @@ def convert_stage_spec_to_execution(
 
 
 def convert_staged_rubric_to_executable(
-    staged_spec: ManagerAgentGeneratedStagedRubric | ManagerAgentGeneratedStagedRubricWithMetadata,
+    staged_spec: ManagerAgentGeneratedStagedRubric
+    | ManagerAgentGeneratedStagedRubricWithMetadata,
 ) -> StagedRubric:
     """Convert staged rubric specification to executable format.
-    
+
     IMPORTANT: If staged_spec has metadata, it will be preserved in the executable
     rubric so that execution costs can be tracked back to the same metadata object.
-    
+
     Args:
         staged_spec: Staged rubric from LLM or GDPEval (with or without metadata)
-        
+
     Returns:
         StagedRubric ready for execution (with metadata reference if provided)
     """
@@ -174,14 +179,12 @@ def convert_staged_rubric_to_executable(
         f"Converting staged rubric '{staged_spec.category_name}' "
         f"with {len(staged_spec.stages)} stages"
     )
-    
+
     # Convert each stage
     execution_stages = []
     for stage_spec in staged_spec.stages:
-        execution_stages.append(
-            convert_stage_spec_to_execution(stage_spec)
-        )
-    
+        execution_stages.append(convert_stage_spec_to_execution(stage_spec))
+
     # Extract metadata if present (for WithMetadata variant)
     metadata_ref = None
     if isinstance(staged_spec, ManagerAgentGeneratedStagedRubricWithMetadata):
@@ -191,7 +194,7 @@ def convert_staged_rubric_to_executable(
             f"generation_cost=${metadata_ref.generation_llm_cost_usd}, "
             f"calls={metadata_ref.generation_llm_calls}"
         )
-    
+
     rubric = StagedRubric(
         category_name=staged_spec.category_name,
         rationale=staged_spec.rationale,
@@ -199,10 +202,10 @@ def convert_staged_rubric_to_executable(
         stages=execution_stages,
         metadata=metadata_ref,  # Preserve metadata reference for execution cost tracking
     )
-    
+
     # Validate stages
     rubric.validate_stages()
-    
+
     return rubric
 
 
@@ -211,23 +214,24 @@ def convert_flat_to_staged(
     preference_name: str | None = None,
 ) -> ManagerAgentGeneratedStagedRubric:
     """Convert flat rubric to single-stage rubric for backward compatibility.
-    
+
     This allows legacy flat rubrics to work in the staged-only evaluation system.
     The flat rubric becomes a single stage with no gating (always passes).
-    
+
     Args:
         flat_spec: Flat rubric specification from LLM
         preference_name: Optional name for the category
-        
+
     Returns:
         Staged rubric with one stage containing all rules
     """
     total_weight = sum(rule.weight for rule in flat_spec.rules)
-    
+
     # Create single stage with all rules (no gating)
     stage = EvaluationStageSpec(
         name="Evaluation",
-        description=flat_spec.rationale or f"Evaluation for {preference_name or flat_spec.rubric_id}",
+        description=flat_spec.rationale
+        or f"Evaluation for {preference_name or flat_spec.rubric_id}",
         is_required=False,  # Not a gate
         min_score_to_pass=0.0,  # Always passes
         rules=flat_spec.rules,
@@ -235,7 +239,7 @@ def convert_flat_to_staged(
         on_failure_action="continue",  # Never stops
         on_failure_score=0.0,
     )
-    
+
     return ManagerAgentGeneratedStagedRubric(
         category_name=preference_name or flat_spec.rubric_id,
         rationale=flat_spec.rationale,

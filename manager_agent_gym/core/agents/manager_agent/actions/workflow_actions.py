@@ -12,7 +12,7 @@ from manager_agent_gym.core.common.logging import logger
 if TYPE_CHECKING:
     from manager_agent_gym.schemas.domain.workflow import Workflow
     from manager_agent_gym.core.communication.service import CommunicationService
-
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 
 from manager_agent_gym.core.agents.manager_agent.actions.base import (
     BaseManagerAction,
@@ -31,6 +31,7 @@ class NoOpAction(BaseManagerAction):
         self,
         workflow: "Workflow",
         communication_service: "CommunicationService | None" = None,
+        llm_generator: "LLMGenerator | None" = None,
     ) -> ActionResult:
         """Execute no-op (no state modification)."""
         logger.info("Manager chose to observe without taking action")
@@ -67,6 +68,7 @@ class RequestEndWorkflowAction(BaseManagerAction):
         self,
         workflow: "Workflow",
         communication_service: "CommunicationService | None" = None,
+        llm_generator: "LLMGenerator | None" = None,
     ) -> ActionResult:
         """Signal end-of-workflow request through the communication service."""
         if communication_service is None:
@@ -106,6 +108,7 @@ class FailedAction(BaseManagerAction):
         self,
         workflow: "Workflow",
         communication_service: "CommunicationService | None" = None,
+        llm_generator: "LLMGenerator | None" = None,
     ) -> ActionResult:
         """Execute the failed action."""
         return ActionResult(

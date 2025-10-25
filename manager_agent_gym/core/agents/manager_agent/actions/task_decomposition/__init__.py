@@ -9,7 +9,6 @@ from manager_agent_gym.core.agents.manager_agent.actions.task_decomposition.serv
     find_task_in_workflow,
     get_workflow_context_string,
     TaskDecompositionError,
-    TaskDecompositionRefusalError,
 )
 
 __all__ = [
@@ -17,5 +16,4 @@ __all__ = [
     "find_task_in_workflow",
     "get_workflow_context_string",
     "TaskDecompositionError",
-    "TaskDecompositionRefusalError",
 ]

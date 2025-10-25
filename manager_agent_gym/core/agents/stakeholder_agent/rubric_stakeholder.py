@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from agents import Agent, Runner, RunResult
-from agents.extensions.models.litellm_model import LitellmModel
 
 from manager_agent_gym.schemas.agents.stakeholder import StakeholderConfig
 from manager_agent_gym.schemas.domain import Task, Resource
@@ -12,7 +11,6 @@ from manager_agent_gym.core.execution.schemas.results import ExecutionResult
 from manager_agent_gym.schemas.preferences.evaluator import PreferenceExemplar
 from manager_agent_gym.core.agents.stakeholder_agent.interface import StakeholderBase
 from manager_agent_gym.core.common.logging import logger
-from manager_agent_gym.core.common.llm_interface import build_litellm_model_id
 
 from manager_agent_gym.core.agents.stakeholder_agent.prompts import (
     build_clarification_system_prompt_with_exemplar,
@@ -21,14 +19,15 @@ from manager_agent_gym.core.agents.stakeholder_agent.prompts import (
 from manager_agent_gym.schemas.agents.stakeholder import (
     StakeholderPublicProfile,
 )
-from manager_agent_gym.schemas.preferences.rubric import RunCondition
 from manager_agent_gym.schemas.preferences.evaluator import (
     Rubric,
     PairwiseExemplar,
 )
+from manager_agent_gym.schemas.preferences.evaluation import StagedRubric
 
 if TYPE_CHECKING:
     from manager_agent_gym.core.communication.service import CommunicationService
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 
 
 class ClarificationStakeholderAgent(StakeholderBase):
@@ -53,18 +52,21 @@ class ClarificationStakeholderAgent(StakeholderBase):
     def __init__(
         self,
         config: StakeholderConfig,
+        llm_generator: "LLMGenerator",
         seed: int | None = 42,
     ):
         """Initialize clarification stakeholder for RL training.
 
         Args:
             config: Stakeholder configuration (role, persona, preferences)
+            llm_generator: LLM generator (shared across workflow for training)
             seed: Random seed for reproducibility
         """
 
         # Validate preference data type before calling super
         if not isinstance(
-            config.preference_data, (PreferenceExemplar, Rubric, PairwiseExemplar)
+            config.preference_data,
+            (PreferenceExemplar, Rubric, PairwiseExemplar, StagedRubric),
         ):
             raise ValueError(
                 "ClarificationStakeholderAgent requires PreferenceMeasure "
@@ -81,11 +83,16 @@ class ClarificationStakeholderAgent(StakeholderBase):
         self._responded_message_ids: set[UUID] = set()
 
         # Generated rubrics (populated during pre-execution phase)
-        self.generated_rubrics: list = []  # Will be list[Rubric] once populated
+        self.generated_rubrics: list[
+            StagedRubric
+        ] = []  # Populated with StagedRubric objects
+
+        # Thread context for parallel rubric generation (None = backward compatible)
+        self.current_thread_id: UUID | None = None
 
         # Create LLM agent for generating responses
         self._clarification_agent: Agent = Agent(
-            model=LitellmModel(model=build_litellm_model_id(self.config.model_name)),
+            model=llm_generator,  # Use our custom generator (shared across workflow)
             name=f"{self.config.agent_id}_clarification",
             instructions=build_clarification_system_prompt_with_exemplar(
                 role=self.config.role,
@@ -93,6 +100,18 @@ class ClarificationStakeholderAgent(StakeholderBase):
                 preference_data=self.preference_measure,
             ),
         )
+
+    def set_thread_context(self, thread_id: UUID | None) -> None:
+        """Set thread context for scoped operation.
+
+        Args:
+            thread_id: Thread ID to scope operations to, or None for global
+        """
+        self.current_thread_id = thread_id
+        if thread_id:
+            logger.debug(
+                f"ClarificationStakeholderAgent: Set thread context to {thread_id}"
+            )
 
     async def policy_step(
         self,
@@ -106,10 +125,16 @@ class ClarificationStakeholderAgent(StakeholderBase):
         2. Generate human-realistic responses using exemplar context
         3. Send responses back via communication service
 
+        If thread context is set, only processes messages from that thread.
+
         Args:
             current_timestep: Current simulation timestep
             communication_service: Service for reading/sending messages
         """
+        logger.info(
+            f"🔍 DEBUG: Stakeholder {self.config.agent_id} policy_step called at timestep {current_timestep}, thread_id={self.current_thread_id}"
+        )
+
         comm = communication_service or self.communication_service
         if comm is None:
             logger.warning(
@@ -117,46 +142,81 @@ class ClarificationStakeholderAgent(StakeholderBase):
             )
             return
 
-        # 1. Get messages addressed to this stakeholder
+        # 1. Get messages addressed to this stakeholder (thread-scoped if context set)
         try:
-            messages = comm.get_messages_for_agent(
-                agent_id=self.config.agent_id,
-                limit=50,  # Process up to 50 messages per timestep
-            )
+            if self.current_thread_id:
+                # Thread-scoped: only get messages from current thread
+                all_messages = comm.get_messages_in_thread(
+                    thread_id=self.current_thread_id,
+                    limit=50,
+                )
+                # Filter to messages addressed to this stakeholder
+                # Check both direct messages (receiver_id) and multicast (recipients list)
+                messages = [
+                    msg
+                    for msg in all_messages
+                    if msg.receiver_id == self.config.agent_id  # Direct messages
+                    or self.config.agent_id in msg.recipients  # Multicast messages
+                    or msg.is_broadcast()  # Broadcast messages
+                ]
+                logger.info(
+                    f"🔍 DEBUG: Stakeholder got {len(messages)} messages in thread {self.current_thread_id}"
+                )
+            else:
+                # Global: get all messages for this agent (backward compatible)
+                messages = comm.get_messages_for_agent(
+                    agent_id=self.config.agent_id,
+                    limit=50,  # Process up to 50 messages per timestep
+                )
+                logger.info(
+                    f"🔍 DEBUG: Stakeholder got {len(messages)} messages (no thread context)"
+                )
         except Exception as e:
             logger.error(f"Failed to get messages for {self.config.agent_id}: {e}")
             return
+
+        logger.info(
+            f"🔍 DEBUG: Stakeholder processing {len(messages)} messages, already responded to {len(self._responded_message_ids)} messages"
+        )
 
         # 2. Process each message and generate responses
         for msg in messages:
             # Skip if we've already responded to this message
             if msg.message_id in self._responded_message_ids:
                 logger.debug(
-                    f"{self.config.agent_id}: Skipping message {msg.message_id} because we've already responded"
+                    f"🔍 DEBUG: {self.config.agent_id}: Skipping message {msg.message_id} (already responded)"
                 )
                 continue
 
             # Only respond to messages from other agents (likely manager)
             if msg.sender_id == self.config.agent_id:
+                logger.debug("🔍 DEBUG: Skipping message from self")
                 continue
+
+            logger.info(
+                f"🔍 DEBUG: Stakeholder processing message {msg.message_id} from {msg.sender_id} (thread={msg.thread_id}, type={msg.message_type})"
+            )
+            logger.info(f"🔍 DEBUG: Message preview: {msg.content[:100]}...")
 
             try:
                 # Generate response using LLM + exemplar context
                 response = await self._generate_response_to_question(msg.content)
 
                 # 3. Send response back to sender via communication service
+                # Keep response in same thread if thread context is set
                 await comm.send_direct_message(
                     from_agent=self.config.agent_id,
                     to_agent=msg.sender_id,
                     content=response,
+                    thread_id=self.current_thread_id
+                    or msg.thread_id,  # Preserve thread
                 )
 
                 # Mark as responded
                 self._responded_message_ids.add(msg.message_id)
 
-                logger.debug(
-                    f"{self.config.agent_id} responded to message from {msg.sender_id} "
-                    f"(Q: {msg.content[:50]}...)"
+                logger.info(
+                    f"🔍 DEBUG: {self.config.agent_id} responded to message {msg.message_id} from {msg.sender_id}"
                 )
 
             except Exception as e:
@@ -232,13 +292,11 @@ class ClarificationStakeholderAgent(StakeholderBase):
             )
             return
 
-        # Trigger validation with our generated rubrics
+        # Trigger validation with our generated rubrics using NEW staged evaluation
         await validation_engine.evaluate_timestep(
             workflow=workflow,
             timestep=timestep,
-            preferences=None,  # No traditional preferences!
-            workflow_evaluators=self.generated_rubrics,  # Use our rubrics instead
-            cadence=RunCondition.EACH_TIMESTEP,
+            staged_rubrics=self.generated_rubrics,
             communications=communications,
             manager_actions=manager_actions,
         )
@@ -250,7 +308,7 @@ class ClarificationStakeholderAgent(StakeholderBase):
             "timestep": timestep,
             "preference_measure_summary": self.preference_measure.get_preference_summary(),
             "rubric_count": len(self.generated_rubrics),
-            "rubric_names": [r.name for r in self.generated_rubrics],
+            "rubric_names": [r.category_name for r in self.generated_rubrics],
         }
 
     def restore_from_state(self, state_dict: dict) -> None:

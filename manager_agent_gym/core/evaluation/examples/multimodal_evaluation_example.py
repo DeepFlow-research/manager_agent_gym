@@ -49,7 +49,7 @@ async def example_excel_code_rule():
         file_path=str(excel_path),
         mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         size_bytes=excel_path.stat().st_size,
-        file_format_metadata={"sheet_names": ["NPV Analysis"]},
+        file_format_metadata="Excel: 1 sheet (NPV Analysis)",
     )
 
     # Create Workflow with Task

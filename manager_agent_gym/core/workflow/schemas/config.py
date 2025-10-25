@@ -124,6 +124,31 @@ class OutputConfig(BaseModel):
             raise ValueError("evaluation_dir is not configured")
         return self.evaluation_dir / filename
 
+    def get_rubrics_dir(self) -> Path:
+        """Get directory for rubric definitions."""
+        if self.evaluation_dir is None:
+            raise ValueError("evaluation_dir is not configured")
+        return self.evaluation_dir / "rubrics"
+
+    def get_worker_outputs_dir(self) -> Path:
+        """Get directory for preserved worker outputs."""
+        if self.evaluation_dir is None:
+            raise ValueError("evaluation_dir is not configured")
+        return self.evaluation_dir / "worker_outputs"
+
+    def get_calibration_dir(self) -> Path:
+        """Get directory for calibration data."""
+        if self.evaluation_dir is None:
+            raise ValueError("evaluation_dir is not configured")
+        return self.evaluation_dir / "calibration_data"
+    
+    @property
+    def base_dir(self) -> Path:
+        """Get the base directory for this run (for relative path calculations)."""
+        if self.create_run_subdirectory:
+            return self.base_output_dir / f"run_{self.run_id}"
+        return self.base_output_dir
+
 
 class SimulationConfig(BaseModel):
     """Complete configuration for a simulation run."""

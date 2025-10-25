@@ -15,6 +15,7 @@ from manager_agent_gym.schemas.preferences.evaluator import (
     Rubric,
     PairwiseExemplar,
 )
+from manager_agent_gym.schemas.preferences.evaluation import StagedRubric
 
 
 class StakeholderPublicProfile(BaseModel):
@@ -55,10 +56,14 @@ class StakeholderConfig(AgentConfig):
         description="Model name to use for stakeholder agent", default="o3"
     )
     preference_data: (
-        PreferenceSnapshot | Rubric | PreferenceExemplar | PairwiseExemplar
+        PreferenceSnapshot
+        | Rubric
+        | StagedRubric
+        | PreferenceExemplar
+        | PairwiseExemplar
     ) = Field(
         ...,
-        description="Initial preference data (snapshot with weights, rubric criteria, text exemplar, or pairwise comparison)",
+        description="Initial preference data (snapshot with weights, flat rubric, staged rubric, text exemplar, or pairwise comparison)",
     )
 
     # Messaging behavior

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from manager_agent_gym.schemas.domain.workflow import Workflow
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 
 
 class PreExecutionPhase(ABC):
@@ -25,12 +26,13 @@ class PreExecutionPhase(ABC):
     async def run(
         self,
         workflow: Workflow,
+        llm_generator: "LLMGenerator",
     ) -> None:
         """Execute pre-execution phase, updating workflow/preferences in place.
 
         Args:
             workflow: Workflow to prepare (can be mutated)
-            preferences: Preference weights (can be mutated)
+            llm_generator: LLM generator for structured outputs (rubrics, etc.)
 
         Note:
             Store any metrics or state in workflow.metadata for tracking.

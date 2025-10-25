@@ -2,10 +2,8 @@
 Centralized LLM interface using Instructor for structured outputs.
 """
 
-from typing import TypeVar, Type, Any, NamedTuple
-import os
+from typing import TypeVar, Any, NamedTuple
 from pydantic import BaseModel
-import traceback
 
 from manager_agent_gym.core.common.logging import logger
 
@@ -103,31 +101,7 @@ class LLMInferenceTruncationError(Exception):
         return base + (" [" + ", ".join(details) + "]" if details else "")
 
 
-def _get_openai_client():
-    """Get configured OpenAI async client patched by Instructor.
-
-    Lazy-imports provider SDKs so they are optional until actually used.
-    """
-    try:
-        from openai import AsyncOpenAI  # type: ignore
-    except Exception as e:  # pragma: no cover - import guard
-        raise ImportError(
-            "OpenAI SDK is not installed. Install with `uv sync --group openai`."
-        ) from e
-
-    client = AsyncOpenAI(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        timeout=300.0,
-    )
-
-    try:
-        import instructor  # type: ignore
-
-        instructor.patch(client)  # type: ignore[attr-defined]
-    except Exception:
-        pass
-
-    return client
+# DEPRECATED: _get_openai_client removed - use CloudLLMGenerator instead
 
 
 def build_litellm_model_id(model_id: str) -> str:
@@ -154,129 +128,19 @@ def build_litellm_model_id(model_id: str) -> str:
         return model_id
 
 
-# Note: Manual prompt truncation and custom retry loops have been removed.
-# Instructor handles validation and retry semantics internally.
-
-
-async def generate_structured_response(
-    system_prompt: str,
-    user_prompt: str | None,
-    response_type: Type[T],
-    seed: int,
-    model: str = "gpt-4o",
-    temperature: float = 1,
-    max_completion_tokens: int = 0,
-    max_retries: int = 0,
-    retry_delay_seconds: float = 0.5,
-    return_usage: bool = False,
-) -> T | StructuredLLMResponse:
-    """
-    Generate a structured response via Instructor with Pydantic validation and provider-agnostic handling.
-
-    Args:
-        system_prompt: System prompt for the LLM
-        user_prompt: User prompt for the LLM
-        response_type: Pydantic model class for response validation
-        seed: Random seed for reproducible outputs
-        model: The OpenAI model to use for generation (must support structured outputs)
-        temperature: Temperature for generation (0-2)
-        max_completion_tokens: Maximum tokens to generate
-        max_retries: Number of retry attempts on failure
-        retry_delay_seconds: Base delay between retries (exponential backoff)
-        return_usage: If True, return StructuredLLMResponse with usage metadata
-
-    Returns:
-        If return_usage=False: Instance of response_type populated with LLM response
-        If return_usage=True: StructuredLLMResponse(result, usage)
-
-    Raises:
-        LLMInferenceTruncationError: If no valid response is received from LLM
-        ValueError: If model is not supported for structured outputs
-    """
-    # Build messages array
-    messages = [{"role": "system", "content": system_prompt}]
-    if user_prompt:
-        messages.append({"role": "user", "content": user_prompt})
-    # Get Instructor-patched OpenAI client
-    client = _get_openai_client()
-
-    try:
-        kwargs: dict[str, Any] = {
-            "model": model,
-            "messages": messages,
-            "response_model": response_type,
-            "temperature": temperature,
-            "seed": seed,
-        }
-        # Map "max_completion_tokens" if provided
-        if max_completion_tokens and max_completion_tokens > 0:
-            kwargs["max_completion_tokens"] = max_completion_tokens
-
-        # Delegate validation and retries to Instructor (patched method not typed)
-        create_fn: Any = client.chat.completions.create
-        result: T = await create_fn(
-            max_retries=max_retries,
-            **kwargs,
-        )
-
-        # Extract usage metadata if requested
-        if return_usage:
-            usage_data = None
-            try:
-                # Instructor preserves raw response in _raw_response attribute
-                if hasattr(result, "_raw_response"):
-                    raw_response = result._raw_response  # type: ignore[attr-defined]
-                    if hasattr(raw_response, "usage") and raw_response.usage:
-                        usage = raw_response.usage
-
-                        # Extract cache token info if available
-                        cached_tokens = 0
-                        cache_creation_tokens = 0
-                        try:
-                            if (
-                                hasattr(usage, "prompt_tokens_details")
-                                and usage.prompt_tokens_details
-                            ):
-                                cached_tokens = (
-                                    getattr(
-                                        usage.prompt_tokens_details, "cached_tokens", 0
-                                    )
-                                    or 0
-                                )
-                                cache_creation_tokens = (
-                                    usage.prompt_tokens - cached_tokens
-                                )
-                        except (AttributeError, TypeError):
-                            pass
-
-                        usage_data = LLMUsage(
-                            input_tokens=usage.prompt_tokens,
-                            output_tokens=usage.completion_tokens,
-                            cached_tokens=cached_tokens,
-                            cache_creation_tokens=cache_creation_tokens,
-                        )
-            except Exception as e:
-                logger.warning(f"Failed to extract usage metadata: {e}")
-
-            return StructuredLLMResponse(result=result, usage=usage_data)
-
-        return result
-
-    except Exception as e:
-        error = LLMInferenceTruncationError(
-            f"LLM request failed for {response_type.__name__}: {str(e)}",
-            model=model,
-            provider_fields={
-                "seed": seed,
-                "max_completion_tokens": max_completion_tokens,
-                "temperature": temperature,
-                "messages": messages,
-                "response_type": response_type,
-                "original_error": str(e),
-                "error_type": type(e).__name__,
-            },
-        )
-        logger.error(
-            f"LLM request failed for {response_type.__name__}: {error} traceback: {traceback.format_exc()} error: {e}"
-        )
-        raise error
+# DEPRECATED: generate_structured_response removed
+# Use CloudLLMGenerator + OpenAI Agents SDK instead:
+#
+# from manager_agent_gym.core.common.llm_generator import CloudLLMGenerator
+# from agents import Agent
+# from agents.run import Runner
+#
+# generator = CloudLLMGenerator(model_name="gpt-4o")
+# agent = Agent(
+#     name="my_agent",
+#     model=generator,
+#     instructions=system_prompt,
+#     output_type=YourPydanticModel,
+# )
+# result = await Runner.run(agent, user_prompt)
+# response = result.final_output

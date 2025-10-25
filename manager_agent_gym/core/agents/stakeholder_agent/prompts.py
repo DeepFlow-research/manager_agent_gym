@@ -16,6 +16,7 @@ if TYPE_CHECKING:
         PairwiseExemplar,
         PreferenceMeasure,
     )
+    from manager_agent_gym.schemas.preferences.evaluation import StagedRubric
 
 # ============================================================================
 # STAKEHOLDER SYSTEM PROMPTS
@@ -388,11 +389,65 @@ Guide them through comparative reasoning without explicitly stating "output A is
 """
 
 
-def build_preference_measure_context(preference_data: "PreferenceMeasure") -> str:
+def build_staged_rubric_exemplar_context(staged_rubric: "StagedRubric") -> str:
+    """Build context for staged rubric exemplar.
+
+    Args:
+        staged_rubric: Ground-truth staged rubric representing true evaluation standards
+
+    Returns:
+        Formatted context string
+    """
+    # Build stages text
+    stages_text = []
+    for i, stage in enumerate(staged_rubric.stages, 1):
+        gate_marker = "🚪 GATE" if stage.is_required else ""
+        stage_header = f"  {i}. {stage.name} {gate_marker}"
+        stage_desc = f"     {stage.description}"
+        stage_points = f"     Max points: {stage.max_points}"
+
+        # Add stage details
+        stage_lines = [stage_header, stage_desc, stage_points]
+
+        if stage.is_required:
+            threshold_pct = stage.min_score_to_pass * 100
+            stage_lines.append(
+                f"     Required: Must score at least {threshold_pct:.0f}% to continue"
+            )
+
+        stages_text.append("\n".join(stage_lines))
+
+    stages_formatted = "\n\n".join(stages_text)
+
+    rationale_section = ""
+    if staged_rubric.rationale:
+        rationale_section = f"\n**Design Rationale:** {staged_rubric.rationale}\n"
+
+    return f"""
+## Staged Rubric: {staged_rubric.category_name}
+{rationale_section}
+**Maximum Total Score:** {staged_rubric.max_total_score} points
+
+**Evaluation Stages (Sequential):**
+{stages_formatted}
+
+These stages represent your actual evaluation standards for this work. The evaluation
+proceeds sequentially through each stage. When the manager asks clarification questions,
+guide them to understand what quality standards matter most at each stage.
+
+DO NOT reveal the exact rubric structure, stage names, or point values explicitly.
+Instead, explain what matters in terms of quality, completeness, and correctness,
+helping them arrive at similar evaluation standards through natural dialogue.
+"""
+
+
+def build_preference_measure_context(
+    preference_data: "PreferenceMeasure | StagedRubric",
+) -> str:
     """Build context based on preference measure type (dispatcher).
 
     Args:
-        preference_data: Any PreferenceMeasure (Rubric, PreferenceExemplar, PairwiseExemplar)
+        preference_data: Any PreferenceMeasure (Rubric, PreferenceExemplar, PairwiseExemplar, StagedRubric)
 
     Returns:
         Formatted context string
@@ -405,6 +460,7 @@ def build_preference_measure_context(preference_data: "PreferenceMeasure") -> st
         Rubric,
         PairwiseExemplar,
     )
+    from manager_agent_gym.schemas.preferences.evaluation import StagedRubric
 
     if isinstance(preference_data, PreferenceExemplar):
         return build_text_exemplar_context(preference_data)
@@ -412,6 +468,8 @@ def build_preference_measure_context(preference_data: "PreferenceMeasure") -> st
         return build_rubric_exemplar_context(preference_data)
     elif isinstance(preference_data, PairwiseExemplar):
         return build_pairwise_exemplar_context(preference_data)
+    elif isinstance(preference_data, StagedRubric):
+        return build_staged_rubric_exemplar_context(preference_data)
     else:
         raise ValueError(f"Unknown preference measure type: {type(preference_data)}")
 
@@ -419,7 +477,7 @@ def build_preference_measure_context(preference_data: "PreferenceMeasure") -> st
 def build_clarification_system_prompt_with_exemplar(
     role: str,
     persona_description: str,
-    preference_data: "PreferenceMeasure",
+    preference_data: "PreferenceMeasure | StagedRubric",
 ) -> str:
     """Build complete system prompt for RL training clarification stakeholder.
 
@@ -428,7 +486,7 @@ def build_clarification_system_prompt_with_exemplar(
     Args:
         role: Stakeholder's role (e.g., "Chief Risk Officer")
         persona_description: Description of stakeholder's persona and priorities
-        preference_data: PreferenceMeasure (Rubric, PreferenceExemplar, or PairwiseExemplar)
+        preference_data: PreferenceMeasure (Rubric, PreferenceExemplar, PairwiseExemplar, or StagedRubric)
 
     Returns:
         Complete system prompt with all context

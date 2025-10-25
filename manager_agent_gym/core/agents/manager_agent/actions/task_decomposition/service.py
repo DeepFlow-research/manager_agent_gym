@@ -5,16 +5,17 @@ Simple task decomposition service that breaks down tasks into subtasks.
 from uuid import UUID
 
 
+from typing import TYPE_CHECKING
+
 from manager_agent_gym.schemas.domain.task import Task
 from manager_agent_gym.core.common.schemas.llm_responses import SubtaskResponse
 from manager_agent_gym.core.agents.manager_agent.prompts.task_decomposition.prompts import (
     TASK_DECOMPOSITION_PROMPT,
 )
 from manager_agent_gym.core.common.logging import logger
-from manager_agent_gym.core.common.llm_interface import (
-    generate_structured_response,
-    LLMInferenceTruncationError,
-)
+
+if TYPE_CHECKING:
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 
 
 class TaskDecompositionError(Exception):
@@ -23,25 +24,20 @@ class TaskDecompositionError(Exception):
     pass
 
 
-class TaskDecompositionRefusalError(TaskDecompositionError):
-    """Raised specifically when the LLM provider refuses the request."""
-
-    pass
-
-
 async def decompose_task(
     task: Task,
+    llm_generator: "LLMGenerator",
     seed: int,
     workflow_context: str = "",
-    model: str = "o3",
 ) -> Task:
     """
     Decompose a task into subtasks using LLM.
 
     Args:
         task: The task to decompose
+        llm_generator: LLM generator for structured outputs
+        seed: Random seed for reproducibility
         workflow_context: Optional context about the broader workflow
-        model: LLM model to use for decomposition
 
     Returns:
         The same task object with subtasks added
@@ -59,14 +55,19 @@ async def decompose_task(
             prompt += f"\n\n## Workflow Context\n{workflow_context}\n"
             prompt += "Ensure your subtasks fit within this broader context and don't duplicate other work.\n"
 
-        response = await generate_structured_response(
-            model=model,
-            system_prompt=prompt,
-            user_prompt=None,
-            response_type=SubtaskResponse,
-            temperature=1,
-            seed=seed,
+        # Use Agents SDK approach
+        from agents import Agent
+        from agents.run import Runner
+
+        agent = Agent(
+            name="task_decomposer",
+            model=llm_generator,
+            instructions=prompt,
+            output_type=SubtaskResponse,
         )
+
+        agent_result = await Runner.run(agent, "Decompose the task into subtasks.")
+        response = agent_result.final_output
 
         for subtask_data in response.subtasks:  # type: ignore
             description = f"""Executive Summary: {subtask_data.executive_summary}
@@ -87,9 +88,6 @@ Acceptance Criteria: {subtask_data.acceptance_criteria}"""
 
         return task
 
-    except LLMInferenceTruncationError as e:
-        logger.warning("Task decomposition refused by provider: %s", str(e))
-        raise TaskDecompositionRefusalError(str(e)) from e
     except Exception as e:
         logger.error("Task decomposition failed", exc_info=True)
         raise TaskDecompositionError(str(e)) from e

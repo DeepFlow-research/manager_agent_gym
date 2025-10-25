@@ -7,6 +7,13 @@ to ensure reliable, validated actions. Based on the management.py pattern.
 
 import traceback
 from datetime import datetime
+from typing import TYPE_CHECKING
+
+from agents import Agent, Runner
+from agents.agent_output import AgentOutputSchema
+
+if TYPE_CHECKING:
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 
 
 from manager_agent_gym.core.agents.manager_agent.common.interface import ManagerAgent
@@ -34,7 +41,6 @@ from manager_agent_gym.core.agents.manager_agent.actions import (
 from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
 from manager_agent_gym.core.common.logging import logger
 from manager_agent_gym.core.common.llm_interface import (
-    generate_structured_response,
     LLMInferenceTruncationError,
 )
 from manager_agent_gym.schemas.agents.base import AgentConfig
@@ -53,6 +59,7 @@ class ChainOfThoughtManagerAgent(ManagerAgent):
 
     def __init__(
         self,
+        llm_generator: "LLMGenerator",  # REQUIRED - must be passed explicitly
         preferences: PreferenceSnapshot | None = None,
         model_name: str = "o3",
         action_classes: list[type[BaseManagerAction]] | None = None,
@@ -62,6 +69,7 @@ class ChainOfThoughtManagerAgent(ManagerAgent):
         self.model_name = model_name
         self.action_classes = action_classes or get_default_action_classes()
         self.manager_persona = manager_persona
+        self.llm_generator = llm_generator
 
     async def take_action(self, observation: ManagerObservation) -> BaseManagerAction:
         """
@@ -87,15 +95,20 @@ class ChainOfThoughtManagerAgent(ManagerAgent):
             )
             user_prompt = self._prepare_context(observation)
 
-            # Direct LLM call with structured output (validated by Pydantic)
-            parsed_action = await generate_structured_response(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                response_type=constrained_schema,
-                model=self.model_name,
-                seed=self._seed,
+            # Create fresh Agent with dynamic schema for OpenAI tracing
+            temp_agent = Agent(
+                model=self.llm_generator,
+                name=f"{self.agent_id}_decision",
+                instructions=system_prompt,
+                output_type=AgentOutputSchema(constrained_schema),
             )
-            return parsed_action.action  # type: ignore[attr-defined]
+
+            # Run agent to get traced decision in OpenAI dashboard
+            result = await Runner.run(temp_agent, user_prompt)
+
+            # Extract action from structured output
+            parsed_response = result.final_output
+            return parsed_response.action  # type: ignore[attr-defined]
 
         except LLMInferenceTruncationError as e:
             concise_reason = (

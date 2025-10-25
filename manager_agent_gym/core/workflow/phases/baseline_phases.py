@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     from manager_agent_gym.core.agents.workflow_agents.tools.registry import (
         AgentRegistry,
     )
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 
 
 BaselineType = Literal["best_of_n", "ground_truth", "trained_policy"]
@@ -54,6 +55,7 @@ class BestOfNBaseline(RubricExecutionPhaseBase):
         rubric_manager: "RubricDecompositionManagerAgent",
         stakeholder: "ClarificationStakeholderAgent",
         communication_service: "CommunicationService",
+        llm_generator: "LLMGenerator",
         additional_tools: list[Any] | None = None,
         max_turns: int = 5,
     ):
@@ -66,6 +68,7 @@ class BestOfNBaseline(RubricExecutionPhaseBase):
             rubric_manager: Manager (unused but required by base class)
             stakeholder: Stakeholder (unused but required by base class)
             communication_service: Service (unused but required by base class)
+            llm_generator: LLM generator (unused but required by base class)
             additional_tools: Tools to inject into workers
             max_turns: Max turns (unused but required by base class)
         """
@@ -75,16 +78,18 @@ class BestOfNBaseline(RubricExecutionPhaseBase):
             rubric_manager=rubric_manager,
             stakeholder=stakeholder,
             communication_service=communication_service,
+            llm_generator=llm_generator,
             additional_tools=additional_tools,
             max_turns=max_turns,
         )
         self.n = n
 
-    async def run(self, workflow: "Workflow") -> None:
+    async def run(self, workflow: "Workflow", llm_generator: "LLMGenerator") -> None:
         """Create N workers with NO rubric guidance.
 
         Args:
             workflow: Workflow to prepare
+            llm_generator: LLM generator (not used in this baseline)
         """
         logger.info("=" * 80)
         logger.info("🎲 Best-of-N Baseline")
@@ -160,6 +165,7 @@ class GroundTruthRubricBaseline(RubricExecutionPhaseBase):
         rubric_manager: "RubricDecompositionManagerAgent",
         stakeholder: "ClarificationStakeholderAgent",
         communication_service: "CommunicationService",
+        llm_generator: "LLMGenerator",
         additional_tools: list[Any] | None = None,
         max_turns: int = 5,
     ):
@@ -172,6 +178,7 @@ class GroundTruthRubricBaseline(RubricExecutionPhaseBase):
             rubric_manager: Manager (unused but required by base class)
             stakeholder: Stakeholder (unused but required by base class)
             communication_service: Service (unused but required by base class)
+            llm_generator: LLM generator (unused but required by base class)
             additional_tools: Tools to inject into worker
             max_turns: Max turns (unused but required by base class)
         """
@@ -181,16 +188,18 @@ class GroundTruthRubricBaseline(RubricExecutionPhaseBase):
             rubric_manager=rubric_manager,
             stakeholder=stakeholder,
             communication_service=communication_service,
+            llm_generator=llm_generator,
             additional_tools=additional_tools,
             max_turns=max_turns,
         )
         self.gt_rubric = ground_truth_rubric
 
-    async def run(self, workflow: "Workflow") -> None:
+    async def run(self, workflow: "Workflow", llm_generator: "LLMGenerator") -> None:
         """Create 1 worker with ground truth rubric.
 
         Args:
             workflow: Workflow to prepare
+            llm_generator: LLM generator (not used in this baseline)
         """
         logger.info("=" * 80)
         logger.info("📋 Ground Truth Rubric Baseline")
@@ -238,11 +247,12 @@ class TrainedPolicyRubricBaseline(RubricExecutionPhaseBase):
     to generate useful rubrics.
     """
 
-    async def run(self, workflow: "Workflow") -> None:
+    async def run(self, workflow: "Workflow", llm_generator: "LLMGenerator") -> None:
         """Generate 1 synthetic rubric and create worker.
 
         Args:
             workflow: Workflow to prepare
+            llm_generator: LLM generator for rubric generation
         """
         logger.info("=" * 80)
         logger.info("🤖 Trained Policy Rubric Baseline")
@@ -304,6 +314,7 @@ def create_baseline_phase(
     rubric_manager: "RubricDecompositionManagerAgent",
     stakeholder: "ClarificationStakeholderAgent",
     communication_service: "CommunicationService",
+    llm_generator: "LLMGenerator",
     ground_truth_rubric: ManagerAgentGeneratedStagedRubricWithMetadata | None = None,
     n: int = 1,
     additional_tools: list[Any] | None = None,
@@ -318,6 +329,7 @@ def create_baseline_phase(
         rubric_manager: Manager for rubric generation
         stakeholder: Stakeholder for clarification
         communication_service: Service for dialogue
+        llm_generator: LLM generator for structured outputs
         ground_truth_rubric: Required for "ground_truth" baseline
         n: Number of samples for "best_of_n"
         additional_tools: Tools to inject into workers
@@ -337,6 +349,7 @@ def create_baseline_phase(
             rubric_manager=rubric_manager,
             stakeholder=stakeholder,
             communication_service=communication_service,
+            llm_generator=llm_generator,
             additional_tools=additional_tools,
             max_turns=max_turns,
         )
@@ -350,6 +363,7 @@ def create_baseline_phase(
             rubric_manager=rubric_manager,
             stakeholder=stakeholder,
             communication_service=communication_service,
+            llm_generator=llm_generator,
             additional_tools=additional_tools,
             max_turns=max_turns,
         )
@@ -360,6 +374,7 @@ def create_baseline_phase(
             rubric_manager=rubric_manager,
             stakeholder=stakeholder,
             communication_service=communication_service,
+            llm_generator=llm_generator,
             additional_tools=additional_tools,
             max_turns=max_turns,
         )

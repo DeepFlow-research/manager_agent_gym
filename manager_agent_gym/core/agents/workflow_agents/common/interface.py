@@ -7,7 +7,7 @@ from uuid import UUID
 from manager_agent_gym.schemas.agents import AgentConfig
 from manager_agent_gym.schemas.domain import Task, Resource
 from manager_agent_gym.core.execution.schemas.results import ExecutionResult
-from manager_agent_gym.core.communication.service import COMMUNICATION_SERVICE_SINGLETON
+from manager_agent_gym.core.communication.service import CommunicationService
 from manager_agent_gym.core.agents.workflow_agents.schemas.telemetry import (
     AgentToolUseEvent,
 )
@@ -31,7 +31,8 @@ class AgentInterface(ABC, Generic[ConfigType]):
         self.config = config
         self.description: str
 
-        self.communication_service = COMMUNICATION_SERVICE_SINGLETON
+        # Communication service injected by WorkflowExecutionEngine
+        self.communication_service: CommunicationService | None = None
         self._seed: int | None = None
 
         self.name: str = config.agent_id

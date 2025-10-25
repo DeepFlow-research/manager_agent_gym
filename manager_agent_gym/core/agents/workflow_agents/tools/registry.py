@@ -24,6 +24,7 @@ from manager_agent_gym.core.agents.workflow_agents.tools.tool_factory import Too
 
 if TYPE_CHECKING:
     from manager_agent_gym.core.communication.service import CommunicationService
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 
 
 class AgentRegistry:
@@ -41,12 +42,30 @@ class AgentRegistry:
         ```
     """
 
-    def __init__(self):
+    def __init__(self, llm_generator: "LLMGenerator"):
+        """Initialize agent registry with shared LLM generator.
+
+        Args:
+            llm_generator: LLM generator to use for ALL AI workers registered via this registry.
+                          This generator is passed to every AIAgent instance created through
+                          register_ai_agent(). For Claude models, you MUST use the quality
+                          generator here (not the fast one) to avoid structured output failures.
+
+        Example:
+            ```python
+            # For workers that need to produce structured outputs
+            quality_gen = CloudLLMGenerator(model_name="claude-haiku-4-5")
+            registry = AgentRegistry(llm_generator=quality_gen)
+            ```
+        """
         self._agents: dict[str, AgentInterface] = {}
         self._agent_classes: dict[str, Type[AgentInterface]] = {}
         # Optional: simple built-in scheduler for adding/removing agents at timesteps
         self._scheduled_changes: dict[int, list[ScheduledAgentChange]] = {}
         self._executed_change_timesteps: set[int] = set()
+
+        # Store llm_generator to pass to agents (shared across workflow)
+        self.llm_generator = llm_generator
 
     def register_agent_class(
         self, agent_type: str, agent_class: Type[AgentInterface]
@@ -164,7 +183,9 @@ class AgentRegistry:
                 "config must be an AIAgentConfig, received: " + str(type(config))
             )
 
-        agent = AIAgent(config=config, tools=additional_tools)
+        agent = AIAgent(
+            config=config, tools=additional_tools, llm_generator=self.llm_generator
+        )
         self.register_agent(agent)
 
     def register_human_agent(

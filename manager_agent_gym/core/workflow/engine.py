@@ -45,7 +45,6 @@ from manager_agent_gym.schemas.preferences.preference import (
     PreferenceSnapshot,
     PreferenceChangeEvent,
 )
-from manager_agent_gym.schemas.preferences.rubric import RunCondition
 
 from manager_agent_gym.core.communication.service import CommunicationService
 from manager_agent_gym.core.evaluation.engine.validation_engine import ValidationEngine
@@ -56,15 +55,16 @@ from manager_agent_gym.core.evaluation.schemas.reward import (
     RewardProjection,
 )
 from manager_agent_gym.core.agents.manager_agent.actions import ActionResult
+from manager_agent_gym.schemas.preferences.evaluation import (
+    StagedRubric,
+    StagedRubricResult,
+)
 
 if TYPE_CHECKING:
     from manager_agent_gym.core.workflow.phases.interface import (
         PreExecutionPhase,
     )
-    from manager_agent_gym.schemas.preferences.evaluation import (
-        StagedRubric,
-        StagedRubricResult,
-    )
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 
 
 class TaskExecutionEvaluationResult(BaseModel):
@@ -135,6 +135,7 @@ class WorkflowExecutionEngine:
     def __init__(
         self,
         workflow: Workflow,
+        llm_generator: "LLMGenerator",
         agent_registry: AgentRegistry,
         stakeholder_agent: StakeholderBase,
         manager_agent: ManagerAgent,
@@ -158,6 +159,8 @@ class WorkflowExecutionEngine:
         pre_execution_phases: "list[PreExecutionPhase] | None" = None,
         # Gold standard evaluation rubrics (GDPEval)
         gold_rubrics: "list[StagedRubric] | None" = None,
+        ignore_validation_gates: bool = True,
+        # LLM generator for structured outputs (rubric generation, etc.)
     ):
         self.workflow = workflow
         self.agent_registry = agent_registry
@@ -175,6 +178,8 @@ class WorkflowExecutionEngine:
         self.seed: int = seed
         # Pre-execution phases (optional list of phases to run before main loop)
         self.pre_execution_phases = pre_execution_phases or []
+        # LLM generator for structured outputs (passed to phases)
+        self.llm_generator = llm_generator
 
         self.output_config = output_config or OutputConfig()
         self.enable_timestep_logging = enable_timestep_logging
@@ -197,11 +202,12 @@ class WorkflowExecutionEngine:
         self._task_group: TaskGroup | None = None
 
         self.validation_engine = ValidationEngine(
+            seed=self.seed,
+            ignore_gates=ignore_validation_gates,
             max_concurrent_rubrics=max_concurrent_rubrics,
             log_preference_progress=log_preference_evaluation_progress,
             reward_aggregator=reward_aggregator,
             reward_projection=reward_projection,
-            seed=self.seed,
         )
 
         self.communication_service = (
@@ -234,9 +240,6 @@ class WorkflowExecutionEngine:
         # Ensure output directories exist (only if logging is enabled)
         if self.enable_timestep_logging or self.enable_final_metrics_logging:
             self.output_writer.ensure_directories()
-
-        # Evaluation cadence configuration (default: BOTH) using rubric enum
-        self.evaluation_cadence: RunCondition = RunCondition.ON_COMPLETION
 
     def restore_from_snapshot(self, snapshot_dir: str, timestep: int) -> None:
         """
@@ -326,6 +329,7 @@ class WorkflowExecutionEngine:
                 )
                 await phase.run(
                     workflow=self.workflow,
+                    llm_generator=self.llm_generator,
                 )
                 logger.info(f"Phase {idx} complete")
 
@@ -391,40 +395,83 @@ class WorkflowExecutionEngine:
         )
         manager_actions = self.manager_agent.get_action_buffer()
 
-        # PRIORITY 1: Evaluate with gold standard rubrics if provided (GDPEval)
-        if self.gold_rubrics:
-            logger.info(f"Evaluating with {len(self.gold_rubrics)} gold standard rubric(s)...")
-            gold_results = await self.evaluate_with_staged_rubrics(
+        # Terminal evaluation: Evaluate with gold standard rubrics
+        from manager_agent_gym.schemas.preferences.evaluation import (
+            TimestepEvaluationResult,
+        )
+
+        logger.info(
+            f"Evaluating with {len(self.gold_rubrics)} gold standard rubric(s)..."
+        )
+
+        # Use per-execution evaluation with GRPO metrics
+        grpo_evaluation: TimestepEvaluationResult = (
+            await self.validation_engine.evaluate_timestep(
+                workflow=self.workflow,
                 timestep=self.current_timestep,
                 staged_rubrics=self.gold_rubrics,
-            )
-            
-            # Store gold evaluation results in workflow metadata for reward calculation
-            if not hasattr(self.workflow, "metadata") or self.workflow.metadata is None:
-                self.workflow.metadata = {}
-            self.workflow.metadata["gold_evaluation_results"] = {
-                category: {
-                    "total_score": result.total_score,
-                    "max_score": result.max_score,
-                    "normalized_score": result.normalized_score,
-                    "stages_passed": result.stages_passed,
-                    "stages_evaluated": result.stages_evaluated,
-                    "failed_gate": result.failed_gate,
-                    "stopped_at": result.stopped_at,
-                }
-                for category, result in gold_results.items()
-            }
-            logger.info("Gold standard evaluation complete")
-        
-        # PRIORITY 2: Let stakeholder run its own evaluation (if needed for legacy)
-        else:
-            await self.stakeholder_agent.evaluate_for_timestep(
-                timestep=self.current_timestep,
-                validation_engine=self.validation_engine,
-                workflow=self.workflow,
                 communications=comms_by_sender,
                 manager_actions=manager_actions,
             )
+        )
+
+        # Store structured GRPO training data
+        if not hasattr(self.workflow, "metadata") or self.workflow.metadata is None:
+            self.workflow.metadata = {}
+
+        self.workflow.metadata["timestep_evaluation"] = grpo_evaluation
+
+        # Also store summary for backward compatibility
+        self.workflow.metadata["gold_evaluation_results"] = {
+            "mean_baseline": grpo_evaluation.mean_baseline_across_tasks,
+            "total_executions": grpo_evaluation.total_executions,
+            "total_tasks": grpo_evaluation.total_tasks,
+            "per_task_baselines": {
+                task_id: metrics.baseline
+                for task_id, metrics in grpo_evaluation.per_task_metrics.items()
+            },
+        }
+
+        logger.info(
+            f"Gold standard evaluation complete - {grpo_evaluation.total_executions} executions evaluated"
+        )
+        logger.info(f"Mean baseline: {grpo_evaluation.mean_baseline_across_tasks:.3f}")
+
+        # Save enhanced evaluation data for calibration
+        if save_outputs:
+            try:
+                # Get synthetic rubrics from pre-execution phase
+                synthetic_rubrics: list = []
+                if self.pre_execution_phases and len(self.pre_execution_phases) > 0:
+                    # pre_execution_phases is a list, get the first phase
+                    first_phase = self.pre_execution_phases[0]
+                    synthetic_rubrics = getattr(first_phase, 'synthetic_rubrics', [])
+                
+                # Get task executions grouped by task
+                task_executions = {}
+                for task in self.workflow.tasks.values():
+                    if task.execution_ids:
+                        execs = [
+                            self.workflow.task_executions[exec_id]
+                            for exec_id in task.execution_ids
+                            if exec_id in self.workflow.task_executions
+                        ]
+                        if execs:
+                            task_executions[task.id] = execs
+                
+                # Save enhanced data
+                if synthetic_rubrics and task_executions:
+                    self.output_writer.save_enhanced_evaluation_data(
+                        synthetic_rubrics=synthetic_rubrics,
+                        ground_truth_rubrics=self.gold_rubrics,
+                        task_executions=task_executions,
+                        workflow=self.workflow,
+                    )
+                    logger.info(f"✅ Saved enhanced evaluation data: {len(synthetic_rubrics)} rubrics, {len(task_executions)} tasks")
+                else:
+                    logger.info(f"ℹ️  Skipping enhanced data save: synthetic_rubrics={len(synthetic_rubrics)}, task_executions={len(task_executions)}")
+            except Exception as e:
+                logger.warning(f"Failed to save enhanced evaluation data: {e}", exc_info=True)
 
         # TODO: Compute utility gap if proxy rubrics were generated
         # If workflow.metadata contains both "true_preferences" and "decomposition_state"
@@ -453,6 +500,11 @@ class WorkflowExecutionEngine:
 
         agent_coordination_changes = self._check_and_apply_agent_changes()
 
+        # DEBUG: Log agent sync status
+        logger.info(
+            f"🔍 DEBUG: After agent sync - workflow.agents: {list(self.workflow.agents.keys())}"
+        )
+
         manager_action = None
         if self.manager_agent:
             self.execution_state = ExecutionState.WAITING_FOR_MANAGER
@@ -474,7 +526,7 @@ class WorkflowExecutionEngine:
             )
             try:
                 action_result = await manager_action.execute(
-                    self.workflow, self.communication_service
+                    self.workflow, self.communication_service, self.llm_generator
                 )
             except Exception:
                 logger.error("failed to execute manager action", exc_info=True)
@@ -492,66 +544,19 @@ class WorkflowExecutionEngine:
 
         self._update_workflow_state(tasks_completed, tasks_failed)
 
-        # Evaluate preferences for this timestep if configured
-        # NEW: Stakeholder handles its own evaluation via evaluate_for_timestep() hook
-        did_eval_this_step = False
-        if self.evaluation_cadence in (
-            RunCondition.EACH_TIMESTEP,
-            RunCondition.BOTH,
-        ):
-            communications_sender = (
-                self.communication_service.get_messages_grouped_by_sender(
-                    sort_within_group="time",
-                    include_broadcasts=True,
-                )
+        # Run stakeholder policy step (skip at timestep 0 to avoid processing pre-execution messages)
+        if self.current_timestep > 0:
+            logger.info(
+                f"🔍 DEBUG: Calling stakeholder.policy_step() at timestep {self.current_timestep}"
             )
-            comms_by_sender: list[SenderMessagesView] = cast(
-                list[SenderMessagesView], communications_sender
+            await self.stakeholder_agent.policy_step(self.current_timestep)
+            logger.info(
+                f"🔍 DEBUG: Stakeholder.policy_step() completed at timestep {self.current_timestep}"
             )
-            manager_actions = self.manager_agent.get_action_buffer()
-
-            # Let stakeholder trigger its own evaluation
-            await self.stakeholder_agent.evaluate_for_timestep(
-                timestep=self.current_timestep,
-                validation_engine=self.validation_engine,
-                workflow=self.workflow,
-                communications=comms_by_sender,
-                manager_actions=manager_actions,
+        else:
+            logger.info(
+                "🔍 DEBUG: Skipping stakeholder.policy_step() at timestep 0 (pre-execution messages handled)"
             )
-            did_eval_this_step = True
-
-        # If cadence is not EACH_TIMESTEP/BOTH, still evaluate on selected timesteps only
-        elif (
-            self.validation_engine.selected_timesteps
-            and self.current_timestep in self.validation_engine.selected_timesteps
-        ):
-            communications_sender = (
-                self.communication_service.get_messages_grouped_by_sender(
-                    sort_within_group="time",
-                    include_broadcasts=True,
-                )
-            )
-            comms_by_sender = cast(list[SenderMessagesView], communications_sender)
-            manager_actions = self.manager_agent.get_action_buffer()
-
-            # Let stakeholder trigger its own evaluation
-            await self.stakeholder_agent.evaluate_for_timestep(
-                timestep=self.current_timestep,
-                validation_engine=self.validation_engine,
-                workflow=self.workflow,
-                communications=comms_by_sender,
-                manager_actions=manager_actions,
-            )
-            did_eval_this_step = True
-
-        # Ensure reward vector has an entry for this timestep even if no evals were run
-        if not did_eval_this_step:
-            rv = self.validation_engine.reward_vector
-            if len(rv) <= self.current_timestep:
-                rv.extend([0.0] * (self.current_timestep + 1 - len(rv)))
-
-        # Run stakeholder policy step
-        await self.stakeholder_agent.policy_step(self.current_timestep)
 
         execution_time = (datetime.now() - start_time).total_seconds()
 
@@ -1222,13 +1227,30 @@ class WorkflowExecutionEngine:
 
         logger.info(f"Starting {len(executions)} executions for task '{task.name}'")
 
+        # DEBUG: Log available agents
+        logger.info(
+            f"🔍 DEBUG: Available agents in workflow.agents: {list(self.workflow.agents.keys())}"
+        )
+        logger.info(
+            f"🔍 DEBUG: Required agents for executions: {[e.agent_id for e in executions]}"
+        )
+
         # Create futures for all executions
         variant_futures = []
         for execution in executions:
+            logger.info(
+                f"🔍 DEBUG: Looking for agent '{execution.agent_id}' (execution {execution.id})"
+            )
             agent = self.workflow.agents.get(execution.agent_id)
             if not agent:
-                logger.warning(f"Agent {execution.agent_id} not found")
+                logger.error(
+                    f"❌ DEBUG: Agent {execution.agent_id} NOT FOUND in workflow.agents!"
+                )
+                logger.error(
+                    f"❌ DEBUG: Execution {execution.id} status: {execution.status}"
+                )
                 continue
+            logger.info(f"✅ DEBUG: Found agent {execution.agent_id}")
 
             # Mark execution as running
             execution.status = TaskStatus.RUNNING
@@ -1269,9 +1291,16 @@ class WorkflowExecutionEngine:
         Returns:
             Tuple of (execution_id, result)
         """
+        logger.info(
+            f"🔍 DEBUG: Starting execution {execution.id} with agent {execution.agent_id}"
+        )
         try:
             # Execute task
             result = await agent.execute_task(task, resources)
+
+            logger.info(
+                f"🔍 DEBUG: Execution {execution.id} returned result.success={result.success}"
+            )
 
             # Update execution state
             execution.status = (
@@ -1285,19 +1314,22 @@ class WorkflowExecutionEngine:
 
             if not result.success:
                 execution.error_message = result.error_message
+                logger.warning(
+                    f"🔍 DEBUG: Execution {execution.id} failed with error: {result.error_message}"
+                )
 
             # Add resources to workflow
             for resource in result.output_resources:
                 WorkflowMutations.add_resource(self.workflow, resource)
 
             logger.info(
-                f"Execution {execution.id} (agent {execution.agent_id}) completed for '{task.name}'"
+                f"Execution {execution.id} (agent {execution.agent_id}) completed for '{task.name}' with status={execution.status}"
             )
             return execution.id, result
 
         except Exception as e:
             logger.error(
-                f"Execution {execution.id} (agent {execution.agent_id}) failed: {e}",
+                f"❌ DEBUG: Exception in _execute_single_variant for execution {execution.id}: {type(e).__name__}: {e}",
                 exc_info=True,
             )
 
@@ -1322,15 +1354,23 @@ class WorkflowExecutionEngine:
             if eid in self.workflow.task_executions
         ]
 
+        # DEBUG: Log execution statuses in detail
+        logger.info(f"🔍 DEBUG: Checking execution statuses for task '{task.name}':")
+        for e in executions:
+            logger.info(
+                f"  - Execution {e.id} (agent {e.agent_id}): status={e.status}, error={e.error_message}"
+            )
+
         # Count successes and failures
         successful_executions = [
             e for e in executions if e.status == TaskStatus.COMPLETED
         ]
         failed_executions = [e for e in executions if e.status == TaskStatus.FAILED]
+        pending_executions = [e for e in executions if e.status == TaskStatus.PENDING]
 
         logger.info(
             f"All executions finished for '{task.name}': "
-            f"{len(successful_executions)} succeeded, {len(failed_executions)} failed"
+            f"{len(successful_executions)} succeeded, {len(failed_executions)} failed, {len(pending_executions)} still pending"
         )
 
         # If all executions failed, mark task as failed
@@ -1344,11 +1384,16 @@ class WorkflowExecutionEngine:
             return
 
         # At least one execution succeeded - evaluate and rank
-        if task.completion_evaluators:
+        # OPTIMIZATION: Skip if gold_rubrics will evaluate at timestep end (avoids double evaluation)
+        if task.completion_evaluators and not self.gold_rubrics:
             await self._evaluate_and_rank_executions(task, successful_executions)
 
         else:
-            # No evaluators: propagate all successful outputs without ranking
+            # No evaluators OR gold_rubrics will handle it: propagate all outputs without ranking
+            if self.gold_rubrics:
+                logger.info(
+                    "Skipping task completion evaluation (gold_rubrics will evaluate at timestep end)"
+                )
             task.output_resource_ids = [
                 rid for ex in successful_executions for rid in ex.output_resource_ids
             ]
@@ -1371,6 +1416,11 @@ class WorkflowExecutionEngine:
 
         Each execution's full resource bundle is evaluated as a unit.
 
+        Supports three evaluator types:
+        - StagedRubric: New staged evaluation system with gates
+        - Rubric: Legacy flat rubric system
+        - Callable: Custom evaluation functions
+
         Args:
             task: The task being evaluated
             executions: List of successful TaskExecution objects to evaluate
@@ -1382,8 +1432,22 @@ class WorkflowExecutionEngine:
 
         logger.info(f"Evaluating {len(executions)} executions for task '{task.name}'")
 
-        # Evaluate each execution
-        for execution in executions:
+        # Get communications and manager actions for context (needed for staged rubrics)
+        communications_sender = (
+            self.communication_service.get_messages_grouped_by_sender(
+                sort_within_group="time",
+                include_broadcasts=True,
+            )
+            if self.communication_service
+            else None
+        )
+        comms_by_sender: list[SenderMessagesView] = cast(
+            list[SenderMessagesView], communications_sender or []
+        )
+        manager_actions = self.manager_agent.get_action_buffer()
+
+        # Evaluate each execution IN PARALLEL
+        async def evaluate_single_execution(execution):
             # Get execution's resource bundle
             resources = [
                 self.workflow.resources[rid]
@@ -1393,31 +1457,68 @@ class WorkflowExecutionEngine:
 
             if not resources:
                 logger.warning(f"No resources found for execution {execution.id}")
-                continue
+                return execution.id, {}, {}
 
-            evaluation_scores = {}
-            evaluation_details = {}
+            evaluation_scores: dict[str, float] = {}
+            evaluation_details: dict[str, Any] = {}
 
             # Run each evaluator on the full resource bundle
             for evaluator in task.completion_evaluators:
                 try:
-                    # === Handle Rubric objects ===
-                    if isinstance(evaluator, Rubric):
+                    # === Handle StagedRubric objects (NEW) ===
+                    if isinstance(evaluator, StagedRubric):
+                        # Evaluate THIS execution with the staged rubric
+                        rubric_results = await self.validation_engine.evaluate_execution_with_staged_rubrics(
+                            workflow=self.workflow,
+                            execution=execution,
+                            timestep=self.current_timestep,
+                            staged_rubrics=[evaluator],
+                            communications=comms_by_sender,
+                            manager_actions=manager_actions,
+                        )
+
+                        # Extract results for each rubric category
+                        for category_name, result in rubric_results.items():
+                            evaluator_name = category_name
+                            evaluation_scores[evaluator_name] = result.normalized_score
+                            evaluation_details[evaluator_name] = {
+                                "score": result.normalized_score,
+                                "max_score": result.max_score,
+                                "total_score": result.total_score,
+                                "stages_evaluated": result.stages_evaluated,
+                                "stages_passed": result.stages_passed,
+                                "failed_gate": result.failed_gate,
+                                "stopped_at": result.stopped_at,
+                                "stage_results": result.stage_results,  # Already list[dict[str, Any]]
+                            }
+
+                            logger.info(
+                                f"Staged rubric '{evaluator_name}' evaluated: "
+                                f"{result.normalized_score:.2%} "
+                                f"({result.stages_passed}/{result.stages_evaluated} stages passed)"
+                            )
+
+                    # === Handle Rubric objects (legacy) ===
+                    elif isinstance(evaluator, Rubric):
                         from manager_agent_gym.core.evaluation.schemas.success_criteria import (
                             ValidationContext,
                         )
-                        
+
                         # Create context for these specific resources
                         context = ValidationContext(
                             workflow=self.workflow,
-                            timestep=0  # Task completion context
+                            timestep=0,  # Task completion context
                         )
-                        context.set_evaluable_resources(resources) 
-                        
+                        context.set_evaluable_resources(resources)
+
                         # Use existing ValidationEngine to evaluate each criterion
                         criterion_results: dict[str, dict[str, float | str]] = {}
                         for criterion in evaluator.criteria:
-                            score_result, _, _ = await self.validation_engine._evaluate_single_rubric(
+                            (
+                                score_result,
+                                _,
+                                _,
+                            ) = await self.validation_engine._evaluate_single_rubric(
                                 workflow=self.workflow,
                                 rubric_criteria=criterion,
                                 context=context,
@@ -1427,7 +1528,7 @@ class WorkflowExecutionEngine:
                                 "reasoning": score_result.reasoning,
                                 "max_score": float(criterion.max_score),
                             }
-                        
+
                         # Aggregate using rubric's weighted average
                         total_weighted = sum(
                             float(r["score"]) * float(r["max_score"])  # type: ignore[arg-type]
@@ -1437,20 +1538,22 @@ class WorkflowExecutionEngine:
                             float(r["max_score"])  # type: ignore[arg-type]
                             for r in criterion_results.values()
                         )
-                        aggregate_score = total_weighted / total_weight if total_weight > 0 else 0.0
-                        
+                        aggregate_score = (
+                            total_weighted / total_weight if total_weight > 0 else 0.0
+                        )
+
                         evaluator_name = evaluator.name
                         evaluation_scores[evaluator_name] = aggregate_score
                         evaluation_details[evaluator_name] = {
                             "score": aggregate_score,
                             "criteria": criterion_results,
                         }
-                        
+
                         logger.info(
                             f"Rubric '{evaluator_name}' evaluated: {aggregate_score:.2f} "
                             f"({len(criterion_results)} criteria)"
                         )
-                    
+
                     # === Handle callable functions ===
                     else:
                         # Call the scorer function with the resource bundle
@@ -1470,25 +1573,46 @@ class WorkflowExecutionEngine:
                             score = result.score
                             metadata = result.evaluation_metadata
                         else:
-                            logger.warning(f"Unexpected scorer result type: {type(result)}")
+                            logger.warning(
+                                f"Unexpected scorer result type: {type(result)}"
+                            )
                             score = 0.0
                             metadata = {}
 
-                        evaluator_name = getattr(
-                            evaluator, "__name__", str(evaluator)
-                        )
+                        evaluator_name = getattr(evaluator, "__name__", str(evaluator))
                         evaluation_scores[evaluator_name] = score
-                        evaluation_details[evaluator_name] = {"score": score, **metadata}
+                        evaluation_details[evaluator_name] = {
+                            "score": score,
+                            **metadata,
+                        }
 
                 except Exception as e:
                     logger.error(f"Evaluator failed: {e}", exc_info=True)
+                    # Extract evaluator name (StagedRubric uses category_name, others use name)
                     evaluator_name = getattr(
-                        evaluator, "name", getattr(evaluator, "__name__", str(evaluator))
+                        evaluator,
+                        "category_name",
+                        getattr(
+                            evaluator,
+                            "name",
+                            getattr(evaluator, "__name__", str(evaluator)),
+                        ),
                     )
                     evaluation_scores[evaluator_name] = 0.0
                     evaluation_details[evaluator_name] = {"error": str(e)}
 
-            # Store evaluation results in execution
+            # Return evaluation results
+            return execution.id, evaluation_scores, evaluation_details
+
+        # Run all evaluations in PARALLEL
+        logger.info(f"Evaluating {len(executions)} executions for task '{task.name}'")
+        eval_results = await asyncio.gather(
+            *[evaluate_single_execution(exec) for exec in executions]
+        )
+
+        # Store evaluation results in executions
+        for exec_id, evaluation_scores, evaluation_details in eval_results:
+            execution = next(e for e in executions if e.id == exec_id)
             execution.evaluation_scores = evaluation_scores
             execution.evaluation_details = evaluation_details
             execution.aggregate_score = (
@@ -1529,24 +1653,24 @@ class WorkflowExecutionEngine:
             if ranked
             else "No executions to rank"
         )
-    
+
     async def evaluate_with_staged_rubrics(
         self,
         timestep: int,
         staged_rubrics: list["StagedRubric"],
     ) -> dict[str, "StagedRubricResult"]:
         """Evaluate workflow using staged rubrics (NEW evaluation path).
-        
+
         This method evaluates the workflow using the new staged rubric system,
         which supports sequential evaluation with gates and failure actions.
-        
+
         Args:
             timestep: Current timestep
             staged_rubrics: List of staged rubrics to evaluate
-            
+
         Returns:
             Dict mapping rubric category_name to evaluation result
-            
+
         Example:
             >>> gold_rubric = convert_staged_rubric_to_executable(gdpeval_spec)
             >>> results = await engine.evaluate_with_staged_rubrics(
@@ -1555,8 +1679,7 @@ class WorkflowExecutionEngine:
             ... )
             >>> print(f"Score: {results['Quality'].total_score}/{results['Quality'].max_score}")
         """
-        from manager_agent_gym.schemas.preferences.evaluation import StagedRubric, StagedRubricResult
-        
+
         # Get communications and manager actions for context
         communications_sender = (
             self.communication_service.get_messages_grouped_by_sender(
@@ -1570,7 +1693,7 @@ class WorkflowExecutionEngine:
             list[SenderMessagesView], communications_sender
         )
         manager_actions = self.manager_agent.get_action_buffer()
-        
+
         # Evaluate using staged rubrics
         results = await self.validation_engine.evaluate_timestep_staged(
             workflow=self.workflow,
@@ -1579,7 +1702,7 @@ class WorkflowExecutionEngine:
             communications=comms_by_sender,
             manager_actions=manager_actions,
         )
-        
+
         # Store results in workflow for reward calculation
         for category_name, result in results.items():
             # Update task executions with evaluation results
@@ -1587,7 +1710,9 @@ class WorkflowExecutionEngine:
                 for execution in task.get_executions(self.workflow):
                     if execution.is_completed():
                         # Store normalized score (0-1) as aggregate_score for compatibility
-                        execution.aggregate_score = result.normalized_score * 10  # Scale to 0-10
+                        execution.aggregate_score = (
+                            result.normalized_score * 10
+                        )  # Scale to 0-10
                         execution.evaluation_details = {
                             "category": category_name,
                             "total_score": result.total_score,
@@ -1599,9 +1724,7 @@ class WorkflowExecutionEngine:
                             "stopped_at": result.stopped_at,
                             "stage_results": result.stage_results,
                         }
-        
-        logger.info(
-            f"Staged evaluation complete: {len(results)} categories evaluated"
-        )
-        
+
+        logger.info(f"Staged evaluation complete: {len(results)} categories evaluated")
+
         return results

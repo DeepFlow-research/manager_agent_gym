@@ -33,7 +33,15 @@ def create_code_execution_tools(
         Execute Python code in a secure sandbox environment.
 
         The code runs in an isolated E2B sandbox with network access and
-        common Python packages (numpy, pandas, matplotlib, etc.) pre-installed.
+        packages available:
+        - Base E2B: numpy, pandas, scipy, matplotlib, scikit-learn, requests
+        - Auto-installed: openpyxl, xlsxwriter, python-docx, statsmodels, seaborn, plotly
+
+        Common use cases:
+        - Excel files: pandas.to_excel(), xlsxwriter.Workbook(), openpyxl
+        - Statistical analysis: statsmodels (time series, regression, ARIMA)
+        - Visualization: seaborn (statistical plots), plotly (interactive charts)
+        - Documents: python-docx for Word files
 
         Args:
             code: Python code to execute

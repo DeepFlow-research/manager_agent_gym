@@ -11,4 +11,3 @@ __all__ = [
     "get_index_manager",
     "create_rag_tools",
 ]
-

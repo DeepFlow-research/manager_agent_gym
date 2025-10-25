@@ -10,6 +10,7 @@ This is your "Hello World" for autonomous workflow management!
 """
 
 import asyncio
+import traceback
 
 # Import key components from manager_agent_gym
 # Many components are available at the top level for convenience
@@ -174,7 +175,7 @@ async def run_hello_manager_agent():
             print(f"\n📈 PROGRESS: {completion_rate:.1f}% of workflow completed")
 
     except Exception as e:
-        print(f"\n❌ Execution failed: {e}")
+        print(f"\n❌ Execution failed: {e, traceback.format_exc()}")
         raise
 
 

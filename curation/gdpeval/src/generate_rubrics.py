@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from tqdm.asyncio import tqdm_asyncio
 import pandas as pd
-from curation.gdpeval.src.staged_rubric_generator import (
+from staged_rubric_generator import (
     generate_staged_rubric_v3 as generate_staged_rubric,
 )
 from dotenv import load_dotenv

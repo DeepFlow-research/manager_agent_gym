@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import os
-from typing import Callable, Dict
+from typing import Callable, Dict, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 
 from manager_agent_gym.core.agents.manager_agent.common.interface import ManagerAgent
 from manager_agent_gym.core.agents.manager_agent.implementations.chain_of_thought import (
@@ -38,6 +41,7 @@ def _resolve_model_name(explicit_model_name: str | None) -> str:
 
 
 def create_manager_agent(
+    llm_generator: "LLMGenerator",  # REQUIRED - must be passed explicitly
     preferences: PreferenceSnapshot,
     model_name: str | None = None,
     manager_mode: str | None = None,
@@ -45,6 +49,7 @@ def create_manager_agent(
     """Create a manager agent instance based on mode and model settings.
 
     Args:
+        llm_generator: LLM generator (shared across workflow for training)
         preferences: Preference weights used by the manager agent.
         model_name: Optional model identifier (defaults from MAG_MODEL_NAME or "o3").
         manager_mode: Optional explicit mode (defaults from MAG_MANAGER_MODE or "cot").
@@ -60,13 +65,23 @@ def create_manager_agent(
 
     creators: Dict[str, Callable[[], ManagerAgent]] = {
         "cot": lambda: ChainOfThoughtManagerAgent(
-            preferences=preferences, model_name=resolved_model
+            llm_generator=llm_generator,
+            preferences=preferences,
+            model_name=resolved_model,
         ),
         # Canonical "random" uses RandomManagerAgentV2 by default
+        # Note: RandomManagerAgent doesn't use LLM, but accepts it for consistency
         "random": lambda: RandomManagerAgentV2(
-            preferences=preferences, model_name=resolved_model, seed=0
+            preferences=preferences, 
+            llm_generator=llm_generator,
+            model_name=resolved_model, 
+            seed=0
         ),
-        "assign_all": lambda: OneShotDelegateManagerAgent(preferences=preferences),
+        "assign_all": lambda: OneShotDelegateManagerAgent(
+            preferences=preferences,
+            llm_generator=llm_generator,
+            model_name=resolved_model,
+        ),
         "noop": lambda: NoOpManagerAgent(
             agent_id="noop_manager", preferences=preferences
         ),
@@ -89,11 +104,15 @@ def manager_mode_label(manager_mode: str | None = None) -> str:
 
 
 def create_manager(
+    llm_generator: "LLMGenerator",  # REQUIRED - must be passed explicitly
     preferences: PreferenceSnapshot,
     model_name: str | None = None,
     manager_mode: str | None = None,
 ) -> ManagerAgent:
     """Convenience alias to match example naming; forwards to create_manager_agent."""
     return create_manager_agent(
-        preferences=preferences, model_name=model_name, manager_mode=manager_mode
+        llm_generator=llm_generator,
+        preferences=preferences,
+        model_name=model_name,
+        manager_mode=manager_mode,
     )

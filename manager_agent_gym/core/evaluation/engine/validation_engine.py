@@ -5,30 +5,33 @@ At each timestep, evaluates:
 - Preference evaluators (from `PreferenceWeights`), batching all rubrics with a tqdm bar
 - Optional floating evaluators provided explicitly for the workflow
 
-Rubrics can be implemented as code functions or via LLM prompts. For LLM,
-we reuse `WorkflowValidationRule` to format, call, and interpret responses.
+Rubrics can be implemented as:
+- Code functions (via `CodeRuleExecutor`)
+- LLM prompts (via `MultimodalEvaluator` with vision support)
+- Legacy evaluator functions (backwards compatibility)
 """
 
 import asyncio
 import inspect
 import tqdm  # type: ignore
-from datetime import datetime
 from typing import Any, Callable, cast
 
 from manager_agent_gym.core.evaluation.schemas.success_criteria import (
     ValidationContext,
 )
 from manager_agent_gym.schemas.domain.workflow import Workflow
+from manager_agent_gym.schemas.domain.task_execution import TaskExecution
 from manager_agent_gym.schemas.preferences.preference import PreferenceSnapshot
 from manager_agent_gym.core.common.logging import logger
 from uuid import UUID
 from manager_agent_gym.schemas.preferences.evaluation import (
     EvaluationResult,
-    PreferenceScore,
     RubricResult,
-    RubricGroupResult,
     StagedRubric,
     StagedRubricResult,
+    TimestepEvaluationResult,
+    TaskEvaluationMetrics,
+    ExecutionEvaluationResult,
 )
 from manager_agent_gym.schemas.preferences.rubric import (
     RunCondition,
@@ -36,10 +39,7 @@ from manager_agent_gym.schemas.preferences.rubric import (
     AdditionalContextItem,
 )
 from manager_agent_gym.core.common.schemas.evaluators import EvaluatedScore
-from manager_agent_gym.schemas.preferences.evaluator import (
-    AggregationStrategy,
-    Rubric,
-)
+from manager_agent_gym.schemas.preferences.evaluator import AggregationStrategy
 from manager_agent_gym.schemas.domain.communication import SenderMessagesView
 from manager_agent_gym.core.evaluation.schemas.reward import (
     BaseRewardAggregator,
@@ -71,8 +71,6 @@ class ValidationEngine:
         seed (int): Random seed for LLM rubric evaluation consistency.
         max_concurrent_rubrics (int): Concurrency limit for rubric execution.
         log_preference_progress (bool): Show tqdm progress when evaluating preferences.
-        selected_timesteps (list[int] | None): Forced evaluation timesteps; if provided,
-            cadence checks are augmented to include these timesteps.
         reward_aggregator (BaseRewardAggregator | None): Aggregator mapping evaluation
             results to a reward value (scalar or structured). Defaults to utility sum.
         reward_projection (RewardProjection | None): Optional projector to scalar reward.
@@ -86,9 +84,9 @@ class ValidationEngine:
     def __init__(
         self,
         seed: int,
+        ignore_gates: bool = False,
         max_concurrent_rubrics: int = 100,
         log_preference_progress: bool = False,
-        selected_timesteps: list[int] | None = None,
         reward_aggregator: BaseRewardAggregator[object] | None = None,
         reward_projection: RewardProjection[object] | None = None,
     ) -> None:
@@ -97,7 +95,6 @@ class ValidationEngine:
         )
         self._log_preference_progress: bool = bool(log_preference_progress)
         self.evaluation_results: list[EvaluationResult] = []
-        self.selected_timesteps: list[int] | None = selected_timesteps
         # Reward plumbing: allow arbitrary reward value + scalar projection
         self._reward_aggregator: BaseRewardAggregator[object] = (
             reward_aggregator
@@ -113,292 +110,8 @@ class ValidationEngine:
         self.reward_vector: list[float] = []
         # Seed for LLM-based rubric evaluation
         self.seed: int = seed
-
-    async def evaluate_timestep(
-        self,
-        workflow: Workflow,
-        timestep: int,
-        cadence: RunCondition,
-        communications: list[SenderMessagesView] | None,
-        manager_actions: list[ActionResult] | None,
-        preferences: PreferenceSnapshot | None = None,
-        workflow_evaluators: list[Rubric] | None = None,
-    ) -> EvaluationResult:
-        """Evaluate all rubrics (preferences + floating) concurrently with one progress bar.
-        
-        .. deprecated::
-            Use :meth:`evaluate_timestep_staged` instead. This method uses the old
-            flat rubric evaluation path with complex aggregation logic. The new
-            staged evaluation path is simpler, more powerful, and supports gate logic.
-            
-            To migrate:
-            1. Convert flat rubrics to staged using `convert_flat_to_staged()`
-            2. Call `evaluate_timestep_staged()` instead
-            
-            This method will be removed in a future version.
-        """
-        import warnings
-        warnings.warn(
-            "evaluate_timestep() is deprecated. Use evaluate_timestep_staged() instead. "
-            "See STAGED_EVALUATION_DELETION_GUIDE.md for migration instructions.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        # 1) Prepare mappings for aggregation after execution
-        pref_name_to_eval: dict[str, Rubric] = {}
-        pref_name_to_weight: dict[str, float] = {}
-        force_full_eval = bool(
-            self.selected_timesteps and (timestep in self.selected_timesteps)
-        )
-
-        if preferences is not None and cadence is not None:
-            for p in preferences.preferences:
-                if p.evaluator is not None:
-                    # p.evaluator is Optional[Evaluator]; assert non-None inside the block
-                    pref_name_to_eval[p.name] = p.evaluator  # type: ignore[assignment]
-                    pref_name_to_weight[p.name] = p.weight
-
-        workflow_eval_by_name: dict[str, Rubric] = {}
-        if workflow_evaluators:
-            for wf_ev in workflow_evaluators:
-                workflow_eval_by_name[wf_ev.name] = wf_ev
-
-        # 2) Collect all scheduled rubrics with an owner key
-        owner_to_kind: dict[str, str] = {}  # owner_key -> "preference" | "workflow"
-        scheduled: list[tuple[str, RubricCriteria]] = []
-
-        if preferences is not None and cadence is not None:
-            for p in preferences.preferences:
-                pref_ev = p.evaluator
-                if pref_ev is None:
-                    continue
-                for r in pref_ev.criteria:
-                    if force_full_eval or r.run_condition == cadence:
-                        scheduled.append((p.name, r))
-                        owner_to_kind[p.name] = "preference"
-
-        if workflow_evaluators:
-            for wf_ev in workflow_evaluators:
-                for r in wf_ev.criteria:
-                    if (
-                        force_full_eval
-                        or r.run_condition == cadence
-                        or cadence is not None
-                    ):
-                        scheduled.append((wf_ev.name, r))
-                        owner_to_kind[wf_ev.name] = "workflow"
-
-        # 3) Run all rubric crtieria concurrently using a single TaskGroup and tqdm
-        rubric_results_by_owner: dict[str, list[RubricResult]] = {}
-        normalized_by_owner: dict[str, list[float]] = {}
-        execution_times_by_owner: dict[str, list[float]] = {}
-
-        async def _eval_one(owner: str, r: RubricCriteria) -> None:
-            import time
-
-            start_time = time.perf_counter()
-
-            async with self._rubric_semaphore:
-                # Build minimal, per-rubric context on demand
-                ctx = self._build_context_for_rubric(
-                    workflow=workflow,
-                    timestep=timestep,
-                    preferences=preferences,
-                    required=r.required_context,
-                    communications=communications,
-                    manager_actions=manager_actions,
-                )
-                es, error_message, raw_output = await self._evaluate_single_rubric(
-                    workflow, r, ctx
-                )
-
-            execution_time = time.perf_counter() - start_time
-
-            clamped = max(0.0, min(r.max_score, float(es.score)))
-            normalized = clamped / r.max_score if r.max_score > 0 else 0.0
-            rr = RubricResult(
-                name=r.name,
-                score=clamped,
-                max_score=r.max_score,
-                normalized_score=normalized,
-                message=es.reasoning,
-                error=error_message,
-                raw_output=raw_output,
-            )
-            rubric_results_by_owner.setdefault(owner, []).append(rr)
-            normalized_by_owner.setdefault(owner, []).append(normalized)
-            execution_times_by_owner.setdefault(owner, []).append(execution_time)
-            pbar.update(1)
-
-        pbar = _make_pbar(
-            total=len(scheduled),
-            disable=(len(scheduled) == 0) or (not self._log_preference_progress),
-            desc="Evaluating rubrics",
-        )
-        try:
-            async with asyncio.TaskGroup() as tg:  # Python 3.11+
-                for owner, r in scheduled:
-                    tg.create_task(_eval_one(owner, r))
-        finally:
-            pbar.close()
-
-        # 4) Aggregate back into the requested output schema
-        preference_scores: dict[str, PreferenceScore] = {}
-        preference_sum_weighted = 0.0
-        for pref_name, evaluator in pref_name_to_eval.items():
-            norm_scores = normalized_by_owner.get(pref_name, [])
-            # Weighted-by-max aggregation: sum(score)/sum(max)
-            rubrics_for_pref = rubric_results_by_owner.get(pref_name, [])
-            if rubrics_for_pref:
-                total_max = sum(float(r.max_score or 0.0) for r in rubrics_for_pref)
-                total_raw = sum(float(r.score or 0.0) for r in rubrics_for_pref)
-                aggregated = (total_raw / total_max) if total_max > 0 else 0.0
-            else:
-                aggregated = self._aggregate_scores(
-                    normalized_scores=norm_scores,
-                    strategy=evaluator.aggregation,
-                    rubrics=rubric_results_by_owner.get(pref_name, []),
-                    workflow=workflow,
-                    context=None,
-                )
-            weight = pref_name_to_weight.get(pref_name, 0.0)
-            pref_agg_strategy = (
-                evaluator.aggregation.value
-                if isinstance(evaluator.aggregation, AggregationStrategy)
-                else "custom"
-            )
-
-            # Update rubric metadata with execution metrics
-            exec_times = execution_times_by_owner.get(pref_name, [])
-            if exec_times and evaluator.metadata:
-                total_exec_time = sum(exec_times)
-
-                # Update execution time (accumulate if already calculated)
-                current_time = evaluator.metadata.execution_wall_time_seconds
-                if isinstance(current_time, (int, float)):
-                    evaluator.metadata.execution_wall_time_seconds = (
-                        current_time + total_exec_time
-                    )
-                else:
-                    evaluator.metadata.execution_wall_time_seconds = total_exec_time
-
-                evaluator.metadata.execution_count += 1
-                evaluator.metadata.last_executed_at = datetime.now().isoformat()
-
-                # Breakdown by criterion
-                for rr, exec_time in zip(
-                    rubric_results_by_owner.get(pref_name, []), exec_times
-                ):
-                    evaluator.metadata.execution_breakdown[rr.name] = (
-                        evaluator.metadata.execution_breakdown.get(rr.name, 0)
-                        + exec_time
-                    )
-
-            preference_scores[pref_name] = PreferenceScore(
-                name=pref_name,
-                score=aggregated,
-                weight=weight,
-                ruberic_group_results=RubricGroupResult(
-                    evaluator_name=evaluator.name,
-                    rubric_scores=rubric_results_by_owner.get(pref_name, []),
-                    generation_metadata=evaluator.metadata,  # Pass through metadata
-                ),
-                aggregation_strategy=pref_agg_strategy,
-            )
-            preference_sum_weighted += aggregated * weight
-
-        evaluation_results: list[RubricGroupResult] = []
-        for name, ev in workflow_eval_by_name.items():
-            rubrics = rubric_results_by_owner.get(name, [])
-
-            # Update workflow evaluator metadata with execution metrics
-            exec_times = execution_times_by_owner.get(name, [])
-            if exec_times and ev.metadata:
-                total_exec_time = sum(exec_times)
-
-                # Update execution time (accumulate if already calculated)
-                current_time = ev.metadata.execution_wall_time_seconds
-                if isinstance(current_time, (int, float)):
-                    ev.metadata.execution_wall_time_seconds = (
-                        current_time + total_exec_time
-                    )
-                else:
-                    ev.metadata.execution_wall_time_seconds = total_exec_time
-
-                ev.metadata.execution_count += 1
-                ev.metadata.last_executed_at = datetime.now().isoformat()
-
-                # Breakdown by criterion
-                for rr, exec_time in zip(rubrics, exec_times):
-                    current_breakdown_time = ev.metadata.execution_breakdown.get(
-                        rr.name, 0
-                    )
-                    ev.metadata.execution_breakdown[rr.name] = (
-                        current_breakdown_time + exec_time
-                    )
-            # Weighted-by-max for workflow-level evaluators too
-            if rubrics:
-                total_max = sum(float(r.max_score or 0.0) for r in rubrics)
-                total_raw = sum(float(r.score or 0.0) for r in rubrics)
-                agg_score = (total_raw / total_max) if total_max > 0 else 0.0
-            else:
-                norm_scores_for_owner = normalized_by_owner.get(name, [])
-                agg_score = self._aggregate_scores(
-                    normalized_scores=norm_scores_for_owner,
-                    strategy=ev.aggregation,
-                    rubrics=rubrics,
-                    workflow=workflow,
-                    context=None,
-                )
-            evaluation_results.append(
-                RubricGroupResult(
-                    evaluator_name=name,
-                    rubric_scores=rubrics,
-                    aggregated_score=agg_score,
-                    aggregation_strategy="weighted_by_max",
-                    generation_metadata=ev.metadata,  # Pass through metadata
-                )
-            )
-
-        result = EvaluationResult(
-            workflow_id=workflow.id,
-            timestep=timestep,
-            preference_scores=preference_scores,
-            evaluation_results=evaluation_results,
-            weighted_preference_total=preference_sum_weighted,
-        )
-        # Only append to history when a cadence is specified (on-demand calls with
-        # cadence=None should not mutate history as some tests expect)
-        if cadence is not None:
-            self.evaluation_results.append(result)
-        # Compute and store reward value for this timestep (or accumulated if desired)
-        try:
-            self._last_reward_value = self._reward_aggregator.aggregate(result)
-            self.most_recent_reward = float(
-                self._reward_projection(self._last_reward_value)
-            )
-        except Exception:
-            # Never raise from reward calculation; default to utility
-            try:
-                agg_name = type(self._reward_aggregator).__name__
-            except Exception:
-                agg_name = "<unknown>"
-            logger.error(
-                "Reward aggregation failed using %s; defaulting to weighted utility",
-                agg_name,
-                exc_info=True,
-            )
-            self._last_reward_value = preference_sum_weighted
-            self.most_recent_reward = float(preference_sum_weighted)
-        # Ensure reward_vector is timestep-aligned and zero for gaps
-        # Expand with zeros if needed up to current timestep index
-        if len(self.reward_vector) <= timestep:
-            self.reward_vector.extend([0.0] * (timestep + 1 - len(self.reward_vector)))
-        # Record reward only when an eval cadence was actually run; else keep zero
-        if cadence is not None:
-            self.reward_vector[timestep] = self.most_recent_reward
-        return result
+        self._seed = seed
+        self._ignore_gates = ignore_gates
 
     # Generic setter supporting typed aggregator + scalar projection
     def set_reward_aggregator(
@@ -478,7 +191,7 @@ class ValidationEngine:
                         result = await dyn_fn(workflow, context)
                     else:
                         result = dyn_fn(workflow, context)
-                
+
                 elif len(params) == 1:
                     # Single param - could be workflow, context, or resources
                     param_name = params[0].name if params else ""
@@ -530,15 +243,15 @@ class ValidationEngine:
         context: ValidationContext,
     ) -> StagedRubricResult:
         """Execute staged rubric with sequential gate logic.
-        
+
         Stages are evaluated in order. Each stage can act as a gate that stops
         evaluation if failed.
-        
+
         Args:
             workflow: Workflow being evaluated
             staged_rubric: Staged rubric with sequential stages
             context: Validation context with helpers
-            
+
         Returns:
             StagedRubricResult with total score and stage breakdown
         """
@@ -549,15 +262,15 @@ class ValidationEngine:
             "stages_passed": 0,
             "failed_gate": None,
             "stopped_at": None,
-            "stage_results": []
+            "stage_results": [],
         }
-        
+
         for stage in staged_rubric.stages:
             results["stages_evaluated"] += 1
-            
+
             stage_score = 0.0
             rule_results = []
-            
+
             # Evaluate all rules in this stage
             for rule_dict in stage.rules:
                 try:
@@ -583,56 +296,64 @@ class ValidationEngine:
                     else:
                         logger.warning(f"Unknown rule type: {rule_dict['type']}")
                         continue
-                    
+
                     # Evaluate the rule
                     score_obj, feedback, _ = await self._evaluate_single_rubric(
                         workflow, criteria, context
                     )
-                    
+
                     stage_score += score_obj.score
-                    rule_results.append({
-                        "name": rule_dict["name"],
-                        "type": rule_dict["type"],
-                        "score": score_obj.score,
-                        "max_score": rule_dict["weight"],
-                        "feedback": feedback or score_obj.reasoning,
-                    })
-                    
+                    rule_results.append(
+                        {
+                            "name": rule_dict["name"],
+                            "type": rule_dict["type"],
+                            "score": score_obj.score,
+                            "max_score": rule_dict["weight"],
+                            "feedback": feedback or score_obj.reasoning,
+                        }
+                    )
+
                 except Exception as e:
                     logger.error(f"Error evaluating rule {rule_dict.get('name')}: {e}")
-                    rule_results.append({
-                        "name": rule_dict.get("name", "unknown"),
-                        "type": rule_dict.get("type", "unknown"),
-                        "score": 0.0,
-                        "max_score": rule_dict.get("weight", 0.0),
-                        "error": str(e),
-                    })
-            
+                    rule_results.append(
+                        {
+                            "name": rule_dict.get("name", "unknown"),
+                            "type": rule_dict.get("type", "unknown"),
+                            "score": 0.0,
+                            "max_score": rule_dict.get("weight", 0.0),
+                            "error": str(e),
+                        }
+                    )
+
             # Cap stage score at max
             stage_score = min(stage_score, stage.max_points)
-            
-            # Check if stage passed
-            score_ratio = stage_score / stage.max_points if stage.max_points > 0 else 0.0
-            passed = score_ratio >= stage.min_score_to_pass
-            
-            results["stage_results"].append({
-                "name": stage.name,
-                "description": stage.description,
-                "score": stage_score,
-                "max_points": stage.max_points,
-                "score_ratio": score_ratio,
-                "passed": passed,
-                "is_required": stage.is_required,
-                "rules": rule_results,
-            })
-            
+
+            # Check if stage passed (using absolute score)
+            score_ratio = (
+                stage_score / stage.max_points if stage.max_points > 0 else 0.0
+            )
+            passed = stage_score >= stage.min_score_to_pass
+
+            results["stage_results"].append(
+                {
+                    "name": stage.name,
+                    "description": stage.description,
+                    "score": stage_score,
+                    "max_points": stage.max_points,
+                    "score_ratio": score_ratio,
+                    "passed": passed,
+                    "is_required": stage.is_required,
+                    "rules": rule_results,
+                }
+            )
+
             if passed:
                 results["stages_passed"] += 1
-            
-            # Handle gate failure
-            if not passed and stage.is_required:
+
+            # Handle gate failure (unless gates are ignored)
+            if not passed and stage.is_required and not self._ignore_gates:
                 results["failed_gate"] = stage.name
-                
+
                 if stage.on_failure_action == "zero_category":
                     # Zero out entire score
                     results["total_score"] = stage.on_failure_score
@@ -642,7 +363,7 @@ class ValidationEngine:
                         f"zeroing category score"
                     )
                     break
-                    
+
                 elif stage.on_failure_action == "skip_remaining":
                     # Stop evaluation, keep current score
                     results["stopped_at"] = stage.name
@@ -651,16 +372,29 @@ class ValidationEngine:
                         f"skipping remaining stages"
                     )
                     break
-                    
+
                 # else: "continue" - proceed to next stage
-            
+            elif not passed and stage.is_required and self._ignore_gates:
+                # Record failure but continue evaluation
+                results["failed_gate"] = (
+                    stage.name
+                    if results.get("failed_gate") is None
+                    else results["failed_gate"]
+                )
+                logger.info(
+                    f"Stage '{stage.name}' failed (required gate) - "
+                    f"but continuing evaluation (ignore_gates=True)"
+                )
+
             # Add stage score to total
             results["total_score"] += stage_score
-        
+
         # Cap at maximum
-        results["total_score"] = min(results["total_score"], staged_rubric.max_total_score)
+        results["total_score"] = min(
+            results["total_score"], staged_rubric.max_total_score
+        )
         results["normalized_score"] = results["total_score"] / results["max_score"]
-        
+
         return StagedRubricResult(
             category_name=staged_rubric.category_name,
             total_score=results["total_score"],
@@ -682,17 +416,17 @@ class ValidationEngine:
         manager_actions: list[ActionResult] | None = None,
     ) -> dict[str, StagedRubricResult]:
         """Evaluate workflow using ONLY staged rubrics.
-        
+
         This is the new simplified evaluation path that replaces the complex
         flat rubric evaluation logic.
-        
+
         Args:
             workflow: Workflow to evaluate
             timestep: Current timestep
             staged_rubrics: List of staged rubrics to evaluate
             communications: Optional communications for context
             manager_actions: Optional manager actions for context
-            
+
         Returns:
             Dict mapping rubric category_name to result
         """
@@ -702,30 +436,330 @@ class ValidationEngine:
             manager_actions=manager_actions,
             communications_by_sender=communications,
         )
-        
+
         results = {}
-        
+
         # Evaluate all staged rubrics concurrently
         tasks = []
         for rubric in staged_rubrics:
             task = self.evaluate_staged_rubric(workflow, rubric, context)
             tasks.append((rubric.category_name, task))
-        
+
         # Run with progress bar
         if self._log_preference_progress:
             from tqdm.asyncio import tqdm_asyncio
+
             completed = await tqdm_asyncio.gather(
-                *[task for _, task in tasks],
-                desc="Evaluating staged rubrics"
+                *[task for _, task in tasks], desc="Evaluating staged rubrics"
             )
         else:
             completed = await asyncio.gather(*[task for _, task in tasks])
-        
+
         # Map results by category name
         for (category_name, _), result in zip(tasks, completed):
             results[category_name] = result
-        
+
         return results
+
+    async def evaluate_execution_with_staged_rubrics(
+        self,
+        workflow: Workflow,
+        execution: TaskExecution,
+        timestep: int,
+        staged_rubrics: list[StagedRubric],
+        communications: list[SenderMessagesView] | None = None,
+        manager_actions: list[ActionResult] | None = None,
+    ) -> dict[str, StagedRubricResult]:
+        """Evaluate a SINGLE execution with staged rubrics.
+
+        Scopes evaluation to only the resources produced by this execution.
+
+        Args:
+            workflow: Full workflow (for context)
+            execution: Specific TaskExecution to evaluate
+            timestep: Current timestep
+            staged_rubrics: Rubrics to evaluate with
+            communications: Optional communications
+            manager_actions: Optional manager actions
+
+        Returns:
+            Dict mapping rubric category_name to result for THIS execution
+        """
+
+        # Create context scoped to this execution's resources
+        context = ValidationContext(
+            workflow=workflow,
+            timestep=timestep,
+            manager_actions=manager_actions,
+            communications_by_sender=communications,
+        )
+
+        # Get this execution's output resources
+        execution_resources = [
+            workflow.resources[res_id]
+            for res_id in execution.output_resource_ids
+            if res_id in workflow.resources
+        ]
+
+        logger.info(
+            f"📊 Evaluating execution {execution.id} (agent={execution.agent_id}): "
+            f"{len(execution_resources)} output resources"
+        )
+        for idx, res in enumerate(execution_resources):
+            logger.info(
+                f"  Output {idx + 1}: {res.name} ({res.mime_type}, {res.size_bytes} bytes) at {res.file_path}"
+            )
+
+        # Override context to ONLY see this execution's resources
+        context.set_evaluable_resources(execution_resources)
+
+        # Evaluate all rubrics against this execution
+        results = {}
+        tasks = []
+        for rubric in staged_rubrics:
+            task = self.evaluate_staged_rubric(workflow, rubric, context)
+            tasks.append((rubric.category_name, task))
+
+        # Run evaluations
+        if self._log_preference_progress:
+            from tqdm.asyncio import tqdm_asyncio
+
+            completed = await tqdm_asyncio.gather(
+                *[task for _, task in tasks],
+                desc=f"Evaluating execution {execution.variant_index}",
+            )
+        else:
+            completed = await asyncio.gather(*[task for _, task in tasks])
+
+        # Map results by category
+        for (category_name, _), result in zip(tasks, completed):
+            results[category_name] = result
+
+        return results
+
+    async def evaluate_timestep(
+        self,
+        workflow: Workflow,
+        timestep: int,
+        staged_rubrics: list[StagedRubric],
+        communications: list[SenderMessagesView] | None = None,
+        manager_actions: list[ActionResult] | None = None,
+    ) -> TimestepEvaluationResult:
+        """Evaluate all task executions for GRPO training.
+
+        This is the main entry point for evaluation. It:
+        1. Evaluates each completed execution separately with gold rubrics
+        2. Groups executions by task
+        3. Computes group-relative advantages per task
+        4. Returns structured Pydantic result ready for GRPO loss computation
+
+        Args:
+            workflow: Workflow to evaluate
+            timestep: Current timestep
+            staged_rubrics: Gold standard rubrics (typically from GDPEval)
+            communications: Optional communications
+            manager_actions: Optional manager actions
+
+        Returns:
+            TimestepEvaluationResult containing per-task metrics, advantages, and full details
+        """
+
+        logger.info("=" * 80)
+        logger.info("📊 Timestep Evaluation (GRPO Mode)")
+        logger.info("=" * 80)
+
+        # ============================================================
+        # Phase 1: Collect and group executions by task
+        # ============================================================
+        task_executions: dict[UUID, list] = {}
+
+        for task in workflow.tasks.values():
+            if not task.is_atomic_task():
+                continue
+
+            completed_execs = [
+                workflow.task_executions[exec_id]
+                for exec_id in task.execution_ids
+                if workflow.task_executions[exec_id].is_completed()
+            ]
+
+            if completed_execs:
+                task_executions[task.id] = completed_execs
+
+        total_executions = sum(len(execs) for execs in task_executions.values())
+        logger.info(
+            f"Found {total_executions} completed executions across "
+            f"{len(task_executions)} tasks"
+        )
+
+        if not task_executions:
+            logger.warning("No completed executions found for evaluation")
+            # Return empty result
+            return TimestepEvaluationResult(
+                workflow_id=workflow.id,
+                timestep=timestep,
+                per_task_metrics={},
+                total_executions=0,
+                total_tasks=0,
+                mean_baseline_across_tasks=0.0,
+                execution_details={},
+            )
+
+        # ============================================================
+        # Phase 2: Evaluate each execution separately
+        # ============================================================
+        execution_results: dict[UUID, dict] = {}  # exec_id -> {scores, results}
+
+        for task_id, executions in task_executions.items():
+            task = workflow.tasks[task_id]
+            logger.info(
+                f"Evaluating {len(executions)} executions for task '{task.name}'"
+            )
+
+            # Create evaluation tasks for parallel execution
+            eval_tasks = []
+            for execution in executions:
+                logger.info(
+                    f"  ⏳ Queueing evaluation for execution {execution.id} (agent={execution.agent_id})"
+                )
+                eval_task = self.evaluate_execution_with_staged_rubrics(
+                    workflow=workflow,
+                    execution=execution,
+                    timestep=timestep,
+                    staged_rubrics=staged_rubrics,
+                    communications=communications,
+                    manager_actions=manager_actions,
+                )
+                eval_tasks.append((execution, eval_task))
+
+            # Run evaluations in PARALLEL (much faster!)
+            logger.info(f"  🚀 Running {len(eval_tasks)} evaluations in parallel...")
+            eval_results = await asyncio.gather(*[task for _, task in eval_tasks])
+
+            # Process results
+            for (execution, _), rubric_results in zip(eval_tasks, eval_results):
+                # Extract scores per rubric category
+                rubric_scores = {
+                    category: result.normalized_score
+                    for category, result in rubric_results.items()
+                }
+
+                # Aggregate score (average across rubrics)
+                aggregate_score = (
+                    sum(rubric_scores.values()) / len(rubric_scores)
+                    if rubric_scores
+                    else 0.0
+                )
+
+                # Store results
+                execution_results[execution.id] = {
+                    "task_id": task_id,
+                    "task_name": task.name,
+                    "variant_index": execution.variant_index,
+                    "rubric_scores": rubric_scores,
+                    "aggregate_score": aggregate_score,
+                    "rubric_results": rubric_results,
+                    "rubric_metadata": execution.metadata.get("rubric_generation", {}),
+                    "rubric_type": execution.metadata.get("rubric_type"),
+                    "generation_seed": execution.metadata.get("generation_seed"),
+                }
+
+                logger.info(
+                    f"  Execution {execution.variant_index}: score={aggregate_score:.3f}"
+                )
+
+        # ============================================================
+        # Phase 3: Compute advantages per task
+        # ============================================================
+        per_task_metrics: dict[str, TaskEvaluationMetrics] = {}
+
+        for task_id, executions in task_executions.items():
+            task = workflow.tasks[task_id]
+
+            # Extract scores for this task (K scores)
+            task_scores = {
+                ex.id: execution_results[ex.id]["aggregate_score"] for ex in executions
+            }
+
+            # Compute group-relative baseline
+            K = len(task_scores)
+            baseline = sum(task_scores.values()) / K if K > 0 else 0.0
+
+            # Compute advantages: A_k = r_k - baseline
+            advantages = {
+                ex_id: score - baseline for ex_id, score in task_scores.items()
+            }
+
+            # Build ExecutionEvaluationResult objects
+            execution_results_list = []
+            for execution in executions:
+                ex_result = execution_results[execution.id]
+                execution_results_list.append(
+                    ExecutionEvaluationResult(
+                        execution_id=execution.id,
+                        variant_index=execution.variant_index,
+                        task_id=task_id,
+                        task_name=task.name,
+                        aggregate_score=ex_result["aggregate_score"],
+                        advantage=advantages[execution.id],
+                        rubric_results=ex_result["rubric_results"],
+                        rubric_scores=ex_result["rubric_scores"],
+                        rubric_metadata=ex_result["rubric_metadata"],
+                        rubric_type=ex_result["rubric_type"],
+                        generation_seed=ex_result["generation_seed"],
+                    )
+                )
+
+            per_task_metrics[str(task_id)] = TaskEvaluationMetrics(
+                task_id=task_id,
+                task_name=task.name,
+                num_executions=K,
+                baseline=baseline,
+                executions=execution_results_list,
+            )
+
+            logger.info(
+                f"Task '{task.name}': K={K}, baseline={baseline:.3f}, "
+                f"advantages=[{', '.join(f'{advantages[ex.id]:.3f}' for ex in executions)}]"
+            )
+
+        # ============================================================
+        # Phase 4: Build execution details lookup
+        # ============================================================
+        execution_details: dict[str, ExecutionEvaluationResult] = {}
+
+        for task_metrics in per_task_metrics.values():
+            execution_result: ExecutionEvaluationResult
+            for execution_result in task_metrics.executions:
+                execution_details[str(execution_result.execution_id)] = execution_result
+
+        # ============================================================
+        # Phase 5: Compute aggregate metrics
+        # ============================================================
+        mean_baseline = (
+            sum(m.baseline for m in per_task_metrics.values()) / len(per_task_metrics)
+            if per_task_metrics
+            else 0.0
+        )
+
+        result = TimestepEvaluationResult(
+            workflow_id=workflow.id,
+            timestep=timestep,
+            per_task_metrics=per_task_metrics,
+            total_executions=total_executions,
+            total_tasks=len(task_executions),
+            mean_baseline_across_tasks=mean_baseline,
+            execution_details=execution_details,
+        )
+
+        logger.info("=" * 80)
+        logger.info("✅ Timestep Evaluation Complete")
+        logger.info(f"   Tasks: {result.total_tasks}")
+        logger.info(f"   Executions: {result.total_executions}")
+        logger.info(f"   Mean Baseline: {result.mean_baseline_across_tasks:.3f}")
+        logger.info("=" * 80)
+
+        return result
 
     def _build_context_for_rubric(
         self,

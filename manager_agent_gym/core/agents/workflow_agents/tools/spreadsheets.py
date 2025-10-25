@@ -483,6 +483,8 @@ async def _add_excel_chart(
 
 def create_spreadsheets_tools(resource_manager: "ResourceFileManager") -> list[Tool]:
     """Create spreadsheet tools for OpenAI SDK."""
+    from manager_agent_gym.core.workflow.context import AgentExecutionContext
+    from agents import RunContextWrapper
 
     @function_tool
     async def read_excel(file_path: str, sheet_name: str | None = None) -> str:
@@ -521,7 +523,10 @@ def create_spreadsheets_tools(resource_manager: "ResourceFileManager") -> list[T
 
     @function_tool
     async def create_excel(
-        data: ExcelData, output_path: str, sheet_name: str = "Sheet1"
+        ctx: RunContextWrapper[AgentExecutionContext],
+        data: ExcelData,
+        output_path: str,
+        sheet_name: str = "Sheet1",
     ) -> str:
         """
         Create a professionally formatted Excel spreadsheet from structured data.
@@ -529,6 +534,14 @@ def create_spreadsheets_tools(resource_manager: "ResourceFileManager") -> list[T
         This tool generates Excel files with automatic formatting including styled headers,
         auto-sized columns, and professional color schemes. Perfect for creating reports,
         data exports, or formatted spreadsheets from processed data.
+
+        **✨ AUTOMATIC FILE TRACKING:**
+        Files you create are **automatically tracked as resources**! You no longer need to:
+        - Parse JSON responses
+        - Manually construct Resource objects
+        - Worry about file paths
+
+        Just create the file and reference it in your notes - the system handles the rest.
 
         Parameters:
             data (ExcelData):
@@ -544,8 +557,7 @@ def create_spreadsheets_tools(resource_manager: "ResourceFileManager") -> list[T
 
         Returns:
             str:
-                JSON string containing file metadata including path, size, and row count,
-                or an error message if creation fails.
+                Human-readable summary: "✅ Created Excel file: filename.xlsx (X rows, Y KB)"
 
         Usage:
             Use this tool to create Excel spreadsheets from data you've generated or
@@ -553,18 +565,36 @@ def create_spreadsheets_tools(resource_manager: "ResourceFileManager") -> list[T
             generating formatted data files for sharing.
         """
         result = await _create_excel(data, output_path, sheet_name)
+
+        # AUTO-REGISTER: Track created file as intermediary resource
         if result["success"]:
-            return json.dumps(
-                {
-                    "success": True,
-                    "file_path": result["file_path"],
-                    "file_name": result["file_name"],
-                    "size_bytes": result["size_bytes"],
-                    "message": f"Created Excel file with {result['num_rows']} rows",
-                },
-                indent=2,
+            try:
+                if ctx.context:
+                    from manager_agent_gym.schemas.domain.resource import Resource
+
+                    ctx.context.register_created_resource(
+                        Resource(
+                            name=f"Generated: {result['file_name']}",
+                            description="Auto-created by create_excel tool",
+                            file_path=result["file_path"],
+                            mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            size_bytes=result["size_bytes"],
+                            resource_role="intermediary",
+                        )
+                    )
+            except Exception as e:
+                from manager_agent_gym.core.common.logging import logger
+
+                logger.warning(f"Failed to auto-register Excel resource: {e}")
+
+            # Return human-readable summary
+            return (
+                f"✅ Created Excel file: {result['file_name']} "
+                f"({result['num_rows']} rows, {result['size_bytes']} bytes)\n"
+                f"Location: {result['file_path']}"
             )
-        return json.dumps(result, indent=2)
+
+        return f"❌ Error creating Excel: {result.get('error', 'Unknown error')}"
 
     @function_tool
     async def add_excel_sheet(file_path: str, sheet_name: str, data: ExcelData) -> str:
@@ -730,7 +760,10 @@ def create_spreadsheets_tools(resource_manager: "ResourceFileManager") -> list[T
 
     @function_tool
     async def write_csv(
-        data: CSVData, output_path: str, include_index: bool = False
+        ctx: RunContextWrapper[AgentExecutionContext],
+        data: CSVData,
+        output_path: str,
+        include_index: bool = False,
     ) -> str:
         """
         Create a CSV file from structured data for easy sharing and compatibility.
@@ -738,6 +771,10 @@ def create_spreadsheets_tools(resource_manager: "ResourceFileManager") -> list[T
         This tool converts structured data into CSV format, which is universally
         compatible with spreadsheet applications, databases, and data analysis tools.
         Perfect for exporting data, creating data files, or sharing datasets.
+
+        **✨ AUTOMATIC FILE TRACKING:**
+        Files you create are **automatically tracked as resources**! Just create the file
+        and reference it in your notes - the system handles resource management.
 
         Parameters:
             data (CSVData):
@@ -753,8 +790,7 @@ def create_spreadsheets_tools(resource_manager: "ResourceFileManager") -> list[T
 
         Returns:
             str:
-                Success message with the output path and row count, or an error message
-                if the operation fails.
+                Human-readable summary: "✅ Created CSV: filename.csv (X rows)"
 
         Usage:
             Call this tool to export data to CSV format for sharing with others, importing
@@ -762,9 +798,34 @@ def create_spreadsheets_tools(resource_manager: "ResourceFileManager") -> list[T
             application. CSV is the most compatible data format.
         """
         result = await _write_csv(data, output_path, include_index)
+
+        # AUTO-REGISTER: Track created file as intermediary resource
         if result["success"]:
-            return f"Successfully created CSV file at {result['output_path']} ({result['num_rows']} rows)"
-        return f"Error: {result.get('error')}"
+            from pathlib import Path
+
+            try:
+                if ctx.context:
+                    from manager_agent_gym.schemas.domain.resource import Resource
+
+                    filename = Path(result["output_path"]).name
+                    ctx.context.register_created_resource(
+                        Resource(
+                            name=f"Generated: {filename}",
+                            description="Auto-created by write_csv tool",
+                            file_path=result["output_path"],
+                            mime_type="text/csv",
+                            size_bytes=result["size_bytes"],
+                            resource_role="intermediary",
+                        )
+                    )
+            except Exception as e:
+                from manager_agent_gym.core.common.logging import logger
+
+                logger.warning(f"Failed to auto-register CSV resource: {e}")
+
+            return f"✅ Created CSV: {Path(result['output_path']).name} ({result['num_rows']} rows, {result['size_bytes']} bytes)\nLocation: {result['output_path']}"
+
+        return f"❌ Error creating CSV: {result.get('error', 'Unknown error')}"
 
     @function_tool
     async def analyze_csv(file_path: str) -> str:

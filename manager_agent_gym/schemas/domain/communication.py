@@ -326,6 +326,33 @@ class CommunicationGraph(BaseModel):
 
         return relevant_messages
 
+    def get_messages_in_thread(
+        self,
+        thread_id: UUID,
+        limit: int | None = None,
+    ) -> list[Message]:
+        """Get all messages in a specific thread.
+
+        Args:
+            thread_id: Thread to retrieve messages from
+            limit: Maximum number of messages (newest first if limited)
+
+        Returns:
+            Messages sorted chronologically (oldest first)
+        """
+        thread_messages = [
+            msg for msg in self.messages.values() if msg.thread_id == thread_id
+        ]
+
+        # Sort chronologically
+        thread_messages.sort(key=lambda m: m.timestamp)
+
+        # Apply limit if needed (keep most recent)
+        if limit:
+            thread_messages = thread_messages[-limit:]
+
+        return thread_messages
+
     def get_conversation_history(
         self, agent_id: str, other_agent: str, limit: int = 50
     ) -> list[Message]:
@@ -344,6 +371,47 @@ class CommunicationGraph(BaseModel):
 
         for message in self.messages.values():
             # Check if message is between these two agents
+            sender = message.sender_id
+            recipients = message.get_all_recipients()
+
+            if (sender == agent_id and other_agent in recipients) or (
+                sender == other_agent and agent_id in recipients
+            ):
+                conversation.append(message)
+
+        # Sort chronologically and apply limit
+        conversation.sort(key=lambda m: m.timestamp)
+        return conversation[-limit:] if limit else conversation
+
+    def get_conversation_history_in_thread(
+        self,
+        thread_id: UUID,
+        agent_id: str,
+        other_agent: str,
+        limit: int = 50,
+    ) -> list[Message]:
+        """Get conversation between two agents within a specific thread.
+
+        This provides thread-scoped conversation history, preventing
+        message contamination between parallel rubric generation variants.
+
+        Args:
+            thread_id: Thread to scope the conversation to
+            agent_id: First agent ID
+            other_agent: Second agent ID
+            limit: Maximum messages to return
+
+        Returns:
+            Messages in chronological order
+        """
+        conversation = []
+
+        for message in self.messages.values():
+            # Must be in the correct thread
+            if message.thread_id != thread_id:
+                continue
+
+            # Must be between these two agents
             sender = message.sender_id
             recipients = message.get_all_recipients()
 

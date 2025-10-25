@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 if TYPE_CHECKING:
     from manager_agent_gym.core.communication.service import CommunicationService
     from manager_agent_gym.schemas.domain.workflow import Workflow
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 
 
 class ActionResult(BaseModel):
@@ -93,6 +94,7 @@ class BaseManagerAction(BaseModel, ABC):
         self,
         workflow: "Workflow",
         communication_service: "CommunicationService | None" = None,
+        llm_generator: "LLMGenerator | None" = None,
     ) -> ActionResult:
         """
         Execute this action against the workflow.
@@ -100,6 +102,7 @@ class BaseManagerAction(BaseModel, ABC):
         Args:
             workflow: The workflow to modify
             communication_service: Optional communication service for agent messaging
+            llm_generator: Optional LLM generator for structured outputs (e.g., task decomposition)
 
         Returns:
             ActionResult summarizing the mutation or information retrieved

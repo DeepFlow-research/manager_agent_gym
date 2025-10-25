@@ -22,7 +22,7 @@ from manager_agent_gym.core.agents.manager_agent.utils.rubric_formatting import 
 if TYPE_CHECKING:
     from manager_agent_gym.schemas.domain.workflow import Workflow
     from manager_agent_gym.core.communication.service import CommunicationService
-
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 from manager_agent_gym.core.agents.manager_agent.actions.base import (
     BaseManagerAction,
     ActionResult,
@@ -45,6 +45,7 @@ class AskClarificationQuestionsAction(BaseManagerAction):
         self,
         workflow: "Workflow",
         communication_service: "CommunicationService | None" = None,
+        llm_generator: "LLMGenerator | None" = None,
     ) -> ActionResult:
         """Send questions to stakeholder."""
 
@@ -75,7 +76,12 @@ class AskClarificationQuestionsAction(BaseManagerAction):
             "manager_id", "decomposition_manager"
         )
 
-        # Send question
+        # Get thread context if available (for parallel rubric generation)
+        thread_id = workflow.metadata.get("decomposition_state", {}).get(
+            "thread_id", None
+        )
+
+        # Send question (optionally scoped to thread)
         message_ids = []
         try:
             # Include preference context in question
@@ -86,6 +92,7 @@ class AskClarificationQuestionsAction(BaseManagerAction):
                 to_agent=stakeholder_id,
                 content=full_question,
                 message_type=MessageType.REQUEST,
+                thread_id=thread_id,  # Include thread if available
             )
             message_ids.append(str(message.message_id))
 
@@ -127,6 +134,7 @@ class GeneratePreferenceRubricAction(BaseManagerAction):
         self,
         workflow: "Workflow",
         communication_service: "CommunicationService | None" = None,
+        llm_generator: "LLMGenerator | None" = None,
     ) -> ActionResult:
         """Generate rubric and broadcast to agents."""
 
@@ -157,19 +165,41 @@ class GeneratePreferenceRubricAction(BaseManagerAction):
             "manager_id", "decomposition_manager"
         )
 
-        # Get clarification context
-        communication_history = communication_service.get_conversation_history(
-            agent_id=manager_id,
-            other_agent=stakeholder_id,
-            limit=1000,
+        # Get thread context if available (for parallel rubric generation)
+        thread_id = workflow.metadata.get("decomposition_state", {}).get(
+            "thread_id", None
         )
+
+        # Get clarification context (thread-scoped if available)
+        if thread_id:
+            # Thread-scoped: only get messages from this variant's thread
+            communication_history = (
+                communication_service.get_conversation_history_in_thread(
+                    thread_id=thread_id,
+                    agent_id=manager_id,
+                    other_agent=stakeholder_id,
+                    limit=1000,
+                )
+            )
+            logger.debug(
+                f"Using thread-scoped conversation history (thread={thread_id}, "
+                f"{len(communication_history)} messages)"
+            )
+        else:
+            # Global: get all conversation history (backward compatible)
+            communication_history = communication_service.get_conversation_history(
+                agent_id=manager_id,
+                other_agent=stakeholder_id,
+                limit=1000,
+            )
 
         # Generate STAGED rubric (now compatible with gold GDPEval rubrics)
         # Note: Returns executable StagedRubric + raw spec for logging
+        # Use gpt-4o-mini for better structured output compliance (handles nested JSON better than gpt-4.1-mini)
         staged_rubric, rubric_spec = await decompose_preference_to_evaluator(
             workflow=workflow,
             stakeholder_manager_messages=communication_history,
-            model_name="gpt-5",  # TODO: make this configurable
+            model_name="gpt-4o-mini",  # gpt-4o-mini handles complex JSON schemas better than gpt-4.1-mini
             seed=workflow.seed,
         )
 
@@ -189,11 +219,13 @@ class GeneratePreferenceRubricAction(BaseManagerAction):
         # Format STAGED rubric as clean markdown for workers
         formatted_rubric = format_staged_rubric_for_worker(rubric_spec)
 
+        # Broadcast rubric (optionally scoped to thread)
         await communication_service.send_multicast_message(
             from_agent=manager_id,
             to_agents=agent_ids,
             content=formatted_rubric,
             message_type=MessageType.RUBRIC_UPDATE,
+            thread_id=thread_id,  # Include thread if available
         )
 
         summary = format_staged_rubric_summary(rubric_spec)

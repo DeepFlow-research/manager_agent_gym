@@ -8,8 +8,12 @@ system prompts and tools via the OpenAI Agents framework.
 import os
 import time
 import traceback
-from agents import Agent, Runner, Tool, RunResult, AgentOutputSchema
+from typing import TYPE_CHECKING
+from agents import Agent, Runner, Tool, RunResult
 from agents.extensions.models.litellm_model import LitellmModel
+
+if TYPE_CHECKING:
+    from manager_agent_gym.core.common.llm_generator import LLMGenerator
 
 
 from manager_agent_gym.config import settings
@@ -30,8 +34,6 @@ from manager_agent_gym.core.agents.workflow_agents.common.interface import (
 )
 from manager_agent_gym.core.common.logging import logger
 
-from manager_agent_gym.core.common.llm_interface import build_litellm_model_id
-
 
 from manager_agent_gym.core.agents.workflow_agents.prompts.ai_agent_prompts import (
     AI_AGENT_TASK_TEMPLATE,
@@ -50,6 +52,7 @@ class AIAgent(AgentInterface[AIAgentConfig]):
         self,
         config: AIAgentConfig,
         tools: list[Tool],
+        llm_generator: "LLMGenerator",
     ):
         if Agent is None or LitellmModel is None or Runner is None:
             raise ImportError(
@@ -70,14 +73,13 @@ class AIAgent(AgentInterface[AIAgentConfig]):
         self.tools = tools + COMMUNICATION_TOOLS
 
         self.openai_agent: Agent[AgentExecutionContext] = Agent(
-            model=LitellmModel(model=build_litellm_model_id(config.model_name)),
+            model=llm_generator,
             name=config.agent_id,
             instructions=AI_AGENT_TASK_TEMPLATE.format(
                 agent_description=config.agent_description,
                 agent_capabilities=config.agent_capabilities,
             ),
             tools=self.tools,
-            output_type=AgentOutputSchema(AITaskOutput, strict_json_schema=False),
         )
 
     async def execute_task(
@@ -108,6 +110,7 @@ class AIAgent(AgentInterface[AIAgentConfig]):
                     agent_id=self.config.agent_id,
                     current_task_id=task.id,
                     tool_event_sink=self.record_tool_use_event,
+                    input_resources=resources or [],
                 )
             else:
                 # Create a minimal context if no communication service
@@ -120,6 +123,7 @@ class AIAgent(AgentInterface[AIAgentConfig]):
                     agent_id=self.config.agent_id,
                     current_task_id=task.id,
                     tool_event_sink=self.record_tool_use_event,
+                    input_resources=resources or [],
                 )
 
             # Build multimodal input with images/PDFs/Excel
@@ -128,21 +132,71 @@ class AIAgent(AgentInterface[AIAgentConfig]):
             )
 
             # Execute using OpenAI Agent with multimodal content
-            result = await Runner.run(
-                self.openai_agent,
-                [user_message],
-                context=context,
-                max_turns=self.config.max_turns,
-            )
+            result = None  # Initialize to avoid unbound variable error
+            try:
+                result = await Runner.run(
+                    self.openai_agent,
+                    [user_message],
+                    context=context,
+                    max_turns=self.config.max_turns,
+                )
 
-            # Extract structured output
-            output = result.final_output
-            if not isinstance(output, AITaskOutput):
-                raise ValueError("Output is not an AITaskOutput")
+                # Extract structured output
+                output = result.final_output
+                if not isinstance(output, AITaskOutput):
+                    raise ValueError(
+                        "Output is not an AITaskOutput, falling back to OpenAI parser"
+                    )
+
+            except Exception:
+                logger.info(
+                    "Detected unstructured output from Anthropic model, fixing with OpenAI parser..."
+                )
+
+                # If result is None, we can't recover, so re-raise
+                if result is None:
+                    logger.error("No result from OpenAI Agent, raising exception")
+                    raise
+
+                # Serialize the conversation to a string
+                import json
+
+                serialized_messages = []
+                for msg in result.to_input_list():
+                    # Handle different message types
+                    if hasattr(msg, "model_dump"):
+                        serialized_messages.append(
+                            json.dumps(msg.model_dump(), indent=2)  # type: ignore
+                        )
+                    elif isinstance(msg, dict):
+                        serialized_messages.append(json.dumps(msg, indent=2))
+                    else:
+                        # Fallback to string representation
+                        serialized_messages.append(str(msg))
+
+                message_list = "\n\n".join(serialized_messages)
+
+                # Use our fix function to parse it into structured format
+                from manager_agent_gym.core.common.llm_generator import (
+                    fix_structured_output_with_openai,
+                )
+
+                output = await fix_structured_output_with_openai(
+                    raw_text_output=message_list,
+                    output_schema=AITaskOutput,
+                )
+                logger.info("Successfully fixed structured output using OpenAI parser")
 
             # Calculate execution metrics
             execution_time = time.time() - start_time
             output_resources = output.resources
+
+            # MERGE: Combine LLM-created resources with auto-tracked intermediaries
+            # This fixes path errors and captures files the LLM forgot to mention
+            final_resources = self._merge_llm_and_intermediary_resources(
+                llm_resources=output_resources,
+                intermediary_resources=context.intermediary_resources,
+            )
 
             # Extract execution trace if enabled
             execution_trace = None
@@ -169,8 +223,8 @@ class AIAgent(AgentInterface[AIAgentConfig]):
                         exc_info=True,
                     )
 
-            # If no resources were created, create a default markdown file
-            if not output_resources:
+            # If no resources were created (neither LLM nor intermediary), create a default markdown file
+            if not final_resources:
                 import tempfile
                 from pathlib import Path
 
@@ -180,7 +234,7 @@ class AIAgent(AgentInterface[AIAgentConfig]):
                 output_content = f"# Task Output\n\n{str(result)}"
                 output_file.write_text(output_content, encoding="utf-8")
 
-                output_resources.append(
+                final_resources.append(
                     Resource(
                         name=f"Completed: {task.name}",
                         description=f"AI agent completed task: {task.description}",
@@ -195,7 +249,7 @@ class AIAgent(AgentInterface[AIAgentConfig]):
                 agent_id=self.config.agent_id,
                 success=True,
                 execution_time=execution_time,
-                resources=output_resources,
+                resources=final_resources,
                 simulated_duration_hours=(execution_time / 3600.0),
                 cost=self._calculate_accurate_cost(result),
                 execution_notes=output.execution_notes,
@@ -365,12 +419,9 @@ class AIAgent(AgentInterface[AIAgentConfig]):
                 f"  Size: {resource.size_bytes} bytes",
             ]
 
-            # Add format-specific metadata if available (format as key=value to avoid braces)
+            # Add format-specific metadata if available
             if resource.file_format_metadata:
-                metadata_items = [
-                    f"{k}={v}" for k, v in resource.file_format_metadata.items()
-                ]
-                resource_info.append(f"  Metadata: {', '.join(metadata_items)}")
+                resource_info.append(f"  Metadata: {resource.file_format_metadata}")
 
             # Try to show text preview for text-based files
             try:
@@ -416,3 +467,110 @@ class AIAgent(AgentInterface[AIAgentConfig]):
         )
 
         return prompt_cost + completion_cost
+
+    def _merge_llm_and_intermediary_resources(
+        self, llm_resources: list[Resource], intermediary_resources: list[Resource]
+    ) -> list[Resource]:
+        """
+        Merge LLM-created resources with auto-tracked intermediaries.
+
+        Strategy:
+        1. Start with LLM resources (these have rich descriptions from the LLM)
+        2. Fix any with sandbox paths using intermediary ground truth paths
+        3. Add any intermediary resources the LLM didn't mention
+
+        This ensures:
+        - No files are lost if LLM forgets to create Resources
+        - All paths are valid (using ground truth from tools)
+        - LLM's descriptions are preserved when available
+
+        Args:
+            llm_resources: Resources manually created by the LLM
+            intermediary_resources: Resources auto-tracked by tools (role='intermediary')
+
+        Returns:
+            Merged list of Resources with validated paths
+        """
+        from pathlib import Path
+
+        logger.info(
+            f"🔀 Merging resources: {len(llm_resources)} LLM + {len(intermediary_resources)} intermediary"
+        )
+        if intermediary_resources:
+            logger.info(
+                f"  Intermediary files: {[Path(r.file_path).name for r in intermediary_resources]}"
+            )
+        if llm_resources:
+            logger.info(f"  LLM resources: {[r.name for r in llm_resources]}")
+
+        final = []
+        llm_filenames = set()
+
+        # Pass 1: Process LLM resources, fix paths if needed
+        for llm_res in llm_resources:
+            if llm_res.file_path:
+                filename = Path(llm_res.file_path).name
+                llm_filenames.add(filename)
+
+                # Check if path needs fixing (sandbox path or non-existent)
+                if (
+                    llm_res.file_path.startswith("/home/user/")
+                    or not Path(llm_res.file_path).exists()
+                ):
+                    # Find matching intermediary with correct path
+                    match = next(
+                        (
+                            r
+                            for r in intermediary_resources
+                            if Path(r.file_path).name == filename
+                        ),
+                        None,
+                    )
+                    if match:
+                        # Use LLM's metadata but intermediary's path (ground truth!)
+                        logger.info(
+                            f"Fixed Resource path for '{llm_res.name}': "
+                            f"{llm_res.file_path} → {match.file_path}"
+                        )
+                        final.append(
+                            Resource(
+                                name=llm_res.name,
+                                description=llm_res.description,
+                                file_path=match.file_path,  # ← Ground truth path!
+                                mime_type=match.mime_type,
+                                size_bytes=match.size_bytes,
+                                resource_role="output",  # LLM intended this as output
+                            )
+                        )
+                    else:
+                        # No match found, keep original (will likely fail evaluation but don't break)
+                        logger.warning(
+                            f"Could not fix path for Resource '{llm_res.name}': "
+                            f"no matching intermediary for {llm_res.file_path}"
+                        )
+                        final.append(llm_res)
+                else:
+                    # Valid path, keep as-is
+                    final.append(llm_res)
+            else:
+                # No file_path, keep as-is (might be text-only resource)
+                final.append(llm_res)
+
+        # Pass 2: Add any intermediary resources LLM didn't mention
+        for inter_res in intermediary_resources:
+            filename = Path(inter_res.file_path).name
+            if filename not in llm_filenames:
+                # LLM forgot this file - include it with intermediary role
+                logger.info(
+                    f"Added forgotten intermediary resource: {inter_res.name} "
+                    f"(LLM did not create a Resource for this file)"
+                )
+                final.append(inter_res)  # Keep role="intermediary"
+
+        if intermediary_resources:
+            logger.info(
+                f"Resource merge: {len(llm_resources)} LLM resources + "
+                f"{len(intermediary_resources)} intermediaries → {len(final)} final resources"
+            )
+
+        return final

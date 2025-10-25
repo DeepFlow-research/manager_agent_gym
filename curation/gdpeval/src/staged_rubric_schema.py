@@ -7,7 +7,7 @@ Extends MA-Gym rubrics with:
 - Conditional evaluation (skip stages if gates fail)
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Literal
 from manager_agent_gym.core.agents.manager_agent.implementations.rubric_generation_manager.rubric_generation import (
     CodeRule,
@@ -32,18 +32,23 @@ class EvaluationStage(BaseModel):
         default=True, description="Must pass this stage to proceed to next stages"
     )
 
+    max_points: float = Field(gt=0, description="Maximum points for this stage")
+
     min_score_to_pass: float = Field(
-        default=0.5,
+        default=0.0,
         ge=0.0,
-        le=1.0,
-        description="Minimum score ratio (score/max_points) to 'pass' stage",
+        description=(
+            "Minimum absolute score needed to pass this stage. "
+            "⚠️ CRITICAL: Must be <= max_points! ⚠️ "
+            "This is an ABSOLUTE score, not a ratio. "
+            "Example: If max_points=8, min_score_to_pass can be 4, 5, 6, 7, or 8 (but NEVER 9 or higher!). "
+            "For ~50% threshold: use max_points/2. For ~75% threshold: use max_points*0.75."
+        ),
     )
 
     rules: list[CodeRule | LLMJudgeRule] = Field(
         description="Rules evaluated in this stage", min_length=1
     )
-
-    max_points: float = Field(gt=0, description="Maximum points for this stage")
 
     on_failure_action: Literal["skip_remaining", "zero_category", "continue"] = Field(
         default="skip_remaining",
@@ -59,6 +64,24 @@ class EvaluationStage(BaseModel):
         default=0.0,
         description="Score if stage fails and on_failure_action='zero_category'",
     )
+
+    @model_validator(mode="after")
+    def validate_min_score(self) -> "EvaluationStage":
+        """Ensure min_score_to_pass is achievable given max_points.
+
+        Auto-corrects if min_score_to_pass > max_points by setting to 25% of max_points.
+        """
+        if self.min_score_to_pass > self.max_points:
+            original = self.min_score_to_pass
+            self.min_score_to_pass = self.max_points * 0.25
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f"Auto-corrected min_score_to_pass: {original:.1f} > max_points ({self.max_points:.1f}). "
+                f"Set to {self.min_score_to_pass:.1f} (25% of max_points) for stage '{self.name}'"
+            )
+        return self
 
 
 class StagedRubric(BaseModel):
