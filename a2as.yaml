@@ -1,0 +1,2040 @@
+manifest:
+  version: "0.1.2"
+  schema: https://a2as.org/cert/schema
+  subject:
+    name: deepflow-research/manager_agent_gym
+    source: https://github.com/deepflow-research/manager_agent_gym
+    branch: main
+    commit: "3f7a5d4a"
+    scope: [manager_agent_gym/core/workflow_agents/ai_agent.py, manager_agent_gym/core/workflow_agents/human_agent.py, manager_agent_gym/core/workflow_agents/interface.py,
+      manager_agent_gym/core/workflow_agents/registry.py, manager_agent_gym/core/workflow_agents/stakeholder_agent.py, manager_agent_gym/core/workflow_agents/tool_factory.py,
+      manager_agent_gym/core/workflow_agents/tools/communication.py, manager_agent_gym/core/workflow_agents/tools/communication_di.py,
+      manager_agent_gym/core/workflow_agents/tools/web_search/__init__.py, manager_agent_gym/core/workflow_agents/tools/web_search/main.py,
+      manager_agent_gym/core/workflow_agents/tools/web_search/search.py, manager_agent_gym/schemas/execution/manager_actions.py]
+  issued:
+    by: A2AS.org
+    at: '2026-01-26T16:15:12Z'
+  signatures:
+    digest: sha256:EbGl68QsO89WlDN0d4hQtkC904ZkMF_AET-bSBdOl9A
+    key: ed25519:0JbZ5TgBtAWDt_7Xh1qK1tN_LKYQucwDkhNM7j4hEuI
+    sig: ed25519:5mzb2Yc-jwQMRAe-UGhAXigtBWJr_0Rebvv2w-G7sAtatrPHsRDr0h7eoDFHSMz1R5ShAmbqp595XPF-75ugBA
+
+agents:
+  agent.0:
+    type: instance
+    models: [LitellmModel]
+    tools: [self.tools]
+    params:
+      class: AIAgent
+      name: config.agent_id
+      output_type: AITaskOutput
+      instance: agent
+  agent.1:
+    type: instance
+    models: [LitellmModel]
+    tools: [self.private_tools]
+    params:
+      class: MockHumanAgent
+      name: '{config.name}_roleplay'
+      output_type: HumanWorkOutput
+      instance: agent
+      instructions: [roleplay_prompt]
+  agent.StakeholderAgent._stakeholder_agent:
+    type: class
+    models: [LitellmModel]
+    tools: [self.tools]
+    params:
+      class: StakeholderAgent
+      name: self.config.agent_id
+      output_type: AITaskOutput
+      instructions: [self._build_system_prompt()]
+  time_estimation_agent:
+    type: instance
+    models: [LitellmModel]
+    params:
+      function: _estimate_human_duration
+      name: '{self.config.name}_time_estimator'
+      output_type: HumanTimeEstimation
+      instructions: ['You are {self.config.role} with {self.config.experience_years} years of experience.', Your task is to
+          estimate how long it would take YOU SPECIFICALLY to complete the given task., 'Consider:', '- Your background: {self.config.background}',
+        '- Your expertise areas: {, .join}', '- Your work style: {self.config.work_style}', '- Your personality traits: {,
+          .join}', '- Realistic time for research, planning, execution, and review', '- Potential challenges you might face
+          given your background', 'Be realistic - include time for breaks, getting up to speed, and potential obstacles.',
+        'Don''t just estimate the "ideal" time, but the real time it would take you personally.']
+
+models:
+  LitellmModel:
+    type: function
+    agents: [agent.StakeholderAgent._stakeholder_agent, time_estimation_agent, agent.0, agent.1]
+
+tools:
+  analyze_data:
+    type: decorator
+    params:
+      description: |-
+        Analyze the provided data and extract insights.
+
+        Args:
+            data: The data to analyze
+
+        Returns:
+            Analysis results
+  broadcast_message:
+    type: decorator
+    params:
+      description: |-
+        Send a broadcast message to all agents in the workflow.
+
+        Use this for announcements, status updates, or information that
+        all team members should know about. The message will be automatically
+        linked to your current task.
+
+        Args:
+            content: The message content to broadcast
+            message_type: Type of message - "broadcast", "alert", "status_update"
+
+        Returns:
+            Confirmation message
+
+        Example:
+            await broadcast_message(
+                content="Database optimization is 75% complete, ETA 30 minutes",
+                message_type="status_update"
+            )
+  calculate_metrics:
+    type: decorator
+    params:
+      description: |-
+        Calculate performance metrics from data.
+
+        Args:
+            data: Input data for metrics calculation
+
+        Returns:
+            Calculated metrics
+  consult_colleague:
+    type: decorator
+    params:
+      description: |-
+        Consult with a colleague about a work topic.
+
+        Args:
+            topic: The topic to discuss
+
+        Returns:
+            Colleague's advice
+  end_workflow:
+    type: decorator
+    params:
+      description: |-
+        Request to end the workflow execution immediately after the current step.
+
+        Should be only ever called by the manager agent when it thinks the workflow is complete and there is no further work to be done.
+
+        Args:
+            reason: Optional reason for termination
+
+        Returns:
+            Confirmation string
+  generate_code:
+    type: decorator
+    params:
+      description: |-
+        Generate code based on a description.
+
+        Args:
+            description: Description of what the code should do
+
+        Returns:
+            Generated code
+  get_conversation_with:
+    type: decorator
+    params:
+      description: |-
+        Get conversation history with a specific agent.
+
+        Use this to review past communications with another agent
+        to understand context or continue a conversation.
+
+        Args:
+            other_agent_id: The ID of the other agent
+            limit: Maximum number of messages to retrieve (1-50)
+
+        Returns:
+            Formatted conversation history
+
+        Example:
+            history = await get_conversation_with("manager_agent", limit=10)
+  get_recent_messages:
+    type: decorator
+    params:
+      description: |-
+        Retrieve recent messages sent to you.
+
+        Use this to check for updates, questions, or communications from
+        other agents that might be relevant to your current work.
+
+        Args:
+            limit: Maximum number of messages to retrieve (1-50)
+            since_minutes: How many minutes back to look for messages (1-1440)
+            message_types: Types to include - "all", "direct", "request", "broadcast", or comma-separated list
+
+        Returns:
+            Formatted list of recent messages
+
+        Example:
+            recent = await get_recent_messages(limit=5, since_minutes=30, message_types="request,direct")
+  get_search_context:
+    type: decorator
+    params:
+      description: |-
+        Perform a real-time web search to answer a user's question with up-to-date information and citations.
+
+        This asynchronous function takes a user's search question, queries the web for recent and relevant results,
+        synthesizes the findings, and returns a structured answer that includes inline citations to the sources.
+
+        Note: Before calling this tool, make sure you tell the user you are going to do a web search.
+        Parameters:
+            question (QuestionRequest):
+                The search request containing:
+                    - query (str): The user's search query.
+                    - return_results_from (str): ISO 8601 date string specifying the earliest date for search results.
+                    - domain (SearchDomain): The content domain to restrict the search (e.g., news, academic, general).
+
+        Returns:
+            SearchResult:
+                An object containing a comprehensive answer to the query, with inline citations referencing the sources used.
+
+        Usage:
+            Call this tool when you need context from the web to complete a user task.
+  get_task_messages:
+    type: decorator
+    params:
+      description: |-
+        Get messages related to a specific task.
+
+        Use this to see all communications about a particular task,
+        which can help understand requirements, progress, or issues.
+
+        Args:
+            task_id: The task ID to get messages for (defaults to current task)
+
+        Returns:
+            Formatted list of task-related messages
+
+        Example:
+            task_comms = await get_task_messages()  # Current task
+            task_comms = await get_task_messages("task-uuid-here")  # Specific task
+  search_information:
+    type: decorator
+    params:
+      description: |-
+        Search for information on a given topic.
+
+        Args:
+            query: The search query
+
+        Returns:
+            Search results as text
+  self.private_tools:
+    type: variable
+    agents: [agent.1]
+    params:
+      dynamic: "True"
+  self.tools:
+    type: variable
+    agents: [agent.StakeholderAgent._stakeholder_agent, agent.0]
+    params:
+      dynamic: "True"
+  send_message:
+    type: decorator
+    params:
+      description: |-
+        Send a message to another agent during task execution.
+
+        Use this tool to communicate with other agents, ask questions,
+        provide updates, or coordinate work. The message will be
+        automatically linked to your current task.
+
+        Args:
+            to_agent_id: The ID of the agent you want to send the message to
+            content: The message content
+            message_type: Type of message - "direct", "request", "response", "status_update", "alert"
+
+        Returns:
+            Confirmation message
+
+        Example:
+            await send_message(
+                to_agent_id="data_analyst_agent",
+                content="Can you provide the latest metrics for the optimization task?",
+                message_type="request"
+            )
+  take_break:
+    type: decorator
+    params:
+      description: |-
+        Take a break from work (human behavior simulation).
+
+        Args:
+            duration_minutes: Length of break in minutes
+
+        Returns:
+            Break completion message
+
+imports:
+  _answer_single_question: main._answer_single_question
+  ABC: abc.ABC
+  abstractmethod: abc.abstractmethod
+  ActionResult: schemas.execution.manager_actions.ActionResult
+  AdditionalContextItem: schemas.preferences.rubric.AdditionalContextItem
+  AddTaskDependencyAction: schemas.execution.manager_actions.AddTaskDependencyAction
+  Agent: agents.Agent
+  AgentConfig: schemas.workflow_agents.config.AgentConfig
+  AgentExecutionContext: execution.context.AgentExecutionContext
+  AgentInterface: core.workflow_agents.interface.AgentInterface
+  AgentPublicState: workflow_agents.telemetry.AgentPublicState
+  AgentRegistry: workflow_agents.registry.AgentRegistry
+  AgentToolUseEvent: schemas.workflow_agents.telemetry.AgentToolUseEvent
+  AggregationStrategy: schemas.preferences.evaluator.AggregationStrategy
+  AI_AGENT_TASK_TEMPLATE: workflow_agents.prompts.ai_agent_prompts.AI_AGENT_TASK_TEMPLATE
+  AIAgent: workflow_agents.ai_agent.AIAgent
+  AIAgentConfig: config.AIAgentConfig
+  AITaskOutput: outputs.AITaskOutput
+  annotations: __future__.annotations
+  Any: typing.Any
+  AssignAllPendingTasksAction: schemas.execution.manager_actions.AssignAllPendingTasksAction
+  AssignmentPair: schemas.execution.manager_actions.AssignmentPair
+  AssignTaskAction: schemas.execution.manager_actions.AssignTaskAction
+  AssignTasksToAgentsAction: schemas.execution.manager_actions.AssignTasksToAgentsAction
+  asyncio: asyncio
+  AsyncOpenAI: openai.AsyncOpenAI
+  auto: enum.auto
+  Awaitable: typing.Awaitable
+  BaseManagerAction: schemas.execution.manager_actions.BaseManagerAction
+  BaseModel: pydantic.BaseModel
+  BaseRewardAggregator: schemas.evaluation.reward.BaseRewardAggregator
+  BaseSettings: pydantic_settings.BaseSettings
+  build_constraint_evaluator: constraint_evaluator.build_constraint_evaluator
+  build_context_constrained_action_schema: action_constraints.build_context_constrained_action_schema
+  build_litellm_model_id: common.llm_interface.build_litellm_model_id
+  build_operational_efficiency_evaluator: operational_efficiency_evaluator.build_operational_efficiency_evaluator
+  build_stakeholder_evaluator: stakeholder_evaluator.build_stakeholder_evaluator
+  Callable: typing.Callable
+  cast: typing.cast
+  ChainOfThoughtManagerAgent: structured_manager.ChainOfThoughtManagerAgent
+  cohere: cohere
+  COHERE_CLIENT: clients.COHERE_CLIENT
+  common: common
+  communication: communication
+  COMMUNICATION_SERVICE_SINGLETON: communication.service.COMMUNICATION_SERVICE_SINGLETON
+  COMMUNICATION_TOOLS: workflow_agents.tools.communication_di.COMMUNICATION_TOOLS
+  CommunicationGraph: schemas.core.communication.CommunicationGraph
+  CommunicationService: communication.service.CommunicationService
+  CommunicationThread: schemas.core.communication.CommunicationThread
+  ConfigDict: pydantic.ConfigDict
+  Constraint: schemas.preferences.constraints.Constraint
+  core: core
+  cost_per_token: litellm.cost_calculator.cost_per_token
+  Counter: collections.Counter
+  create_communication_tools: workflow_agents.tools.communication.create_communication_tools
+  create_model: pydantic.create_model
+  create_task_result: schemas.unified_results.create_task_result
+  create_timestep_result: schemas.unified_results.create_timestep_result
+  CreateTaskAction: schemas.execution.manager_actions.CreateTaskAction
+  datetime: datetime.datetime
+  decompose_task: core.decomposition.decompose_task
+  DecomposeTaskAction: schemas.execution.manager_actions.DecomposeTaskAction
+  decomposition: decomposition
+  deque: collections.deque
+  Dict: typing.Dict
+  Enum: enum.Enum
+  EvaluatedScore: schemas.core.evaluators.EvaluatedScore
+  EvaluationResult: schemas.preferences.evaluation.EvaluationResult
+  Evaluator: schemas.preferences.evaluator.Evaluator
+  Exa: exa_py.Exa
+  EXA_CLIENT: clients.EXA_CLIENT
+  execution: execution
+  ExecutionResult: schemas.unified_results.ExecutionResult
+  ExecutionState: schemas.execution.ExecutionState
+  FailedAction: schemas.execution.manager_actions.FailedAction
+  Field: pydantic.Field
+  field_validator: pydantic.field_validator
+  function_tool: agents.function_tool
+  functools: functools
+  generate_structured_response: common.llm_interface.generate_structured_response
+  Generic: typing.Generic
+  get_action_descriptions: llm_action_utils.get_action_descriptions
+  get_default_action_classes: llm_action_utils.get_default_action_classes
+  get_search_context: workflow_agents.tools.web_search.main.get_search_context
+  get_workflow_context_string: core.decomposition.get_workflow_context_string
+  GetAvailableAgentsAction: schemas.execution.manager_actions.GetAvailableAgentsAction
+  GetPendingTasksAction: schemas.execution.manager_actions.GetPendingTasksAction
+  GetWorkflowStatusAction: schemas.execution.manager_actions.GetWorkflowStatusAction
+  HUMAN_SIMULATION_INSTRUCTIONS_TEMPLATE: workflow_agents.prompts.human_agent_prompts.HUMAN_SIMULATION_INSTRUCTIONS_TEMPLATE
+  HUMAN_TASK_ASSIGNMENT_TEMPLATE: workflow_agents.prompts.human_agent_prompts.HUMAN_TASK_ASSIGNMENT_TEMPLATE
+  HumanAgentConfig: config.HumanAgentConfig
+  HumanTimeEstimation: outputs.HumanTimeEstimation
+  HumanWorkOutput: outputs.HumanWorkOutput
+  identity_float: schemas.evaluation.reward.identity_float
+  inspect: inspect
+  InspectTaskAction: schemas.execution.manager_actions.InspectTaskAction
+  instructor: instructor
+  Iterable: typing.Iterable
+  json: json
+  List: typing.List
+  LitellmModel: agents.extensions.models.litellm_model.LitellmModel
+  Literal: typing.Literal
+  LLMInferenceTruncationError: common.llm_interface.LLMInferenceTruncationError
+  logger: common.logging.logger
+  logging: logging
+  manager_agent: manager_agent
+  ManagerAgent: interface.ManagerAgent
+  ManagerObservation: schemas.execution.manager.ManagerObservation
+  Message: schemas.core.communication.Message
+  MessageGrouping: schemas.core.communication.MessageGrouping
+  MessageType: schemas.core.communication.MessageType
+  MissingPreferencePolicy: weight_update.MissingPreferencePolicy
+  MockHumanAgent: workflow_agents.human_agent.MockHumanAgent
+  model_validator: pydantic.model_validator
+  NO_RESOURCES_MESSAGE: workflow_agents.prompts.ai_agent_prompts.NO_RESOURCES_MESSAGE
+  NoOpAction: schemas.execution.manager_actions.NoOpAction
+  OneShotDelegateManagerAgent: random_manager.OneShotDelegateManagerAgent
+  os: os
+  OutputConfig: schemas.config.OutputConfig
+  Path: pathlib.Path
+  PERSONA_ROLEPLAY_TEMPLATE: schemas.workflow_agents.prompts.persona_prompts.PERSONA_ROLEPLAY_TEMPLATE
+  Preference: schemas.preferences.preference.Preference
+  PreferenceChange: schemas.preferences.preference.PreferenceChange
+  PreferenceScore: schemas.preferences.evaluation.PreferenceScore
+  PreferenceWeights: schemas.preferences.preference.PreferenceWeights
+  PreferenceWeightUpdateRequest: schemas.preferences.weight_update.PreferenceWeightUpdateRequest
+  QuestionRequest: schemas.workflow_agents.tools.web_search.QuestionRequest
+  QuestionRequestWithId: schemas.workflow_agents.tools.web_search.QuestionRequestWithId
+  random: random
+  RandomManagerAgent: random_manager.RandomManagerAgent
+  RandomManagerAgentV2: random_manager.RandomManagerAgentV2
+  RedistributionStrategy: weight_update.RedistributionStrategy
+  RefineTaskAction: schemas.execution.manager_actions.RefineTaskAction
+  RemoveTaskAction: schemas.execution.manager_actions.RemoveTaskAction
+  RemoveTaskDependencyAction: schemas.execution.manager_actions.RemoveTaskDependencyAction
+  Resource: schemas.core.resources.Resource
+  RewardProjection: schemas.evaluation.reward.RewardProjection
+  RubricGroupResult: schemas.preferences.evaluation.RubricGroupResult
+  RubricResult: schemas.preferences.evaluation.RubricResult
+  RunCondition: schemas.preferences.rubric.RunCondition
+  RunContextWrapper: agents.RunContextWrapper
+  Runner: agents.Runner
+  RunResult: agents.RunResult
+  ScalarUtilityReward: schemas.evaluation.reward.ScalarUtilityReward
+  ScheduledAgentChange: agent_coordination.ScheduledAgentChange
+  schemas: schemas
+  search: search.search
+  SearchDomain: schemas.workflow_agents.tools.web_search.SearchDomain
+  SearchItem: schemas.workflow_agents.tools.web_search.SearchItem
+  SearchResult: schemas.workflow_agents.tools.web_search.SearchResult
+  SenderMessagesView: schemas.core.communication.SenderMessagesView
+  SendMessageAction: schemas.execution.manager_actions.SendMessageAction
+  Sequence: typing.Sequence
+  Set: typing.Set
+  settings: config.settings
+  SimulationConfig: schemas.config.SimulationConfig
+  STAKEHOLDER_SYSTEM_PROMPT_TEMPLATE: workflow_agents.prompts.stakeholder_prompts.STAKEHOLDER_SYSTEM_PROMPT_TEMPLATE
+  StakeholderAgent: workflow_agents.stakeholder_agent.StakeholderAgent
+  StakeholderBase: interface.StakeholderBase
+  StakeholderConfig: stakeholder.StakeholderConfig
+  StakeholderPublicProfile: schemas.workflow_agents.stakeholder.StakeholderPublicProfile
+  StrEnum: enum.StrEnum
+  STRUCTURED_MANAGER_SYSTEM_PROMPT_TEMPLATE: prompts.structured_manager_prompts.STRUCTURED_MANAGER_SYSTEM_PROMPT_TEMPLATE
+  Task: schemas.core.Task
+  TaskGroup: asyncio.TaskGroup
+  TaskStatus: schemas.core.tasks.TaskStatus
+  ThreadMessagesView: schemas.core.communication.ThreadMessagesView
+  time: time
+  timedelta: datetime.timedelta
+  TimeoutMessage: schemas.workflow_agents.tools.web_search.TimeoutMessage
+  TimestepEndContext: schemas.execution.callbacks.TimestepEndContext
+  Tool: agents.Tool
+  ToolFactory: workflow_agents.tool_factory.ToolFactory
+  ToolFactoryType: workflow_agents.tool_factory.ToolFactory
+  tqdm: tqdm
+  traceback: traceback
+  Tuple: typing.Tuple
+  Type: typing.Type
+  TYPE_CHECKING: typing.TYPE_CHECKING
+  TypeAlias: typing.TypeAlias
+  TypeVar: typing.TypeVar
+  Union: typing.Union
+  UUID: uuid.UUID
+  uuid4: uuid.uuid4
+  ValidationContext: schemas.evaluation.success_criteria.ValidationContext
+  ValidationEngine: evaluation.validation_engine.ValidationEngine
+  ValidationFrequency: schemas.evaluation.success_criteria.ValidationFrequency
+  WeightUpdateMode: weight_update.WeightUpdateMode
+  Workflow: schemas.core.workflow.Workflow
+  workflow_agents: workflow_agents
+  WorkflowExecutionEngine: core.execution.engine.WorkflowExecutionEngine
+  WorkflowRubric: schemas.preferences.rubric.WorkflowRubric
+  WorkflowSerialiser: output_writer.WorkflowSerialiser
+  WorkflowStateRestorer: state_restorer.WorkflowStateRestorer
+  WorkflowValidationRule: evaluation.validation_rules.WorkflowValidationRule
+
+functions:
+  __init__:
+    type: sync
+    module: manager_agent_gym.core.execution.state_restorer
+    args: [self, snapshot_dir, timestep]
+  __str__:
+    type: sync
+    module: manager_agent_gym.core.common.llm_interface
+    args: [self]
+    params:
+      returns: str
+  _aggregate_scores:
+    type: sync
+    module: manager_agent_gym.core.evaluation.validation_engine
+    args: [self, normalized_scores, strategy, rubrics, workflow, context]
+    params:
+      returns: float
+  _answer_single_question:
+    type: async
+    module: manager_agent_gym.core.workflow_agents.tools.web_search.main
+    args: [question]
+    params:
+      returns: SearchResult
+  _build_context_for_rubric:
+    type: sync
+    module: manager_agent_gym.core.evaluation.validation_engine
+    args: [self, workflow, timestep, preferences, required, communications, manager_actions]
+    params:
+      returns: ValidationContext
+  _build_system_prompt:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.stakeholder_agent
+    args: [self]
+    params:
+      returns: str
+  _build_task_prompt:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.stakeholder_agent
+    args: [self, task, resources]
+    params:
+      returns: str
+  _calculate_accurate_cost:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.ai_agent
+    args: [self, result]
+    params:
+      returns: float
+  _calculate_quality_modifier:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.human_agent
+    args: [self]
+    params:
+      returns: float
+  _calculate_speed_modifier:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.human_agent
+    args: [self]
+    params:
+      returns: float
+  _check_and_apply_agent_changes:
+    type: sync
+    module: manager_agent_gym.core.execution.engine
+    args: [self]
+    params:
+      returns: list[str]
+  _constrain_action_class:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.action_constraints
+    args: [action_class, observation]
+    params:
+      returns: type[BaseManagerAction]
+  _create_execution_notes:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.human_agent
+    args: [self, output, quality_modifier]
+    params:
+      returns: list[str]
+  _create_human_task_prompt:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.human_agent
+    args: [self, task, resources, quality_modifier]
+    params:
+      returns: str
+  _create_misunderstood_task_prompt:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.human_agent
+    args: [self, task, resources]
+    params:
+      returns: str
+  _create_roleplay_prompt:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.human_agent
+    args: [self]
+    params:
+      returns: str
+  _create_task_prompt:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.ai_agent
+    args: [self, task, resources]
+    params:
+      returns: str
+  _estimate_human_duration:
+    type: async
+    module: manager_agent_gym.core.workflow_agents.human_agent
+    args: [self, task, default_duration]
+    params:
+      returns: float
+  _eval_one:
+    type: async
+    module: manager_agent_gym.core.evaluation.validation_engine
+    args: [owner, r]
+    params:
+      returns: None
+  _evaluate_single_rubric:
+    type: async
+    module: manager_agent_gym.core.evaluation.validation_engine
+    args: [self, workflow, rubric, context]
+    params:
+      returns: tuple
+  _execute_ready_tasks:
+    type: async
+    module: manager_agent_gym.core.execution.engine
+    args: [self]
+    params:
+      returns: tuple
+  _expand_to_leaf_dependencies:
+    type: sync
+    module: manager_agent_gym.schemas.core.workflow
+    args: [dep_ids]
+    params:
+      returns: set[UUID]
+  _find_stakeholder_id:
+    type: sync
+    module: manager_agent_gym.core.evaluation.stakeholder_evaluator
+    args: [workflow]
+  _format_actions:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.structured_manager
+    args: [self, action_descriptions]
+    params:
+      returns: str
+  _format_priorities:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.structured_manager
+    args: [self, action_priorities]
+    params:
+      returns: str
+  _format_reply:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.stakeholder_agent
+    args: [self, incoming]
+    params:
+      returns: str
+  _format_resources:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.ai_agent
+    args: [self, resources]
+    params:
+      returns: str
+  _generate_suggestion:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.stakeholder_agent
+    args: [self]
+    params:
+      returns: str
+  _get_candidate_action_classes:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.random_manager
+    args: [self, observation]
+    params:
+      returns: list[type[BaseManagerAction]]
+  _get_openai_client:
+    type: sync
+    module: manager_agent_gym.core.common.llm_interface
+  _get_preferences_from_stakeholder_agent:
+    type: sync
+    module: manager_agent_gym.core.execution.engine
+    args: [self, timestep]
+    params:
+      returns: PreferenceWeights
+  _get_system_prompt:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.random_manager
+    args: [self, selected_action_classes, available_agent_configs]
+    params:
+      returns: str
+  _get_task_resources:
+    type: sync
+    module: manager_agent_gym.core.execution.engine
+    args: [self, task]
+    params:
+      returns: list[Resource]
+  _handle_misunderstanding:
+    type: async
+    module: manager_agent_gym.core.workflow_agents.human_agent
+    args: [self, task, resources, start_time, started_at]
+    params:
+      returns: ExecutionResult
+  _inject_communication_service:
+    type: sync
+    module: manager_agent_gym.core.execution.engine
+    args: [self]
+    params:
+      returns: None
+  _is_leaf_completed:
+    type: sync
+    module: manager_agent_gym.core.execution.engine
+    args: [leaf]
+    params:
+      returns: bool
+  _is_terminal_state:
+    type: sync
+    module: manager_agent_gym.core.execution.engine
+    args: [self]
+    params:
+      returns: bool
+  _iter_manager_to_stakeholder_messages:
+    type: sync
+    module: manager_agent_gym.core.evaluation.stakeholder_evaluator
+    args: [context]
+    params:
+      returns: List[Message]
+  _iter_stakeholder_to_manager_messages:
+    type: sync
+    module: manager_agent_gym.core.evaluation.stakeholder_evaluator
+    args: [context]
+    params:
+      returns: List[Message]
+  _leaf_statuses:
+    type: sync
+    module: manager_agent_gym.core.execution.engine
+    args: [node]
+    params:
+      returns: list[TaskStatus]
+  _make_pbar:
+    type: sync
+    module: manager_agent_gym.core.evaluation.validation_engine
+    args: [total, disable, desc]
+  _normalize_mode:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.factory
+    args: [raw_mode]
+    params:
+      returns: str
+  _normalize_user_result:
+    type: sync
+    module: manager_agent_gym.core.evaluation.validation_engine
+    args: [self, result, max_score]
+    params:
+      returns: tuple
+  _notify_listeners:
+    type: async
+    module: manager_agent_gym.core.communication.service
+    args: [self, message]
+    params:
+      returns: None
+  _prepare_context:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.random_manager
+    args: [self, observation, selected_class]
+    params:
+      returns: str
+  _propagate_and_register:
+    type: sync
+    module: manager_agent_gym.schemas.core.workflow
+    args: [task, inherited_deps]
+    params:
+      returns: None
+  _resolve_model_name:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.factory
+    args: [explicit_model_name]
+    params:
+      returns: str
+  _restore_communication_history:
+    type: sync
+    module: manager_agent_gym.core.execution.engine
+    args: [self, messages]
+    params:
+      returns: None
+  _restore_stakeholder_preferences:
+    type: sync
+    module: manager_agent_gym.core.execution.engine
+    args: [self, prefs_data]
+    params:
+      returns: None
+  _restore_workflow_state:
+    type: sync
+    module: manager_agent_gym.core.execution.engine
+    args: [self, workflow_snapshot]
+    params:
+      returns: None
+  _sample_latency_steps:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.stakeholder_agent
+    args: [self]
+    params:
+      returns: int
+  _save_workflow_state:
+    type: async
+    module: manager_agent_gym.core.execution.engine
+    args: [self, timestep_result]
+    params:
+      returns: None
+  _search:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.tools.web_search.search
+    args: [query, domain, maximum_length_search_result, num_results_to_return, return_results_from]
+    params:
+      returns: list[SearchItem]
+  _serialize_agents_for_snapshot:
+    type: sync
+    module: manager_agent_gym.core.execution.output_writer
+    args: [self]
+    params:
+      returns: list[dict]
+  _set_effective_status_recursive:
+    type: sync
+    module: manager_agent_gym.core.execution.engine
+    args: [node]
+    params:
+      returns: None
+  _update_broadcast_edge:
+    type: sync
+    module: manager_agent_gym.schemas.core.communication
+    args: [self, message]
+    params:
+      returns: None
+  _update_composite_completion:
+    type: sync
+    module: manager_agent_gym.core.execution.engine
+    args: [node]
+    params:
+      returns: None
+  _update_direct_edge:
+    type: sync
+    module: manager_agent_gym.schemas.core.communication
+    args: [self, message, recipient]
+    params:
+      returns: None
+  _update_human_state:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.human_agent
+    args: [self]
+  _update_thread:
+    type: sync
+    module: manager_agent_gym.schemas.core.communication
+    args: [self, message]
+    params:
+      returns: None
+  _update_workflow_state:
+    type: sync
+    module: manager_agent_gym.core.execution.engine
+    args: [self, completed_tasks, failed_tasks]
+    params:
+      returns: None
+  add_agent:
+    type: sync
+    module: manager_agent_gym.schemas.core.workflow
+    args: [self, agent]
+    params:
+      returns: None
+  add_communication_tools:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.tool_factory
+    args: [tools, communication_service, agent_id]
+    params:
+      returns: list[Tool]
+  add_message:
+    type: sync
+    module: manager_agent_gym.schemas.core.communication
+    args: [self, message]
+    params:
+      returns: None
+  add_message_listener:
+    type: async
+    module: manager_agent_gym.core.communication.service
+    args: [self, agent_id, callback]
+    params:
+      returns: None
+  add_message_to_thread:
+    type: async
+    module: manager_agent_gym.core.communication.service
+    args: [self, thread_id, from_agent, to_agent, content, message_type, priority]
+    params:
+      returns: Message
+  add_participant:
+    type: sync
+    module: manager_agent_gym.schemas.core.communication
+    args: [self, agent_id]
+    params:
+      returns: None
+  add_resource:
+    type: sync
+    module: manager_agent_gym.schemas.core.workflow
+    args: [self, resource]
+    params:
+      returns: None
+  add_subtask:
+    type: sync
+    module: manager_agent_gym.schemas.core.tasks
+    args: [self, subtask]
+    params:
+      returns: None
+  add_task:
+    type: sync
+    module: manager_agent_gym.schemas.core.workflow
+    args: [self, task]
+    params:
+      returns: None
+  agent_id:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.interface
+    args: [self]
+    params:
+      returns: str
+  agent_type:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.interface
+    args: [self]
+    params:
+      returns: str
+  analyze_data:
+    type: tool
+    module: manager_agent_gym.core.workflow_agents.tool_factory
+    args: [data]
+    params:
+      returns: str
+  apply_preference_change:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.stakeholder_agent
+    args: [self, timestep, new_weights, change_event]
+    params:
+      returns: None
+  apply_scheduled_changes_for_timestep:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.registry
+    args: [self, timestep, communication_service, tool_factory]
+    params:
+      returns: list[str]
+  apply_weight_update:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.stakeholder_agent
+    args: [self, request]
+    params:
+      returns: PreferenceChange
+  apply_weight_updates:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.stakeholder_agent
+    args: [self, requests]
+    params:
+      returns: list[PreferenceChange]
+  broadcast_message:
+    type: tool
+    module: manager_agent_gym.core.workflow_agents.tools.communication_di
+    args: [wrapper, content, message_type]
+    params:
+      returns: str
+  build_action_constraint_schema:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.llm_action_utils
+    args: [action_classes]
+    params:
+      returns: Type[BaseModel]
+  build_context_constrained_action_schema:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.action_constraints
+    args: [action_classes, observation]
+    params:
+      returns: Type[BaseModel]
+  build_default_evaluators:
+    type: sync
+    module: manager_agent_gym.core.evaluation.common_evaluators
+    args: [communication_service]
+    params:
+      returns: list[Evaluator]
+  build_labeled_output_config:
+    type: sync
+    module: manager_agent_gym.config
+    args: [self, label, base_output_dir, create_run_subdirectory, run_suffix, label_as_subdir]
+    params:
+      returns: OutputConfig
+  build_litellm_model_id:
+    type: sync
+    module: manager_agent_gym.core.common.llm_interface
+    args: [model_id]
+    params:
+      returns: str
+  build_stakeholder_evaluator:
+    type: sync
+    module: manager_agent_gym.core.evaluation.stakeholder_evaluator
+    params:
+      returns: Evaluator
+  build_system_prompt:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.random_manager
+    params:
+      returns: str
+  build_user_prompt:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.random_manager
+    args: [workflow_summary, available_agent_configs]
+    params:
+      returns: str
+  calculate_coordination_deadtime_seconds:
+    type: sync
+    module: manager_agent_gym.schemas.core.tasks
+    args: [self]
+    params:
+      returns: float
+  calculate_metrics:
+    type: tool
+    module: manager_agent_gym.core.workflow_agents.tool_factory
+    args: [data]
+    params:
+      returns: str
+  can_handle_task:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.interface
+    args: [self, task]
+    params:
+      returns: bool
+  check_evaluator_source:
+    type: sync
+    module: manager_agent_gym.schemas.preferences.rubric
+    args: [self]
+    params:
+      returns: WorkflowRubric
+  clear:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.registry
+    args: [self]
+    params:
+      returns: None
+  configure_library_logging:
+    type: sync
+    module: manager_agent_gym.core.common.logging
+    args: [level]
+    params:
+      returns: None
+  configure_seed:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.random_manager
+    args: [self, seed]
+    params:
+      returns: None
+  consult_colleague:
+    type: tool
+    module: manager_agent_gym.core.workflow_agents.tool_factory
+    args: [topic]
+    params:
+      returns: str
+  cost_per_token:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.ai_agent
+  create_agent:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.registry
+    args: [self, config]
+    params:
+      returns: AgentInterface
+  create_ai_tools:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.tool_factory
+    params:
+      returns: list[Tool]
+  create_basic_tools:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.tool_factory
+    params:
+      returns: list[Tool]
+  create_communication_tools:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.tools.communication
+    args: [communication_service, agent_id, current_task_id]
+    params:
+      returns: list
+  create_human_tools:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.tool_factory
+    params:
+      returns: list[Tool]
+  create_manager:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.factory
+    args: [preferences, model_name, manager_mode]
+    params:
+      returns: ManagerAgent
+  create_manager_agent:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.factory
+    args: [preferences, model_name, manager_mode]
+    params:
+      returns: ManagerAgent
+  create_observation:
+    type: async
+    module: manager_agent_gym.core.manager_agent.interface
+    args: [self, workflow, execution_state, stakeholder_profile, current_timestep, running_tasks, completed_task_ids, failed_task_ids,
+      communication_service]
+    params:
+      returns: ManagerObservation
+  create_simulation_config:
+    type: sync
+    module: manager_agent_gym.config
+    args: [self, base_output_dir, run_id]
+    params:
+      returns: SimulationConfig
+  create_task_result:
+    type: sync
+    module: manager_agent_gym.schemas.unified_results
+    args: [task_id, agent_id, success, execution_time, resources, cost, error, simulated_duration_hours]
+    params:
+      returns: ExecutionResult
+  create_thread:
+    type: sync
+    module: manager_agent_gym.core.communication.service
+    args: [self, participants, topic, related_task_id]
+    params:
+      returns: CommunicationThread
+  create_timestep_result:
+    type: sync
+    module: manager_agent_gym.schemas.unified_results
+    args: [timestep, manager_id, tasks_started, tasks_completed, tasks_failed, execution_time, completed_tasks_simulated_hours,
+      manager_action, manager_observation, workflow_snapshot, preference_change_event]
+    params:
+      returns: ExecutionResult
+  end_workflow:
+    type: tool
+    module: manager_agent_gym.core.workflow_agents.tools.communication_di
+    args: [wrapper, reason]
+    params:
+      returns: str
+  ensure_directories:
+    type: sync
+    module: manager_agent_gym.core.execution.output_writer
+    args: [self]
+    params:
+      returns: None
+  ensure_directories_exist:
+    type: sync
+    module: manager_agent_gym.schemas.config
+    args: [self]
+    params:
+      returns: None
+  evaluate_timestep:
+    type: async
+    module: manager_agent_gym.core.evaluation.validation_engine
+    args: [self, workflow, timestep, cadence, communications, manager_actions, preferences, workflow_evaluators]
+    params:
+      returns: EvaluationResult
+  execute:
+    type: async
+    module: manager_agent_gym.schemas.execution.manager_actions
+    args: [self, workflow, communication_service]
+    params:
+      returns: ActionResult
+  execute_task:
+    type: async
+    module: manager_agent_gym.core.workflow_agents.ai_agent
+    args: [self, task, resources]
+    params:
+      returns: ExecutionResult
+  execute_timestep:
+    type: async
+    module: manager_agent_gym.core.execution.engine
+    args: [self]
+    params:
+      returns: ExecutionResult
+  expand_to_leaf_ids:
+    type: sync
+    module: manager_agent_gym.schemas.core.workflow
+    args: [dep_ids]
+    params:
+      returns: set[UUID]
+  experience_factor:
+    type: sync
+    module: manager_agent_gym.schemas.workflow_agents.config
+    args: [self]
+    params:
+      returns: float
+  find_task_by_id:
+    type: sync
+    module: manager_agent_gym.schemas.core.tasks
+    args: [self, task_id]
+    params:
+      returns: Task | None
+  generate_code:
+    type: tool
+    module: manager_agent_gym.core.workflow_agents.tool_factory
+    args: [description]
+    params:
+      returns: str
+  generate_roleplay_prompt:
+    type: sync
+    module: manager_agent_gym.schemas.workflow_agents.config
+    args: [self]
+    params:
+      returns: str
+  generate_structured_response:
+    type: async
+    module: manager_agent_gym.core.common.llm_interface
+    args: [system_prompt, user_prompt, response_type, seed, model, temperature, max_completion_tokens, max_retries, retry_delay_seconds]
+    params:
+      returns: T
+  get_action_buffer:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.interface
+    args: [self, number_most_recent_actions]
+    params:
+      returns: list[ActionResult]
+  get_action_descriptions:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.llm_action_utils
+    args: [action_classes]
+    params:
+      returns: dict
+  get_agent:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.registry
+    args: [self, agent_id]
+  get_agent_capability_summary:
+    type: sync
+    module: manager_agent_gym.schemas.workflow_agents.config
+    args: [self]
+    params:
+      returns: str
+  get_agent_communication_stats:
+    type: sync
+    module: manager_agent_gym.schemas.core.communication
+    args: [self, agent_id]
+    params:
+      returns: dict
+  get_agent_stats:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.registry
+    args: [self]
+    params:
+      returns: dict
+  get_agent_view:
+    type: sync
+    module: manager_agent_gym.core.communication.service
+    args: [self, agent_id]
+    params:
+      returns: dict
+  get_agent_workloads:
+    type: sync
+    module: manager_agent_gym.core.execution.state_restorer
+    args: [self]
+    params:
+      returns: dict
+  get_all_messages:
+    type: sync
+    module: manager_agent_gym.core.communication.service
+    args: [self]
+    params:
+      returns: list[Message]
+  get_all_messages_grouped:
+    type: sync
+    module: manager_agent_gym.core.communication.service
+    args: [self, grouping, sort_within_group, include_broadcasts]
+  get_all_recipients:
+    type: sync
+    module: manager_agent_gym.schemas.core.communication
+    args: [self]
+    params:
+      returns: set[str]
+  get_all_resources:
+    type: sync
+    module: manager_agent_gym.schemas.core.workflow
+    args: [self]
+    params:
+      returns: list[Resource]
+  get_all_subtasks_flat:
+    type: sync
+    module: manager_agent_gym.schemas.core.tasks
+    args: [self]
+    params:
+      returns: list[Task]
+  get_atomic_subtasks:
+    type: sync
+    module: manager_agent_gym.schemas.core.tasks
+    args: [self]
+    params:
+      returns: list[Task]
+  get_available_agents:
+    type: sync
+    module: manager_agent_gym.schemas.core.workflow
+    args: [self]
+    params:
+      returns: list[AgentInterface]
+  get_communication_analytics:
+    type: sync
+    module: manager_agent_gym.core.communication.service
+    args: [self]
+    params:
+      returns: dict
+  get_conversation_history:
+    type: sync
+    module: manager_agent_gym.schemas.core.communication
+    args: [self, agent_id, other_agent, limit]
+    params:
+      returns: list[Message]
+  get_conversation_with:
+    type: tool
+    module: manager_agent_gym.core.workflow_agents.tools.communication
+    args: [other_agent_id, limit]
+    params:
+      returns: str
+  get_current_execution_context:
+    type: sync
+    module: manager_agent_gym.core.execution.engine
+    args: [self]
+    params:
+      returns: dict
+  get_current_workflow_state:
+    type: sync
+    module: manager_agent_gym.core.execution.engine
+    args: [self]
+    params:
+      returns: Workflow
+  get_default_action_classes:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.llm_action_utils
+    params:
+      returns: list[type[BaseManagerAction]]
+  get_edge_key:
+    type: sync
+    module: manager_agent_gym.schemas.core.communication
+    args: [self]
+    params:
+      returns: str
+  get_evaluation_results_path:
+    type: sync
+    module: manager_agent_gym.schemas.config
+    args: [self, timestamp]
+    params:
+      returns: Path
+  get_final_metrics_path:
+    type: sync
+    module: manager_agent_gym.schemas.config
+    args: [self]
+    params:
+      returns: Path
+  get_last_reward_value:
+    type: sync
+    module: manager_agent_gym.core.evaluation.validation_engine
+    args: [self]
+  get_llm_evaluation_details_path:
+    type: sync
+    module: manager_agent_gym.schemas.config
+    args: [self, timestamp]
+    params:
+      returns: Path
+  get_manager_view:
+    type: sync
+    module: manager_agent_gym.core.communication.service
+    args: [self]
+    params:
+      returns: dict
+  get_messages_for_agent:
+    type: sync
+    module: manager_agent_gym.schemas.core.communication
+    args: [self, agent_id, since, message_types, limit]
+    params:
+      returns: list[Message]
+  get_messages_grouped_by_sender:
+    type: sync
+    module: manager_agent_gym.core.communication.service
+    args: [self, sort_within_group, include_broadcasts]
+    params:
+      returns: list[SenderMessagesView]
+  get_preference_dict:
+    type: sync
+    module: manager_agent_gym.schemas.preferences.preference
+    args: [self]
+    params:
+      returns: dict
+  get_preference_names:
+    type: sync
+    module: manager_agent_gym.schemas.preferences.preference
+    args: [self]
+    params:
+      returns: List[str]
+  get_preference_summary:
+    type: sync
+    module: manager_agent_gym.schemas.preferences.preference
+    args: [self]
+    params:
+      returns: str
+  get_preferences_for_timestep:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.stakeholder_agent
+    args: [self, timestep]
+    params:
+      returns: PreferenceWeights
+  get_ready_tasks:
+    type: sync
+    module: manager_agent_gym.schemas.core.workflow
+    args: [self]
+    params:
+      returns: list[Task]
+  get_recent_broadcasts:
+    type: sync
+    module: manager_agent_gym.core.communication.service
+    args: [self, since_minutes, limit]
+    params:
+      returns: list[Message]
+  get_recent_messages:
+    type: tool
+    module: manager_agent_gym.core.workflow_agents.tools.communication_di
+    args: [wrapper, hours, limit]
+    params:
+      returns: str
+  get_rubric_names:
+    type: sync
+    module: manager_agent_gym.schemas.preferences.preference
+    args: [self]
+    params:
+      returns: List[str]
+  get_search_context:
+    type: tool
+    module: manager_agent_gym.core.workflow_agents.tools.web_search.main
+    args: [wrapper, question]
+  get_simulated_time_state:
+    type: sync
+    module: manager_agent_gym.core.execution.state_restorer
+    args: [self]
+    params:
+      returns: dict
+  get_task_communications:
+    type: sync
+    module: manager_agent_gym.core.communication.service
+    args: [self, task_id]
+    params:
+      returns: list[Message]
+  get_task_dependencies_graph:
+    type: sync
+    module: manager_agent_gym.schemas.core.workflow
+    args: [self]
+    params:
+      returns: dict
+  get_task_messages:
+    type: tool
+    module: manager_agent_gym.core.workflow_agents.tools.communication
+    args: [task_id]
+    params:
+      returns: str
+  get_task_output_resources:
+    type: sync
+    module: manager_agent_gym.schemas.core.workflow
+    args: [self, task]
+    params:
+      returns: list[Resource]
+  get_timestep_file_path:
+    type: sync
+    module: manager_agent_gym.schemas.config
+    args: [self, timestep]
+    params:
+      returns: Path
+  get_tool_usage_by_task:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.interface
+    args: [self]
+    params:
+      returns: dict
+  get_workflow_summary_path:
+    type: sync
+    module: manager_agent_gym.schemas.config
+    args: [self, timestamp]
+    params:
+      returns: Path
+  graph_complexity_penalty:
+    type: sync
+    module: manager_agent_gym.core.evaluation.stakeholder_evaluator
+    args: [workflow, context]
+    params:
+      returns: Tuple
+  has_circular_dependency:
+    type: sync
+    module: manager_agent_gym.schemas.execution.manager_actions
+    args: [start_id, target_id, visited]
+    params:
+      returns: bool
+  is_atomic_task:
+    type: sync
+    module: manager_agent_gym.schemas.core.tasks
+    args: [self]
+    params:
+      returns: bool
+  is_broadcast:
+    type: sync
+    module: manager_agent_gym.schemas.core.communication
+    args: [self]
+    params:
+      returns: bool
+  is_complete:
+    type: sync
+    module: manager_agent_gym.schemas.core.workflow
+    args: [self]
+    params:
+      returns: bool
+  is_composite_task:
+    type: sync
+    module: manager_agent_gym.schemas.core.tasks
+    args: [self]
+    params:
+      returns: bool
+  is_end_workflow_requested:
+    type: sync
+    module: manager_agent_gym.core.communication.service
+    args: [self]
+    params:
+      returns: bool
+  is_ready_to_start:
+    type: sync
+    module: manager_agent_gym.schemas.core.tasks
+    args: [self, completed_task_ids]
+    params:
+      returns: bool
+  list_agents:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.registry
+    args: [self]
+    params:
+      returns: list[AgentInterface]
+  load_snapshot_data:
+    type: sync
+    module: manager_agent_gym.core.execution.state_restorer
+    args: [self]
+    params:
+      returns: None
+  manager_mode_label:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.factory
+    args: [manager_mode]
+    params:
+      returns: str
+  mark_message_read:
+    type: sync
+    module: manager_agent_gym.core.communication.service
+    args: [self, message_id, agent_id]
+    params:
+      returns: bool
+  mark_read_by:
+    type: sync
+    module: manager_agent_gym.schemas.core.communication
+    args: [self, agent_id]
+    params:
+      returns: None
+  model_post_init:
+    type: sync
+    module: manager_agent_gym.schemas.config
+    args: [self, __context]
+    params:
+      returns: None
+  normalize:
+    type: sync
+    module: manager_agent_gym.schemas.preferences.preference
+    args: [self]
+    params:
+      returns: PreferenceWeights
+  normalize_weights:
+    type: sync
+    module: manager_agent_gym.schemas.preferences.preference
+    args: [self]
+    params:
+      returns: PreferenceWeights
+  normalized_score:
+    type: sync
+    module: manager_agent_gym.schemas.evaluation.success_criteria
+    args: [self]
+    params:
+      returns: float
+  on_action_executed:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.interface
+    args: [self, timestep, action, action_result]
+    params:
+      returns: None
+  policy_step:
+    type: async
+    module: manager_agent_gym.core.workflow_agents.stakeholder_agent
+    args: [self, current_timestep, communication_service]
+    params:
+      returns: None
+  prepare_simulation:
+    type: sync
+    module: manager_agent_gym.schemas.config
+    args: [self]
+    params:
+      returns: None
+  pretty_print:
+    type: sync
+    module: manager_agent_gym.schemas.core.tasks
+    args: [self, indent]
+    params:
+      returns: str
+  record_action:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.interface
+    args: [self, brief]
+    params:
+      returns: None
+  record_tool_event:
+    type: sync
+    module: manager_agent_gym.core.execution.context
+    args: [self, event]
+    params:
+      returns: None
+  record_tool_use_event:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.interface
+    args: [self, event]
+    params:
+      returns: None
+  register_agent:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.registry
+    args: [self, agent]
+    params:
+      returns: None
+  register_agent_class:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.registry
+    args: [self, agent_type, agent_class]
+    params:
+      returns: None
+  register_ai_agent:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.registry
+    args: [self, config, additional_tools]
+    params:
+      returns: None
+  register_human_agent:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.registry
+    args: [self, config, additional_tools]
+    params:
+      returns: None
+  register_task_tree:
+    type: sync
+    module: manager_agent_gym.schemas.core.workflow
+    args: [task]
+    params:
+      returns: None
+  regret:
+    type: sync
+    module: manager_agent_gym.schemas.evaluation.success_criteria
+    args: [self]
+    params:
+      returns: float
+  remove_agent:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.registry
+    args: [self, agent_id]
+    params:
+      returns: bool
+  remove_subtask:
+    type: sync
+    module: manager_agent_gym.schemas.core.tasks
+    args: [self, subtask_id]
+    params:
+      returns: bool
+  request_end_workflow:
+    type: sync
+    module: manager_agent_gym.core.communication.service
+    args: [self, reason]
+    params:
+      returns: None
+  reset:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.random_manager
+    args: [self]
+    params:
+      returns: None
+  resolve_max_timesteps:
+    type: sync
+    module: manager_agent_gym.config
+    args: [self, fallback]
+    params:
+      returns: int
+  resource_id:
+    type: sync
+    module: manager_agent_gym.schemas.core.resources
+    args: [self]
+    params:
+      returns: UUID
+  response_latency_adherence:
+    type: sync
+    module: manager_agent_gym.core.evaluation.stakeholder_evaluator
+    args: [workflow, context]
+    params:
+      returns: Tuple
+  restore_active_agents:
+    type: sync
+    module: manager_agent_gym.core.execution.state_restorer
+    args: [self, agent_registry]
+    params:
+      returns: None
+  restore_communication_history:
+    type: sync
+    module: manager_agent_gym.core.execution.state_restorer
+    args: [self, communication_service]
+    params:
+      returns: None
+  restore_from_snapshot:
+    type: sync
+    module: manager_agent_gym.core.execution.engine
+    args: [self, snapshot_dir, timestep]
+    params:
+      returns: None
+  restore_manager_action_buffer:
+    type: sync
+    module: manager_agent_gym.core.execution.state_restorer
+    args: [self, manager_agent]
+    params:
+      returns: None
+  restore_stakeholder_preferences:
+    type: sync
+    module: manager_agent_gym.core.execution.state_restorer
+    args: [self, stakeholder_agent]
+    params:
+      returns: None
+  restore_workflow_state:
+    type: sync
+    module: manager_agent_gym.core.execution.state_restorer
+    args: [self, workflow]
+    params:
+      returns: None
+  run_full_execution:
+    type: async
+    module: manager_agent_gym.core.execution.engine
+    args: [self, save_outputs]
+    params:
+      returns: list[ExecutionResult]
+  save_evaluation_outputs:
+    type: sync
+    module: manager_agent_gym.core.execution.output_writer
+    args: [self, evaluation_results, reward_vector]
+    params:
+      returns: None
+  save_execution_logs:
+    type: sync
+    module: manager_agent_gym.core.execution.output_writer
+    args: [self, manager_action_history]
+    params:
+      returns: None
+  save_timestep:
+    type: sync
+    module: manager_agent_gym.core.execution.output_writer
+    args: [self, timestep_result, workflow, current_timestep, manager_agent, stakeholder_weights]
+    params:
+      returns: None
+  save_workflow_summary:
+    type: sync
+    module: manager_agent_gym.core.execution.output_writer
+    args: [self, workflow, completed_task_ids, failed_task_ids, current_timestep]
+    params:
+      returns: None
+  schedule_agent_add:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.registry
+    args: [self, timestep, config, reason]
+    params:
+      returns: None
+  schedule_agent_remove:
+    type: sync
+    module: manager_agent_gym.core.workflow_agents.registry
+    args: [self, timestep, agent_id, reason]
+    params:
+      returns: None
+  search:
+    type: async
+    module: manager_agent_gym.core.workflow_agents.tools.web_search.search
+    args: [query, domain, num_results, maximum_length_search_result, return_results_from, rerank_model]
+    params:
+      returns: SearchResult
+  search_information:
+    type: tool
+    module: manager_agent_gym.core.workflow_agents.tool_factory
+    args: [query]
+    params:
+      returns: str
+  send_direct_message:
+    type: async
+    module: manager_agent_gym.core.communication.service
+    args: [self, from_agent, to_agent, content, message_type, related_task_id, thread_id, priority]
+    params:
+      returns: Message
+  send_message:
+    type: tool
+    module: manager_agent_gym.core.workflow_agents.tools.communication_di
+    args: [wrapper, to_agent, content, message_type]
+    params:
+      returns: str
+  send_multicast_message:
+    type: async
+    module: manager_agent_gym.core.communication.service
+    args: [self, from_agent, to_agents, content, message_type, related_task_id, thread_id, priority]
+    params:
+      returns: Message
+  serialise_workflow_states_and_metrics:
+    type: sync
+    module: manager_agent_gym.core.execution.engine
+    args: [self]
+    params:
+      returns: None
+  set_current_task:
+    type: sync
+    module: manager_agent_gym.core.execution.context
+    args: [self, task_id]
+    params:
+      returns: None
+  set_max_timesteps:
+    type: sync
+    module: manager_agent_gym.core.manager_agent.interface
+    args: [self, max_timesteps]
+    params:
+      returns: None
+  set_reward_aggregator:
+    type: sync
+    module: manager_agent_gym.core.evaluation.validation_engine
+    args: [self, aggregator, projection]
+    params:
+      returns: None
+  silence_third_party_logs:
+    type: sync
+    module: manager_agent_gym.core.common.logging
+    args: [level, libraries]
+    params:
+      returns: None
+  stakeholder_assignment_load_penalty:
+    type: sync
+    module: manager_agent_gym.core.evaluation.stakeholder_evaluator
+    args: [workflow, context]
+    params:
+      returns: Tuple
+  stakeholder_engagement_penalty:
+    type: sync
+    module: manager_agent_gym.core.evaluation.stakeholder_evaluator
+    args: [workflow, context]
+    params:
+      returns: Tuple
+  step:
+    type: async
+    module: manager_agent_gym.core.manager_agent.random_manager
+    args: [self, workflow, execution_state, stakeholder_profile, current_timestep, running_tasks, completed_task_ids, failed_task_ids,
+      communication_service, previous_reward, done]
+    params:
+      returns: BaseManagerAction
+  sync_embedded_tasks_with_registry:
+    type: sync
+    module: manager_agent_gym.schemas.core.tasks
+    args: [self, task_registry]
+    params:
+      returns: None
+  take_action:
+    type: async
+    module: manager_agent_gym.core.manager_agent.random_manager
+    args: [self, observation]
+    params:
+      returns: BaseManagerAction
+  take_break:
+    type: tool
+    module: manager_agent_gym.core.workflow_agents.tool_factory
+    args: [duration_minutes]
+    params:
+      returns: str
+  task_id:
+    type: sync
+    module: manager_agent_gym.schemas.core.tasks
+    args: [self]
+    params:
+      returns: UUID
+  total_budget:
+    type: sync
+    module: manager_agent_gym.schemas.core.workflow
+    args: [self]
+    params:
+      returns: float
+  total_expected_hours:
+    type: sync
+    module: manager_agent_gym.schemas.core.workflow
+    args: [self]
+    params:
+      returns: float
+  update_activity:
+    type: sync
+    module: manager_agent_gym.schemas.core.communication
+    args: [self]
+    params:
+      returns: None
+  update_for_message:
+    type: sync
+    module: manager_agent_gym.schemas.core.communication
+    args: [self, message]
+    params:
+      returns: None
+  validate_agent_id:
+    type: sync
+    module: manager_agent_gym.schemas.workflow_agents.config
+    args: [cls, v]
+    params:
+      returns: str
+  validate_content:
+    type: sync
+    module: manager_agent_gym.schemas.core.communication
+    args: [cls, v]
+    params:
+      returns: str
+  validate_hourly_rate:
+    type: sync
+    module: manager_agent_gym.schemas.workflow_agents.config
+    args: [cls, v]
+    params:
+      returns: float
+  validate_recipients:
+    type: sync
+    module: manager_agent_gym.schemas.core.communication
+    args: [cls, v]
+    params:
+      returns: list[str]
+  validate_system_prompt:
+    type: sync
+    module: manager_agent_gym.schemas.workflow_agents.config
+    args: [cls, v]
+    params:
+      returns: str
+  validate_task_graph:
+    type: sync
+    module: manager_agent_gym.schemas.core.workflow
+    args: [self]
+    params:
+      returns: bool
+  workflow_id:
+    type: sync
+    module: manager_agent_gym.schemas.core.workflow
+    args: [self]
+    params:
+      returns: UUID
+  zeroing_gate:
+    type: sync
+    module: manager_agent_gym.core.evaluation.stakeholder_evaluator
+    args: [workflow, context, scores]
+    params:
+      returns: float
+
+variables:
+  ANTHROPIC_API_KEY:
+    type: env
+    params:
+      caller: [os.environ]
+  COHERE_API_KEY:
+    type: env
+    params:
+      caller: [os.environ]
+  EXA_API_KEY:
+    type: env
+    params:
+      caller: [os.environ]
+  MAG_MANAGER_MODE:
+    type: env
+    params:
+      caller: [os.environ.get]
+      path: [manager_agent_gym.core.manager_agent.factory]
+  MAG_MAX_TIMESTEPS:
+    type: env
+    params:
+      caller: [os.environ.get]
+      path: [manager_agent_gym.config]
+  MAG_MODEL_NAME:
+    type: env
+    params:
+      caller: [os.environ.get]
+      path: [manager_agent_gym.core.manager_agent.factory]
+  MAG_OUTPUT_DIR:
+    type: env
+    params:
+      caller: [os.environ.get]
+      path: [manager_agent_gym.config]
+  OPENAI_API_KEY:
+    type: env
+    params:
+      caller: [os.environ, os.getenv, AsyncOpenAI]
+      path: [manager_agent_gym.core.common.llm_interface]
+
+files:
+  ./simulation_outputs:
+    type: literal
+    actions: [read]
+  .env:
+    type: literal
+    actions: [read]
+  base_dir:
+    type: variable
+    actions: [read]
+    params:
+      caller: [Path()]
+  ev_dir:
+    type: variable
+    actions: [write]
+    params:
+      caller: [ev_dir.mkdir]
+  exec_dir:
+    type: variable
+    actions: [write]
+    params:
+      caller: [exec_dir.mkdir]
+  execution_log_file:
+    type: variable
+    actions: [read]
+    params:
+      caller: [open, json.load]
+      alias: [f]
+  filepath:
+    type: variable
+    actions: [write]
+    params:
+      caller: [filepath.parent.mkdir, open]
+  final_metrics.json:
+    type: literal
+    actions: [read]
+    params:
+      caller: [get_final_metrics_path]
+      path: [self.timestep_dir]
+  final_path:
+    type: variable
+    actions: [write]
+    params:
+      caller: [open]
+      alias: [f]
+  history_path:
+    type: variable
+    actions: [write]
+    params:
+      caller: [open]
+      alias: [f]
+  path:
+    type: variable
+    actions: [write]
+    params:
+      caller: [open]
+      alias: [f]
+  snapshot_dir:
+    type: variable
+    actions: [read]
+    params:
+      caller: [Path]
+  timestep_file:
+    type: variable
+    actions: [read]
+    params:
+      caller: [open, json.load]
+      alias: [f]
+  wf_dir:
+    type: variable
+    actions: [write]
+    params:
+      caller: [wf_dir.mkdir]
