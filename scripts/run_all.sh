@@ -13,12 +13,9 @@
 #
 # Benchmark choice (first argument or BENCHMARK=...):
 #   original (default): the 3 scenarios above x cot, random, assign_all, from examples/end_to_end_examples
-#   team: the team-membership variants in examples/end_to_end_examples_team (legal_m_and_a) x cot, random.
-#         assign_all is excluded there (docs/team_non_stationarity/index.md). Runs are labelled
-#         <workflow>_team, so they never overwrite the original runs.
 #
 # Usage:
-#   OPENAI_API_KEY=sk-... ./scripts/run_all.sh [original|team]
+#   OPENAI_API_KEY=sk-... ./scripts/run_all.sh [original]
 # or populate .env at repo root with OPENAI_API_KEY=... beforehand.
 
 set -euo pipefail
@@ -29,8 +26,7 @@ cd "$REPO_ROOT"
 BENCHMARK="${1:-${BENCHMARK:-original}}"
 case "$BENCHMARK" in
   original) WORKFLOWS=(legal_m_and_a marketing_campaign orsa); MODES=(cot random assign_all); LABEL_SUFFIX="" ;;
-  team)     WORKFLOWS=(legal_m_and_a);                         MODES=(cot random);            LABEL_SUFFIX="_team" ;;
-  *) echo "BENCHMARK must be 'original' or 'team', got '$BENCHMARK'" >&2; exit 1 ;;
+  *) echo "BENCHMARK must be 'original' (no team scenarios remain), got '$BENCHMARK'" >&2; exit 1 ;;
 esac
 MODEL_NAME="gpt-5-mini"
 SEED=42
@@ -52,7 +48,7 @@ fi
 
 for mode in "${MODES[@]}"; do
   for wf in "${WORKFLOWS[@]}"; do
-    echo "==== benchmark=$BENCHMARK workflow=$wf manager_mode=$mode model=$MODEL_NAME seed=$SEED ===="
+    echo "==== workflow=$wf manager_mode=$mode model=$MODEL_NAME seed=$SEED ===="
     RUN_DIR="$OUT_ROOT/$mode/${wf}${LABEL_SUFFIX}/run_seed_$SEED"
     if [[ -d "$RUN_DIR" ]]; then
       echo "Clearing existing run directory: $RUN_DIR"
@@ -60,7 +56,6 @@ for mode in "${MODES[@]}"; do
     fi
     LOG_FILE="$OUT_ROOT/logs/${wf}${LABEL_SUFFIX}__${mode}.log"
     uv run python examples/run_examples.py \
-      --benchmark "$BENCHMARK" \
       --workflow_name "$wf" \
       --manager-agent-mode "$mode" \
       --model-name "$MODEL_NAME" \
@@ -73,4 +68,4 @@ done
 
 echo
 echo "All $(( ${#WORKFLOWS[@]} * ${#MODES[@]} )) runs complete. Outputs under: $OUT_ROOT/<manager_mode>/<workflow_name>/run_<timestamp>/"
-echo "Next: scripts/eval.sh $BENCHMARK"
+echo "Next: scripts/eval.sh"

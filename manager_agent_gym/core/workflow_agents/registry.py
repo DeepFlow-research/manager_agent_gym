@@ -44,9 +44,6 @@ class AgentRegistry:
         # Optional: simple built-in scheduler for adding/removing agents at timesteps
         self._scheduled_changes: dict[int, list[ScheduledAgentChange]] = {}
         self._executed_change_timesteps: set[int] = set()
-        # Every applied join/leave with its public profile (a leaver's profile is captured
-        # before removal), oldest first. Read by the engine to inform the manager.
-        self.change_log: list[dict] = []
 
     def register_agent_class(
         self, agent_type: str, agent_class: Type[AgentInterface]
@@ -214,25 +211,6 @@ class AgentRegistry:
         )
         self._scheduled_changes.setdefault(timestep, []).append(change)
 
-    def _log_change(
-        self,
-        timestep: int,
-        action: str,
-        config: "AIAgentConfig | HumanAgentConfig | AgentConfig | None",
-        reason: str,
-        agent_id: str | None = None,
-    ) -> None:
-        self.change_log.append(
-            {
-                "timestep": timestep,
-                "action": action,
-                "agent_id": config.agent_id if config is not None else agent_id or "",
-                "description": getattr(config, "agent_description", "") or "",
-                "capabilities": list(getattr(config, "agent_capabilities", []) or []),
-                "reason": reason,
-            }
-        )
-
     def apply_scheduled_changes_for_timestep(
         self,
         timestep: int,
@@ -277,14 +255,10 @@ class AgentRegistry:
                         agent.communication_service = communication_service
 
                 changes.append(f"Added {change.agent_config.agent_id}: {change.reason}")
-                self._log_change(timestep, "joined", change.agent_config, change.reason)
 
             elif change.action == "remove" and change.agent_id is not None:
-                leaving = self.get_agent(change.agent_id)
-                leaving_config = leaving.config if leaving is not None else None
                 removed = self.remove_agent(change.agent_id)
                 if removed:
-                    self._log_change(timestep, "left", leaving_config, change.reason, change.agent_id)
                     changes.append(f"Removed {change.agent_id}: {change.reason}")
                 else:
                     changes.append(

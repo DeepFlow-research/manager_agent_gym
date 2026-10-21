@@ -6,6 +6,7 @@ from typing import TypeVar, Type, Any
 import os
 from pydantic import BaseModel
 from .logging import logger
+from .usage import record_usage
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -166,6 +167,7 @@ async def generate_structured_response(
             max_retries=max_retries,
             **kwargs,
         )
+        record_usage(model, result)  # no-op unless a UsageTracker is installed
         return result
 
     except Exception as e:

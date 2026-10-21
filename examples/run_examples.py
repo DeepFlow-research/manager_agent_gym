@@ -1,9 +1,7 @@
 # pyright: reportMissingImports=false, reportMissingTypeStubs=false
 """
 Unified example runner that loads workflow, preferences, and team timeline
-from per-scenario modules under examples/end_to_end_examples/<workflow_name>/
-(--benchmark original) or examples/end_to_end_examples_team/<workflow_name>/ (--benchmark team;
-outputs go under the label <workflow_name>_team).
+from per-scenario modules under examples/end_to_end_examples/<workflow_name>/.
 """
 
 # ruff: noqa: E402
@@ -49,26 +47,34 @@ from manager_agent_gym.core.evaluation.common_evaluators import build_default_ev
 from manager_agent_gym.schemas.workflow_agents import AgentConfig
 from manager_agent_gym.schemas.preferences.rubric import RunCondition
 
-from examples.scenarios import get_scenario, base_scenario_name, TEAM_SUFFIX
+from examples.scenarios import SCENARIOS
 
 
 def create_workflow(name: str) -> Workflow:
-    return get_scenario(name).create_workflow()
+    if name not in SCENARIOS:
+        raise ValueError(f"Unknown workflow: {name}")
+    return SCENARIOS[name].create_workflow()
 
 
 def create_preferences(name: str) -> PreferenceWeights:
-    return get_scenario(name).create_preferences()
+    if name not in SCENARIOS:
+        raise ValueError(f"Unknown preferences: {name}")
+    return SCENARIOS[name].create_preferences()
 
 
 def create_team_timeline(name: str) -> dict[int, list]:
-    return get_scenario(name).create_team_timeline()
+    if name not in SCENARIOS:
+        raise ValueError(f"Unknown team timeline: {name}")
+    return SCENARIOS[name].create_team_timeline()
 
 
 def create_evaluator_to_measure_goal_achievement(name: str) -> Evaluator:
-    factory = get_scenario(name).create_evaluator_to_measure_goal_achievement
-    if not factory:
+    if name not in SCENARIOS:
+        raise ValueError(f"Unknown evaluator: {name}")
+    if not SCENARIOS[name].create_evaluator_to_measure_goal_achievement:
         raise ValueError(f"No evaluator to measure goal achievement for {name}")
-    return factory()
+
+    return SCENARIOS[name].create_evaluator_to_measure_goal_achievement() #type: ignore
 
 
 async def run_demo(
@@ -155,8 +161,8 @@ async def run_demo(
     stakeholder = create_stakeholder_agent(persona="balanced", preferences=preferences)
 
     # Apply scenario-defined preference dynamics (if provided)
-    spec = get_scenario(workflow_name)
-    if spec.create_preference_update_requests:
+    spec = SCENARIOS.get(workflow_name)
+    if spec and spec.create_preference_update_requests:
         stakeholder.apply_weight_updates(spec.create_preference_update_requests())
 
     max_steps = int(max_timesteps or settings.resolve_max_timesteps(fallback=50))
@@ -174,7 +180,7 @@ async def run_demo(
     )
 
     # Add scenario hard constraints (if any)
-    scenario_constraints = build_constraints_for_scenario(base_scenario_name(workflow_name))
+    scenario_constraints = build_constraints_for_scenario(workflow_name)
     if scenario_constraints is not None:
         default_evaluators.append(scenario_constraints)
 
@@ -191,12 +197,6 @@ async def run_demo(
         timestep_end_callbacks=default_timestep_callbacks(),
         evaluations=default_evaluators,
         seed=seed,
-        # Team benchmark: metrics are deterministic checklists, so no LLM-judge rubrics.
-        skip_llm_judge=workflow_name.endswith(TEAM_SUFFIX),
-        # Team benchmark: the manager is told about roster changes and failed actions.
-        team_awareness=workflow_name.endswith(TEAM_SUFFIX),
-        # Team benchmark: reassigning a running task restarts it with the new agent.
-        restart_on_reassign=workflow_name.endswith(TEAM_SUFFIX),
     )
     print("   ✅ Engine configured")
 
@@ -317,13 +317,6 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Run an end-to-end example workflow")
     parser.add_argument("--workflow_name", required=True)
-    parser.add_argument(
-        "--benchmark",
-        choices=["original", "team"],
-        default="original",
-        help="original: examples/end_to_end_examples; team: the team-membership variant in "
-        "examples/end_to_end_examples_team (runs are labelled <workflow>_team)",
-    )
     parser.add_argument("--offline-run-dir", dest="offline_run_dir", default=None)
     parser.add_argument("--max-timesteps", dest="max_timesteps", type=int, default=None)
     parser.add_argument("--model-name", dest="model_name", default="gpt-5-mini")
@@ -357,8 +350,6 @@ if __name__ == "__main__":
         help="Number of random seeds to run sequentially (seed, seed+1, ...).",
     )
     args = parser.parse_args()
-    if args.benchmark == "team" and not args.workflow_name.endswith(TEAM_SUFFIX):
-        args.workflow_name += TEAM_SUFFIX
 
     async def _run_multi_seed() -> None:
         base_seed = int(args.seed)

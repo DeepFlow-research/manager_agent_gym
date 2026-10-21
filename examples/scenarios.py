@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib
 from typing import Callable
 from pydantic import BaseModel, ConfigDict
 
@@ -330,41 +329,8 @@ SCENARIOS: dict[str, ScenarioSpec] = {
 }
 
 
-# Team-membership variants live in examples/end_to_end_examples_team/<name>/ and are addressed by the
-# label "<name>_team" (also the output directory name, so they never overwrite the original runs).
-TEAM_SUFFIX = "_team"
-TEAM_PACKAGE = "examples.end_to_end_examples_team"
-
-
-def base_scenario_name(name: str) -> str:
-    """`legal_m_and_a_team` -> `legal_m_and_a`; other names unchanged."""
-    return name[: -len(TEAM_SUFFIX)] if name.endswith(TEAM_SUFFIX) else name
-
-
-def _load_team_scenario(name: str) -> ScenarioSpec:
-    try:
-        mod = importlib.import_module(f"{TEAM_PACKAGE}.{name}")
-    except ModuleNotFoundError as e:
-        raise ValueError(f"No team scenario '{name}' under examples/end_to_end_examples_team/ ({e})") from e
-    update = next(
-        (getattr(mod, n) for n in dir(mod) if n.startswith("create_") and n.endswith("preference_update_requests")),
-        None,
-    )
-    return ScenarioSpec(
-        create_workflow=mod.create_workflow,
-        create_preferences=mod.create_preferences,
-        create_team_timeline=mod.create_team_timeline,
-        create_preference_update_requests=update,
-        create_evaluator_to_measure_goal_achievement=getattr(
-            mod, "create_evaluator_to_measure_goal_achievement", None
-        ),
-    )
-
-
 def get_scenario(name: str) -> ScenarioSpec:
-    """The original scenario for `name`, or the team variant for `<name>_team`."""
-    if name.endswith(TEAM_SUFFIX):
-        return _load_team_scenario(base_scenario_name(name))
+    """The scenario spec for `name` (used by the dashboard analysis)."""
     if name not in SCENARIOS:
         raise ValueError(f"Unknown workflow: {name}")
     return SCENARIOS[name]

@@ -19,8 +19,8 @@ from manager_agent_gym.core.evaluation.task_requirements_evaluator import flatte
 from .data import REPO_ROOT
 
 # Scenario collections, in the order they are offered. `end_to_end_examples` holds the
-# originals; `end_to_end_examples_team` holds the team-membership non-stationarity variants.
-SCENARIO_ROOTS = ["end_to_end_examples", "end_to_end_examples_team"]
+# originals; `specialist_loss` holds the team-membership non-stationarity variants.
+SCENARIO_ROOTS = ["end_to_end_examples", "specialist_loss"]
 
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))

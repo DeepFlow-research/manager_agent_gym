@@ -1,43 +1,75 @@
 # CLAUDE.md
 
-## Keep UPDATES.md in sync
+## Project: adaptive replanning for manager agents under unexpected external team changes
 
-`UPDATES.md` (repo root) is the running record of changes made for team-membership
-non-stationarity, as three tables: **Manager agent**, **Benchmark**, **Metric**.
+Direction is set by `research/Project Proposal.pdf`; the specification of record is `research/decisions.md` (D15 to D19). Summary:
 
-Whenever you add, change, or remove an update — code, scripts, dashboard, docs, or a revert —
-edit `UPDATES.md` in the same turn, before reporting the work as done:
+- **Question:** when an agent becomes unexpectedly unavailable (outage, rate limit, permanent deprecation), when do rule-based approaches suffice, and when is a
+  manager or replanning policy needed? Either outcome is a finding.
+- **Sub-questions:** (1) does telling the manager in its prompt suffice, or does an explicit continue/repair/replan policy improve recovery; (2) how does recovery
+  change with the share of affected tasks that have an equivalent remaining agent (none to all); (3) at what cost (tokens, time, unnecessary reassignments).
+- **Contributions:** a benchmark whose change processes are grounded in public incident and release records; possibly a continue/repair/replan policy manager.
+- **Fixed:** task goals and requirements, accurately declared capabilities. **Varied:** change type and duration, substitute availability, what the manager is told
+  (unannounced signals; informed as the upper bound), workflow size and depth. **Out of scope:** error recovery, task and preference drift, changing requirements, joins,
+  deployment-performance claims. Specialised agents are an assumption, not a claim about industry practice.
+- **Benchmarks are grounded in real-world scenarios** (documented deployments, public incident and release records), not MA-Gym's example workflows (`decisions.md` D20). The experiment types are in `research/preregistration.md` (E0 to E7).
+- The earlier join/leave "team non-stationarity" direction is **removed**.
 
-- **Added** an update: add a row to the table for the component it belongs to. If it touches
-  several components, add a row to each.
-- **Removed or reverted** an update: delete its row, or change its status. Do not leave a row
-  describing something that no longer exists.
-- **Planned work that gets built**: change its status from `Planned` to `Done`.
-- Each row has: Update, Files, Purpose, Status (`Done` or `Planned`). Link files that exist.
-- Which table: changes to how the manager is run, informed, or compared go in **Manager agent**;
-  scenarios, tasks, workers, and checklists go in **Benchmark**; scoring, evaluators, and
-  analysis and dashboard reporting go in **Metric**.
+Three components, each with one home. Do not create a fourth place for any of them.
 
-Verify a row against the working tree (`git diff`, or the file itself) before writing it.
+| Component | Code | Converted data | Docs | UPDATES.md table |
+|---|---|---|---|---|
+| **Benchmark**: scenarios, events, workers, checklists | `manager_agent_gym/specialist_loss/` (`events`, `engine`, `worker`, `scenario`, `family`) | `examples/specialist_loss/<workflow>/` | `research/decisions.md` | Benchmark |
+| **Metric**: scoring, analysis, validation | `specialist_loss/scoring.py`, `analysis.py`, `thresholds.py`; `tests/specialist_loss/` | n/a | `research/preregistration.md` | Metric |
+| **Manager agent**: how it is run, informed, compared | `specialist_loss/managers.py`, `runner.py`, `phase2_stub.py`; the notice block in `structured_manager.py` | n/a | `research/decisions.md` | Manager agent |
 
-## Dashboard
+Status (2026-10-21): the first Phase 1 implementation (benchmark, metrics, baselines, validation) is **no longer in the working tree**; `decisions.md` and `preregistration.md`
+keep its design as the specification, and `decisions.md` D17 lists how it falls short of the proposal. Every path below is the planned layout until it is rebuilt; check that a file
+exists before relying on it, and do not write benchmark code unless asked. The LLM diagnostic waits for the
+user's "go" (then write `research/diagnostic_report.md` and stop again). Phase 2 (the LLM manager) is a stub until the user confirms the verdict.
 
-`dashboard/` is the React + FastAPI eval app (`scripts/launch_dashboard.sh`). It only reads
-existing files under `dashboard/outputs/` (override with `$MAG_OUTPUTS_DIR`) and scenario `workflow.py` files, so it is safe to run.
-Keep `dashboard/FEATURES.md` in sync the same way as `UPDATES.md`: add, change, or remove a row
-whenever a feature is added, changed, or removed.
+## Where things live
 
-## Team benchmark skill
+- **Benchmarks are saved in `examples/specialist_loss/<workflow>/`**, in the original MA-Gym layout (`workflow.py`, `team.py`,
+  `team_change_spec.py`, `preferences.py`, `__init__.py`, `CONVERSION.md`), loaded by `examples.scenarios.get_scenario("<workflow>_team")`.
+  Variants are factory arguments: `create_team_change_spec(roster, event_type, timing)`. Nothing converted goes anywhere else.
+- Each package's `.conversion/` holds the LLM conversion cache (`family.json`, `llm_cache/`, `log.json`). The package files are **generated** from it
+  by `scripts/specialist_loss/generate_packages.py`: never hand-edit them; change the conversion or the generator and regenerate.
+- `research/decisions.md` (design decisions and Step 0 findings) and `research/preregistration.md` (thresholds, grid, decision rule) are the only
+  docs for this work. **Edit them; do not add new documents.** Record a new decision as a new `D<n>` in `decisions.md`.
+- **All project specs and research notes live in `research/`** (the proposal, `decisions.md`, `preregistration.md`, `problem.md`); `docs/` is the original MA-Gym documentation site. `CLAUDE.md` stays at the repo root because Claude Code only loads it from there.
+- Commands: `DEV.md`. Running record of changes: `UPDATES.md`. Dashboard features: `dashboard/FEATURES.md`.
 
-`/create-team-benchmark <workflow>` (or `scripts/create_team_benchmark.sh`) converts a workflow into
-its team-membership variant from `docs/team_non_stationarity/benchmark.md`. It calls Claude only, never
-the OpenAI API, and it never runs `run.sh`, `run_all.sh` or `run_examples.py`. Gate validation
-(`scripts/team_benchmark.py gate-run`, Claude plays each worker on each affected task) is deferred
-because of its cost: the skill sets `correct_agents` by judgment, and `gate-run` refuses without
-`--enable`. On an existing scenario the skill updates in place: `scripts/team_benchmark.py diff` shows
-what changed in its inputs since it was stamped, and the skill edits only what that affects
-(`--rebuild` deletes and recreates it from scratch, with a backup in the temp directory). Prefer
-changing `benchmark.md` or the skill and running the update over hand-editing a generated scenario;
-a hand edit leaves `CONVERSION.md` and the stamp out of step unless you also update them. If you edit
-the skill, `benchmark.md` or `metrics.md`, tell the user which scenarios
-`scripts/create_team_benchmark.sh --status` now reports as stale.
+## Keep things in step (maintenance)
+
+- **`UPDATES.md`**: whenever you add, change or remove an update (code, scripts, docs, dashboard, a revert), edit it in the same turn, before
+  reporting the work done. Three tables: **Manager agent**, **Benchmark**, **Metric** (rows marked "Specialist loss" are the current direction; unmarked
+  rows are the shelved join/leave work). Each row: Update, Files (link files that exist), Purpose, Status (`Done` or `Planned`). Removed work: delete the
+  row. Built planned work: `Planned` to `Done`. Verify a row against the working tree (`git diff`) before writing it.
+- **Thresholds have one source**: `specialist_loss/thresholds.py`, mirrored in `research/preregistration.md`; `tests/specialist_loss/test_preregistration.py`
+  fails if they disagree. Change both, and add a dated amendment to the preregistration after the go.
+- **Shared MA-Gym code is edited only additively**, with the new path inert by default, so existing managers and benchmarks behave as before.
+  Prove it with a test (`test_new_hooks_are_inert_by_default`) and keep the whole suite green: `uv run pytest tests -q`.
+- A failing scenario gate (`tests/specialist_loss/test_validation.py`) means the **scenario** is broken, not the manager: fix or drop the scenario.
+- Dashboard: `dashboard/` only reads existing files under `dashboard/outputs/` (override `$MAG_OUTPUTS_DIR`). Keep `dashboard/FEATURES.md` in
+  sync the same way as `UPDATES.md`.
+
+## Never spend money without an explicit ask in the user's current message
+
+Not `scripts/specialist_loss/run_grid.py --enable-llm`, not `scripts/specialist_loss/convert_workflows.py` (cheap OpenAI calls), not `scripts/run.sh`,
+`scripts/run_all.sh` or `examples/run_examples.py`. Scripted and rule-based managers, tests, the analysis script and `estimate_cost.py` are free.
+`runner.build_manager` refuses `cot` and `assign_all` unless `allow_llm=True`; tests mock the model.
+
+## Claude skill and agent
+
+- `/create-benchmark <workflow>` (or `scripts/create_benchmark.sh`): converts a workflow into its adaptive-replanning package (dry-run, convert on
+  request, generate, validate, `UPDATES.md` row). It never runs an LLM manager and does not edit the preregistered grid
+  (`WORKFLOWS` in `specialist_loss/family.py`): adding a workflow changes the preregistration, so the user decides.
+- `problem-checker` agent: fact-checks `research/problem.md` against prior work and, if `research/inputs.md` exists, the preregistration and
+  diagnostic report. Keep its input paths current if those docs move.
+- If you change the skill, the agent, `decisions.md` or `preregistration.md`, say which other files now disagree.
+
+## Removed: team-membership (join/leave) benchmark
+
+The join/leave scenario, its docs, roster-change log, static-roster loader and `create-team-benchmark` tooling were removed (2026-10-21). The code is otherwise upstream MA-Gym plus: the ML-050/052/053 fixes, task checklists
+(`TaskRequirement`) with the post-change and disruption metrics, a no-LLM-judge option, a manager context log, and the dashboard and run scripts. Ask before adding back anything join/leave.

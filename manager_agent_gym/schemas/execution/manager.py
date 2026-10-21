@@ -13,15 +13,23 @@ from ...schemas.workflow_agents.stakeholder import StakeholderPublicProfile
 from ...schemas.workflow_agents.config import AgentConfig
 
 
-class RosterChange(BaseModel):
-    """One worker joining or leaving the team, as shown to the manager (public information only)."""
+class AvailabilityNotice(BaseModel):
+    """An outage or rate limit on one worker, as shown to the manager (specialist-loss benchmark).
 
-    timestep: int = Field(..., description="Timestep at which the change took effect")
-    action: Literal["joined", "left"]
+    Public information only: it names the worker and the effect, never a task or a substitute.
+    """
+
+    timestep: int = Field(..., description="Timestep at which the event took effect")
     agent_id: str
-    description: str = Field(default="", description="Public agent description")
-    capabilities: list[str] = Field(default_factory=list, description="Public capabilities")
-    reason: str = Field(default="", description="Scaling reason; never names a task")
+    kind: Literal["outage", "rate_limit"]
+    status: Literal["unavailable", "recovered"] = Field(
+        ..., description="unavailable: in effect now; recovered: the worker is available again"
+    )
+    reset_timestep: int | None = Field(
+        default=None,
+        description="Timestep at which the worker is available again; None if not before the run ends",
+    )
+    message: str = Field(default="", description="Human-readable statement of the effect")
 
 
 class RunningTaskInfo(BaseModel):
@@ -103,9 +111,9 @@ class ManagerObservation(BaseModel):
         default_factory=list,
         description="Running tasks with their worker and start timestep (empty unless team awareness is on)",
     )
-    roster_changes: list[RosterChange] = Field(
+    availability_notices: list[AvailabilityNotice] = Field(
         default_factory=list,
-        description="Joins and leaves after timestep 0, oldest first (empty unless team awareness is on)",
+        description="Outages and rate limits so far, oldest first (empty outside the specialist-loss benchmark)",
     )
 
     stakeholder_profile: StakeholderPublicProfile = Field(

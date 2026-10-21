@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from abc import ABC, abstractmethod
 
 from ...schemas.execution import ManagerObservation
-from ...schemas.execution.manager import RosterChange, RunningTaskInfo
+from ...schemas.execution.manager import AvailabilityNotice, RunningTaskInfo
 from ...schemas.execution.manager_actions import BaseManagerAction, ActionResult
 from ...schemas.preferences.preference import PreferenceWeights
 from ...schemas.core.base import TaskStatus
@@ -57,13 +57,14 @@ class ManagerAgent(ABC):
         self._max_timesteps: int | None = None
         # Seed configured by engine (if any)
         self._seed: int = 42
-        # Team-membership benchmark: set by the engine. When on, observations carry the roster
-        # changes (joins and leaves after timestep 0) and managers that support it use them.
+        # Set by the engine. When on, observations carry the running tasks and the manager's history
+        # shows the cause of failed actions.
         self.team_awareness: bool = False
         # Prompts of the last decision ({"model", "system_prompt", "user_prompt"}); the engine
         # clears it before each step and writes it, with the action, to the manager context log.
         self.last_trace: dict[str, str] | None = None
-        self._roster_changes: list[RosterChange] = []
+        # Specialist-loss benchmark: outages and rate limits so far, set by the engine each step.
+        self._availability_notices: list[AvailabilityNotice] = []
 
     def configure_seed(self, seed: int) -> None:
         """Configure deterministic seed for this manager (overridable)."""
@@ -89,8 +90,8 @@ class ManagerAgent(ABC):
     def set_team_awareness(self, enabled: bool) -> None:
         self.team_awareness = bool(enabled)
 
-    def set_roster_changes(self, changes: list[RosterChange]) -> None:
-        self._roster_changes = list(changes)
+    def set_availability_notices(self, notices: list[AvailabilityNotice]) -> None:
+        self._availability_notices = list(notices)
 
     async def create_observation(
         self,
@@ -162,7 +163,6 @@ class ManagerAgent(ABC):
             completed_task_ids=list(completed_task_ids),
             failed_task_ids=list(failed_task_ids),
             available_agent_metadata=[agent.config for agent in available_agents],
-            roster_changes=list(self._roster_changes) if self.team_awareness else [],
             running_task_info=[
                 RunningTaskInfo(
                     task_id=tid,
@@ -186,6 +186,7 @@ class ManagerAgent(ABC):
             task_ids=list(workflow.tasks.keys()),
             resource_ids=list(workflow.resources.keys()),
             agent_ids=list(workflow.agents.keys()),
+            availability_notices=list(self._availability_notices),
             stakeholder_profile=stakeholder_profile,
         )
 

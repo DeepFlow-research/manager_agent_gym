@@ -95,6 +95,11 @@ class Workflow(BaseModel):
     # behaviour, where assign only overwrites `assigned_agent_id` and always reports success.
     strict_assignment: bool = Field(default=False)
 
+    # Specialist-loss benchmark: agents that are currently unavailable (outage or rate limit) mapped
+    # to the reason shown to the manager when it tries to assign to them. Empty in every other
+    # benchmark, so assignment behaves exactly as before.
+    unavailable_agents: dict[str, str] = Field(default_factory=dict)
+
     # Metrics for evaluation
     total_cost: float = Field(
         default=0.0, description="Cumulative actual cost reported by agents"

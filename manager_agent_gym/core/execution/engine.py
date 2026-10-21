@@ -40,7 +40,6 @@ from ...schemas.preferences.preference import (
     Preference,
 )
 from ...schemas.preferences.rubric import RunCondition
-from ...schemas.execution.manager import RosterChange
 
 # from ...schemas.evaluation.workflow_quality import CoordinationDeadtimeMetrics
 from ..communication.service import CommunicationService
@@ -420,15 +419,6 @@ class WorkflowExecutionEngine:
         timestep = self.current_timestep
 
         agent_coordination_changes = self._check_and_apply_agent_changes()
-        if self.team_awareness and self.manager_agent:
-            self.manager_agent.set_roster_changes(
-                [
-                    RosterChange(**c)
-                    for c in self.agent_registry.change_log
-                    if c["timestep"] > 0
-                ]
-            )
-
         manager_action = None
         if self.manager_agent:
             self.execution_state = ExecutionState.WAITING_FOR_MANAGER
@@ -771,7 +761,7 @@ class WorkflowExecutionEngine:
                 if task.assigned_agent_id:
                     agent = self.workflow.agents.get(task.assigned_agent_id)
 
-                if agent:
+                if agent and self._can_start(task, agent):
                     # Get task resources
                     resources = self._get_task_resources(task)
 
@@ -790,6 +780,11 @@ class WorkflowExecutionEngine:
                     tasks_started.append(task.id)
 
         return tasks_started, tasks_completed, tasks_failed
+
+    def _can_start(self, task: Task, agent: AgentInterface) -> bool:
+        """Hook: whether a ready, assigned task may start now. Always True here; the
+        specialist-loss engine holds tasks whose agent is in an outage or rate limit."""
+        return True
 
     async def _restart_reassigned_tasks(self) -> None:
         """Cancel the run of every RUNNING task the manager reassigned and return it to READY.

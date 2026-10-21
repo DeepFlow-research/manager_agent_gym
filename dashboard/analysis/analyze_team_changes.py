@@ -10,7 +10,7 @@ For each (workflow, manager mode) it computes post-change score, baseline score,
 disruption cost, prints a comparison table, and writes team_change_metrics.json into the
 run directory (read by the dashboard's Metrics page).
 
-A scenario opts in by providing, under examples/end_to_end_examples_team/<workflow>/:
+A scenario opts in by providing, under examples/specialist_loss/<workflow>/:
   - team_change_spec.py exposing create_team_change_spec() -> TeamChangeSpec
   - workflow.py exposing create_workflow(), whose tasks carry `requirements`
     (TaskRequirement with a `pattern`) for every affected task
@@ -44,9 +44,8 @@ from manager_agent_gym.core.evaluation.team_change_metrics import (  # noqa: E40
 )
 from manager_agent_gym.schemas.core.tasks import TaskRequirement  # noqa: E402
 
-from examples.scenarios import base_scenario_name  # noqa: E402
 
-SCENARIO_PACKAGE = "examples.end_to_end_examples_team"
+SCENARIO_PACKAGE = "examples.specialist_loss"
 OUTPUT_NAME = "team_change_metrics.json"
 # Managers benchmarked for this focus; assign_all is excluded (docs/team_non_stationarity/index.md).
 DEFAULT_MODES = ["cot", "random"]
@@ -55,7 +54,7 @@ DEFAULT_MODES = ["cot", "random"]
 def load_scenario(workflow: str) -> tuple[TeamChangeSpec, dict[str, list[TaskRequirement]]]:
     """Import the scenario's spec and its tasks' checklists (by task name).
     `workflow` may be the run label (`legal_m_and_a_team`) or the scenario name."""
-    workflow = base_scenario_name(workflow)
+    workflow = workflow.removesuffix('_team_static').removesuffix('_team')
     try:
         spec_mod = importlib.import_module(f"{SCENARIO_PACKAGE}.{workflow}.team_change_spec")
     except ModuleNotFoundError as e:

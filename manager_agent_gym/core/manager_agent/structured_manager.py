@@ -311,38 +311,21 @@ class ChainOfThoughtManagerAgent(ManagerAgent):
                 lines.append(f"- (+{extra} more running)")
             running_block = "\n### Running Tasks\n" + "\n".join(lines) + "\n"
 
-        # Roster changes (team-membership benchmark only): every join and leave so far
-        roster_block = ""
-        if self.team_awareness and observation.roster_changes:
-            lines: list[str] = []
-            for c in sorted(
-                observation.roster_changes, key=lambda c: c.timestep, reverse=True
-            ):
-                new = "[NEW] " if c.timestep == observation.timestep else ""
-                verb = (
-                    "JOINED"
-                    if c.action == "joined"
-                    else "LEFT (no longer assignable)"
-                )
-                caps = "; ".join(c.capabilities) or "none listed"
-                line = f"- {new}t={c.timestep} {verb} {c.agent_id} — {c.description} | capabilities: {caps}"
-                if c.reason:
-                    line += f" | reason: {c.reason}"
-                lines.append(line)
-            roster_block = (
-                "\n### Roster Changes (all joins and leaves so far, newest first)\n"
+        # Outages and rate limits (specialist-loss benchmark only): empty list renders nothing
+        availability_block = ""
+        if observation.availability_notices:
+            lines = []
+            for n in sorted(observation.availability_notices, key=lambda n: n.timestep, reverse=True):
+                new = "[NEW] " if n.timestep == observation.timestep else ""
+                state = "UNAVAILABLE" if n.status == "unavailable" else "AVAILABLE AGAIN"
+                lines.append(f"- {new}t={n.timestep} {n.agent_id} {state} — {n.message}")
+            availability_block = (
+                "\n### Worker Availability (outages and rate limits so far, newest first)\n"
                 + "\n".join(lines)
+                + "\nAn assignment to an unavailable worker is rejected. Reassigning a RUNNING task to a different "
+                "agent cancels its current run and restarts it from scratch with the new agent; COMPLETED, FAILED "
+                "and composite tasks cannot be reassigned.\n"
             )
-            if any(c.timestep == observation.timestep for c in observation.roster_changes):
-                roster_block += (
-                    "\nThe roster changed; re-evaluate unassigned and pending work against the "
-                    "current roster, and leave assignments that remain well-suited."
-                )
-            roster_block += (
-                "\nReassigning a RUNNING task to a different agent cancels its current run and restarts "
-                "it from scratch with the new agent; COMPLETED, FAILED and composite tasks cannot be reassigned."
-            )
-            roster_block += "\n"
 
         # Valid ID universes (helps the model avoid fabricating IDs)
         id_guidance_lines = [
@@ -404,7 +387,7 @@ class ChainOfThoughtManagerAgent(ManagerAgent):
 
 ### Manager Action History (recent)
 {actions_block}
-{running_block}{roster_block}
+{running_block}{availability_block}
 ### Stakeholder Profile (public)
 {stakeholder_block}
 """

@@ -116,7 +116,10 @@ def apply_assignment(workflow: "Workflow", task: "Task", agent_id: str) -> tuple
 
     outcome is "assigned", "restarted" (a RUNNING task handed to another agent), "unchanged" or
     "rejected". Without `workflow.strict_assignment` this is the legacy behaviour: always "assigned".
+    An agent in `workflow.unavailable_agents` (specialist-loss benchmark) is always rejected.
     """
+    if agent_id in workflow.unavailable_agents:
+        return "rejected", workflow.unavailable_agents[agent_id]
     if not workflow.strict_assignment:
         task.assigned_agent_id = agent_id
         return "assigned", ""
@@ -256,6 +259,18 @@ class AssignAllPendingTasksAction(BaseManagerAction):
                 )
             # Pick any agent deterministically for reproducibility
             target_agent_id = next(iter(workflow.agents.keys()))
+
+        if target_agent_id in workflow.unavailable_agents:
+            reason = workflow.unavailable_agents[target_agent_id]
+            self.success = False
+            self.result_summary = f"Failed: no tasks assigned: {reason}"
+            return ActionResult(
+                summary=self.result_summary,
+                kind="failed_action",
+                data={},
+                action_type=self.action_type,
+                success=False,
+            )
 
         assigned_count = 0
         for task in workflow.tasks.values():

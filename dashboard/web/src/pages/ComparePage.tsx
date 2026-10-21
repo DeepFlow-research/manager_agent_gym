@@ -28,7 +28,7 @@ export default function ComparePage() {
   // Default: the first team-variant scenario against its original of the same name.
   useEffect(() => {
     if (!list.length || before) return;
-    const team = list.find((s) => s.collection === "end_to_end_examples_team");
+    const team = list.find((s) => s.collection === "specialist_loss");
     const base = team ?? list.find((s) => s.name === "legal_m_and_a") ?? list[0];
     const original = list.find((s) => s.collection === "end_to_end_examples" && s.name === base.name) ?? base;
     setParams(
